@@ -21,11 +21,11 @@ export default async (req, context) => {
   }
 
   try {
-    console.log("Starting fast vote sync batch...");
+    console.log("Starting vote sync batch...");
 
-    // Reduced limit to 3 bills to prevent Netlify execution timeout
+    // Increased limit to 15 to ensure we capture valid policy areas
     const congressRes = await fetch(
-      `https://api.congress.gov/v3/house-vote?api_key=${CONGRESS_API_KEY}&limit=3`
+      `https://api.congress.gov/v3/house-vote?api_key=${CONGRESS_API_KEY}&limit=15`
     );
     
     if (!congressRes.ok) {
@@ -57,24 +57,28 @@ export default async (req, context) => {
       const billRef = db.collection('bills').doc(billId);
       const billSnap = await billRef.get();
       if (billSnap.exists) {
-        continue; // Skip if already processed
+        continue; // Skip if already cached
       }
 
       const billDetailRes = await fetch(
         `https://api.congress.gov/v3/bill/${congress}/${billType}/${billNumber}?api_key=${CONGRESS_API_KEY}`
       );
       
-      if (!billDetailRes.ok) continue;
+      let mappedCategory = 'Economy'; // Default fallback so nothing gets dropped
+      let billTitle = vote.bill.title || `Bill ${billId.toUpperCase()}`;
 
-      const billDetailData = await billDetailRes.json();
-      const billInfo = billDetailData.bill || {};
-      const rawPolicy = billInfo.policyArea?.name || '';
-      const mappedCategory = policyMap[rawPolicy];
+      if (billDetailRes.ok) {
+        const billDetailData = await billDetailRes.json();
+        const billInfo = billDetailData.bill || {};
+        const rawPolicy = billInfo.policyArea?.name || '';
+        if (rawPolicy && policyMap[rawPolicy]) {
+          mappedCategory = policyMap[rawPolicy];
+        }
+        if (billInfo.title) {
+          billTitle = billInfo.title;
+        }
+      }
 
-      if (!mappedCategory) continue; // Skip outside scope
-
-      const billTitle = billInfo.title || vote.bill.title || `Bill ${billId.toUpperCase()}`;
-      
       // Fast AI summary generation
       const aiPrompt = `Summarize the direct practical impacts of this bill on everyday American citizens in exactly 3 short bullet points. Avoid political spin.\n\nTitle: ${billTitle}`;
 
@@ -119,6 +123,9 @@ export default async (req, context) => {
       });
 
       processedCount++;
+      
+      // Stop after successfully processing 3 new bills to keep well clear of timeouts
+      if (processedCount >= 3) break;
     }
 
     return new Response(JSON.stringify({ 
