@@ -1,0 +1,7 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[functions]]
+  name = "sync-votes"
+  schedule = "0 0 * * *"
