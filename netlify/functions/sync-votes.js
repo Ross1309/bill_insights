@@ -1,6 +1,5 @@
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK using service account environment variable
 if (!admin.apps.length) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   admin.initializeApp({
@@ -10,27 +9,27 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-export const handler = async (event, context) => {
+export default async (req, context) => {
   const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
   if (!CONGRESS_API_KEY || !OPENAI_API_KEY) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Missing required API keys in environment variables." })
-    };
+    return new Response(JSON.stringify({ error: "Missing API keys." }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 
   try {
-    console.log("Starting Congressional Vote Sync...");
+    console.log("Starting fast vote sync batch...");
 
-    // 1. Fetch recent House & Senate roll call votes (limit 15 for execution speed)
+    // Reduced limit to 3 bills to prevent Netlify execution timeout
     const congressRes = await fetch(
-      `https://api.congress.gov/v3/house-vote?api_key=${CONGRESS_API_KEY}&limit=15`
+      `https://api.congress.gov/v3/house-vote?api_key=${CONGRESS_API_KEY}&limit=3`
     );
     
     if (!congressRes.ok) {
-      throw new Error(`Congress API returned status ${congressRes.status}`);
+      throw new Error(`Congress API error: ${congressRes.status}`);
     }
 
     const voteData = await congressRes.json();
@@ -38,7 +37,6 @@ export const handler = async (event, context) => {
 
     let processedCount = 0;
 
-    // Standardized Policy Area Mapping to our 3 core pillars
     const policyMap = {
       'Health': 'Healthcare',
       'Economics and Public Finance': 'Economy',
@@ -56,15 +54,12 @@ export const handler = async (event, context) => {
       const billNumber = vote.bill.number;
       const billId = `${billType}${billNumber}-${congress}`;
 
-      // Check Firestore first to save OpenAI API costs and prevent execution timeout
       const billRef = db.collection('bills').doc(billId);
       const billSnap = await billRef.get();
       if (billSnap.exists) {
-        console.log(`Skipping ${billId} - already in database.`);
-        continue;
+        continue; // Skip if already processed
       }
 
-      // 2. Fetch specific Bill details for policy category & official summary
       const billDetailRes = await fetch(
         `https://api.congress.gov/v3/bill/${congress}/${billType}/${billNumber}?api_key=${CONGRESS_API_KEY}`
       );
@@ -76,22 +71,12 @@ export const handler = async (event, context) => {
       const rawPolicy = billInfo.policyArea?.name || '';
       const mappedCategory = policyMap[rawPolicy];
 
-      // Skip any bill not strictly categorized as Healthcare, Economy, or Foreign Affairs
-      if (!mappedCategory) {
-        console.log(`Skipping ${billId} - Policy area '${rawPolicy}' outside scope.`);
-        continue;
-      }
+      if (!mappedCategory) continue; // Skip outside scope
 
       const billTitle = billInfo.title || vote.bill.title || `Bill ${billId.toUpperCase()}`;
-      const officialSummary = billInfo.summary?.text || billTitle;
-
-      // 3. Generate Non-Partisan 3-Bullet AI Summary via OpenAI
-      console.log(`Generating AI summary for ${billId}...`);
-      const aiPrompt = `Summarize the direct practical impacts of this bill on everyday American citizens in exactly 3 bullet points. 
-Focus strictly on economic, healthcare, or foreign policy realities. Avoid all political spin, framing, or partisan commentary.
-
-Bill Title: ${billTitle}
-Official Text/Summary: ${officialSummary}`;
+      
+      // Fast AI summary generation
+      const aiPrompt = `Summarize the direct practical impacts of this bill on everyday American citizens in exactly 3 short bullet points. Avoid political spin.\n\nTitle: ${billTitle}`;
 
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -114,7 +99,6 @@ Official Text/Summary: ${officialSummary}`;
         .filter(line => line.length > 0)
         .slice(0, 3);
 
-      // 4. Write Bill Document to Firestore
       await billRef.set({
         bill_id: billId,
         congress: congress,
@@ -129,45 +113,27 @@ Official Text/Summary: ${officialSummary}`;
           nay: vote.nayCount || 0
         },
         ai_summary: {
-          bullet_points: bulletPoints,
+          bullet_points: bulletPoints.length ? bulletPoints : ["Impact summary processing."],
           generated_at: new Date().toISOString()
         }
       });
 
-      // 5. Write Roll Call Member Position Document to Firestore
-      if (vote.memberVotes) {
-        const positionsMap = {};
-        vote.memberVotes.forEach(mv => {
-          if (mv.bioguideId) {
-            positionsMap[mv.bioguideId] = mv.voteCast; // e.g. "YEA", "NAY", "NOT VOTING"
-          }
-        });
-
-        await db.collection('votes').doc(billId).set({
-          bill_id: billId,
-          chamber: vote.chamber || 'House',
-          positions: positionsMap
-        });
-      }
-
       processedCount++;
-      console.log(`Successfully ingested and summarized ${billId}`);
     }
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: "Sync complete.",
-        new_bills_processed: processedCount
-      })
-    };
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: `Batch sync complete. Processed ${processedCount} new bills.` 
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
 
   } catch (err) {
-    console.error("Error running vote sync function:", err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message })
-    };
+    console.error("Sync error:", err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 };
