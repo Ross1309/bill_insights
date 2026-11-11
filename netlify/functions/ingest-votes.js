@@ -3,6 +3,7 @@ import { getDb, admin } from '../lib/firebase.js';
 import { STATE_CODES } from '../../public/states.js';
 import { fetchLatestSenateVotes } from '../lib/senate-votes.js';
 import { listHouseVotes, buildHouseVoteDoc } from '../lib/house-votes.js';
+import { writeOverviewStats } from '../lib/overview.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -32,8 +33,17 @@ export async function handler(event, context) {
     const failures = results.filter(r => r.status === "rejected").map(r => r.reason?.message || String(r.reason));
     failures.forEach(msg => console.error("Vote sync failed:", msg));
 
+    // 4. Rebuild the Overview tab's precomputed stats (small fields only).
+    try {
+      const stats = await writeOverviewStats(db, admin, { congress: CONGRESS_NUM });
+      console.log(`stats/overview rebuilt from ${stats.votes} votes`);
+    } catch (err) {
+      failures.push(`stats: ${err.message}`);
+      console.error("Stats rebuild failed:", err);
+    }
+
     return {
-      statusCode: failures.length === results.length ? 500 : 200,
+      statusCode: results.every(r => r.status === "rejected") ? 500 : 200,
       body: JSON.stringify({
         message: failures.length ? "Ingested with errors." : "Successfully ingested members and roll-call votes!",
         errors: failures,

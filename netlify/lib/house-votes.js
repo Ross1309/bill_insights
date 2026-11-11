@@ -2,6 +2,8 @@
 // Shared by netlify/functions/ingest-votes.js (latest few) and scripts/import-votes.js
 // (whole-congress backfill).
 
+import { partyBreakdown } from './vote-stats.js';
+
 const API = 'https://api.congress.gov/v3';
 const BILL_TYPES = new Set(['HR', 'S', 'HRES', 'SRES', 'HJRES', 'SJRES', 'HCONRES', 'SCONRES']);
 const TALLY_KEYS = { yea: 'yea', aye: 'yea', nay: 'nay', no: 'nay', present: 'present', 'not voting': 'not_voting' };
@@ -72,6 +74,7 @@ export async function buildHouseVoteDoc(voteItem, congress, apiKey) {
     result: voteItem.result || null,
     tallies,
     individual_votes,
+    party_breakdown: partyBreakdown(individual_votes),
     source_url: voteItem.sourceDataURL || null,
   };
 }

@@ -6,6 +6,8 @@
 // Senators are identified by LIS member id (e.g. "S428"); callers pass a
 // lis -> bioguideId map (from the congress-legislators dataset).
 
+import { partyBreakdown } from './vote-stats.js';
+
 const LIS = 'https://www.senate.gov/legislative/LIS';
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; CongressWatcher/1.0)' };
 const BILL_TYPES = new Set(['HR', 'S', 'HRES', 'SRES', 'HJRES', 'SJRES', 'HCONRES', 'SCONRES']);
@@ -122,6 +124,7 @@ function parseVote(xml, { congress, session, number }, lisToBioguide) {
       result: tag(xml, 'vote_result'),
       tallies,
       individual_votes,
+      party_breakdown: partyBreakdown(individual_votes),
       source_url: `${LIS}/roll_call_votes/vote${congress}${session}/vote_${congress}_${session}_${padded}.htm`,
     },
   };

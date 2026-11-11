@@ -35,12 +35,16 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
 ```
 public/index.html, public/app.js   UI (no build step)
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
+public/overview.js                 Overview tab charts (plain SVG/HTML) from stats/overview
 firestore.indexes.json             Composite indexes the UI's queries need
 netlify/functions/sync-bills.js    Syncs recent bills + AI summaries (was sync-votes.js)
 netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House
                                    and 5 latest Senate roll-call votes
 netlify/lib/senate-votes.js        senate.gov LIS XML -> `votes` docs (menu, vote parse, ET->UTC)
 netlify/lib/house-votes.js         Congress.gov House votes -> `votes` docs (list + build doc)
+netlify/lib/vote-stats.js          party_breakdown, alignment/category/outcome rules, computeOverview
+netlify/lib/overview.js            writeOverviewStats(): rebuild stats/overview (ingest + script)
+scripts/build-stats.js             Rebuild stats/overview [--backfill party_breakdown]
 scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
 scripts/import-bills.js            Backfill the N most recently updated bills (resumable)
 scripts/summarize-bills.js         CRS-based AI summaries for stored bills (resumable)
@@ -71,6 +75,7 @@ node scripts/backfill-bills.js --write [--summaries]
 node scripts/import-votes.js [--write] [--chamber house|senate] [--congress 118] [--limit N]
 node scripts/import-bills.js [--write] [--limit 2000]
 node scripts/summarize-bills.js [--write] [--limit N] [--recheck-days 3]
+node scripts/build-stats.js [--backfill]
 ```
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
@@ -100,6 +105,7 @@ chamber ("House" | "Senate"), congress, session, roll_call_number, date (UTC ISO
 vote_type, result, tallies { yea, nay, present, not_voting } (Aye/No counted as yea/nay),
 individual_votes [{ bioguideId, name, state, party ("R"/"D"/"I"), position }],
 source_url (House Clerk XML / senate.gov vote page), updatedAt
+party_breakdown { D|R|I: { yea, nay, present, not_voting } } (from individual_votes)
 Senate only: document_title (bill title or nomination text), amendment, title,
 individual_votes[].lis_member_id
 ```
@@ -111,9 +117,24 @@ individual_votes[].lis_member_id
   via congress-legislators `id.lis` (100/100 mapped). Times are Eastern, converted to UTC
   with DST. Nominations (`PN`) get `legislation` + `document_title` but no `bill_id`.
 - House and Senate syncs run in parallel and independently (`Promise.allSettled`).
-  A full ingest took ~5s locally; watch Netlify's 10s function limit.
+  A full ingest (members + votes + stats rebuild) took ~6.6s locally; watch Netlify's 10s
+  limit. If it gets close, move the stats rebuild into its own scheduled function.
 - Congress.gov bill action histories lag senate.gov by about a day, so a brand-new Senate
   vote may not be linked from the bill's Actions tab yet.
+
+**`stats/overview`** — single doc (~12 KB), rebuilt by every `ingest-votes.js` run and by
+`scripts/build-stats.js`; read once by the Overview tab
+```
+congress, first_vote_date, last_vote_date, totals { House, Senate },
+weekly [{ week (Monday, ET), House, Senate }] (continuous, zeros = no votes),
+monthly [{ month, House|Senate: { same, opposed, unclear } }],
+alignment_totals { House|Senate: { same, opposed, unclear } },
+outcomes { House|Senate: { passage|cloture|nomination|amendment|procedural|other:
+  { succeeded, failed, other } } },
+delegations { WA: { D, R, I, other, senators, representatives, delegate } },
+votes_without_party_breakdown, generated_at
+```
+Built from `select()`ed small vote fields (needs `party_breakdown` on every vote).
 
 **`members`** — doc id = bioguideId, written by `ingest-votes.js`
 ```
@@ -152,6 +173,30 @@ Pending / known issues:
   parallel and AI summaries are capped at 3 per run.
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
+
+## Overview tab (frontend, default tab)
+
+Four charts in `public/overview.js`, plain SVG/HTML, one Firestore read (`stats/overview`):
+1. **Activity:** roll-call votes per week, House and Senate rows on a shared y scale.
+2. **Party agreement:** monthly 100% columns. "Majorities opposed" = most Democrats and
+   most Republicans voted opposite ways (Yea/Nay only; ties -> "unclear", excluded). The
+   definition is printed under the chart.
+3. **Outcomes:** each question grouped by `voteCategory()` (passage, cloture, nomination,
+   amendment, procedural, other) x `voteOutcome()` (succeeded/failed/other).
+4. **Delegations:** equal-size state tile grid (`TILES`), party segments + counts; tap a
+   state -> Legislators filtered to it. Territories in a strip below.
+
+Every chart has hover/tap tooltips (`data-tip`), printed values, and "View as table".
+Chart colors are deeper "mark" steps (OKLCH L 0.48–0.67, C ≥ 0.10) validated with the
+dataviz palette checker against `#363636`: activity/agreed `#13a5b2`, opposed `#8f68cb`,
+succeeded `#6fa326`, failed `#c04637`, party D `#707ed4` R `#d15b5c` I `#3ba888`. Pastels
+stay for text and badges. Party fills are allowed **only in charts that show no Yea/Nay or
+outcome colors** (the delegation map). Elsewhere the outlined-chip rule still holds.
+Independent is teal in charts (gray fails the chroma floor) but stays gray as a chip.
+
+No leaderboards or member-vs-member rankings (footer promise). Phase 2 ideas: member
+participation + own party-agreement trend in profiles, List/Chart toggles. Phase 3:
+bill-stage funnel (needs stage data), aggregate FEC totals.
 
 ## Visual design (frontend)
 

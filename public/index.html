@@ -68,6 +68,7 @@
 
   <nav class="sticky top-0 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar" role="tablist">
+      <button id="nav-overview" role="tab" class="nav-tab">Overview</button>
       <button id="nav-bills" role="tab" class="nav-tab">Bills &amp; Summaries</button>
       <button id="nav-votes" role="tab" class="nav-tab">Roll-Call Votes</button>
       <button id="nav-members" role="tab" class="nav-tab">Legislators</button>
@@ -76,8 +77,22 @@
 
   <main class="max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8 flex-1">
 
+    <!-- VIEW 0: OVERVIEW -->
+    <section id="view-overview" class="tab-view">
+      <div class="mb-6">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">The big picture</h2>
+        <p class="text-sm text-gray-500">What the official record shows about this Congress at a glance. Every number links back to roll-call votes and member records you can browse.</p>
+      </div>
+      <div id="overview-container" class="min-h-[300px]">
+        <div class="text-center py-12">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <p class="text-gray-500">Loading overview...</p>
+        </div>
+      </div>
+    </section>
+
     <!-- VIEW 1: BILLS & SUMMARIES -->
-    <section id="view-bills" class="tab-view">
+    <section id="view-bills" class="tab-view hidden">
       <div class="mb-6">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Bills &amp; Summaries</h2>
         <p class="text-sm text-gray-500">Recently updated bills from Congress.gov, with plain-language summaries labeled by source.</p>

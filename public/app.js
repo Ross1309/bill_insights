@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebas
 import { getFirestore, collection, doc, getDoc, getDocs, getCountFromServer, query, where, limit, orderBy, startAfter } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 import { STATES, DELEGATE_JURISDICTIONS } from "./states.js";
+import { renderOverview } from "./overview.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyB53n86BTG9co1S8Ek0Acvx4onbzvXQD8Y",
@@ -24,10 +25,12 @@ const searchInput = document.getElementById("search-input");
 const stateSelect = document.getElementById("state-select");
 
 // Tab Navigation Elements
+const navOverview = document.getElementById("nav-overview");
 const navBills = document.getElementById("nav-bills");
 const navVotes = document.getElementById("nav-votes");
 const navMembers = document.getElementById("nav-members");
 
+const viewOverview = document.getElementById("view-overview");
 const viewBills = document.getElementById("view-bills");
 const viewVotes = document.getElementById("view-votes");
 const viewMembers = document.getElementById("view-members");
@@ -37,12 +40,36 @@ let allBills = [];
 // Every bill seen this session, by id (used to label votes with bill titles).
 const billCache = new Map();
 let votesLoaded = false;
+let overviewLoaded = false;
+
+// --- Overview tab: one small precomputed doc (stats/overview) ------------------
+async function loadOverview() {
+  const container = document.getElementById("overview-container");
+  try {
+    const snap = await getDoc(doc(db, "stats", "overview"));
+    if (!snap.exists()) {
+      container.innerHTML = `<p class="text-center text-gray-500 py-12">The overview hasn't been built yet.</p>`;
+      return;
+    }
+    overviewLoaded = true;
+    renderOverview(container, snap.data(), {
+      // State tile -> that state's members in the directory.
+      onState: code => {
+        switchTab("members");
+        setMemberFilters({ state: code, party: "", chamber: "", text: "" });
+      },
+    });
+  } catch (err) {
+    console.error("Error loading overview:", err);
+    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load the overview: ${escapeHtml(err.message)}</p>`;
+  }
+}
 let activeCategory = "all";
 
 async function init() {
   populateStateSelect();
   setupTabs();
-  switchTab("bills");
+  switchTab("overview");
   setupMemberFilters();
   setupVoteFilters();
   setupBillFilters();
@@ -52,6 +79,7 @@ async function init() {
 }
 
 function setupTabs() {
+  navOverview.addEventListener("click", () => switchTab("overview"));
   navBills.addEventListener("click", () => switchTab("bills"));
   navVotes.addEventListener("click", () => switchTab("votes"));
   navMembers.addEventListener("click", () => {
@@ -65,7 +93,7 @@ const TAB_ACTIVE = `${TAB_BASE} text-gray-900 border-pink`;
 const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-800`;
 
 function switchTab(tabName) {
-  const tabs = { bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers] };
+  const tabs = { overview: [navOverview, viewOverview], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers] };
   for (const [name, [nav, view]] of Object.entries(tabs)) {
     const active = name === tabName;
     nav.className = active ? TAB_ACTIVE : TAB_IDLE;
@@ -73,6 +101,7 @@ function switchTab(tabName) {
     view.classList.toggle("hidden", !active);
   }
   if (tabName === "votes" && !votesLoaded) fetchVotes();
+  if (tabName === "overview" && !overviewLoaded) loadOverview();
   // If the sticky tab bar is pinned (scrolled past the header), start the new tab
   // at its top instead of mid-way down.
   // (The bar sits right under the header, so the header's height is where it pins.)
