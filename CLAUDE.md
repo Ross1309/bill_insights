@@ -102,11 +102,6 @@ party breakdown, bill link (own bill data or Congress.gov), House Clerk source l
 Backfill has been run (verified 2026-11-10: no fake fields, all summaries sourced).
 
 Pending / known issues:
-- **Firestore index not created yet** (category ASC, update_date DESC on `bills`), so
-  category buttons show an error. Create it from the link in the browser console error or
-  with `firebase deploy --only firestore:indexes`.
-- Legacy vote docs with ids `119-house-vote-{315..319}` (pre-session ids) duplicate the
-  new `119-2-house-vote-*` docs and should be deleted.
 - `sync-votes.js` must stay under Netlify's function timeout: detail fetches run in
   parallel and AI summaries are capped at 3 per run.
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
@@ -118,7 +113,9 @@ Pending / known issues:
   `startAfter(lastDoc)` cursors behind a "Load more bills" button.
 - Category buttons filter in the query (`where('category','==',…)`), which needs the
   composite index (category ASC, update_date DESC) in `firestore.indexes.json`. Without
-  it the UI shows "Category filtering isn't available yet".
+  it the UI shows "Category filtering isn't available yet". Created in the Firebase console
+  2026-11-10; add new indexes to the JSON and create them the same way (or
+  `firebase deploy --only firestore:indexes`).
 - Search filters only the loaded pages (Firestore has no text search). Bill-number terms
   ("HR 1234", "H.R. 1234", "1234") also do an exact `number`/`type` lookup across the
   whole collection.
