@@ -1,8 +1,8 @@
 import fetch from 'node-fetch';
 import { getDb, admin } from '../lib/firebase.js';
 import { STATE_CODES } from '../../public/states.js';
-import { fetchLatestSenateVotes } from '../lib/senate-votes.js';
-import { listHouseVotes, buildHouseVoteDoc } from '../lib/house-votes.js';
+import { listSenateVotes, fetchSenateVote, senateVoteId } from '../lib/senate-votes.js';
+import { listHouseVotes, buildHouseVoteDoc, houseVoteId } from '../lib/house-votes.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
 import { currentCongress } from '../lib/congress.js';
@@ -12,7 +12,20 @@ const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
 // Current Congress from the date (rolls over on January 3 of odd years).
 const CONGRESS_NUM = currentCongress().congress;
 const API = 'https://api.congress.gov/v3';
-const VOTES_PER_RUN = 5;
+// Every vote not yet stored is fetched (newest first), up to this many per chamber
+// per run so the scheduled function stays inside its 30 s limit; any remainder is
+// picked up the next night. Busy days have had 24 votes in one chamber.
+const MAX_NEW_VOTES_PER_CHAMBER = 40;
+
+async function pool(items, concurrency, fn) {
+  let next = 0;
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      await fn(items[i]);
+    }
+  }));
+}
 
 async function getJson(url) {
   const res = await fetch(url);
@@ -32,7 +45,8 @@ export async function handler(event, context) {
 
     // 2 + 3. Latest House and Senate roll-call votes. Independent, so one source
     // failing doesn't block the other.
-    const results = await Promise.allSettled([syncHouseVotes(), syncSenateVotes(legislators)]);
+    const stored = new Set((await db.collection("votes").where("congress", "==", CONGRESS_NUM).select().get()).docs.map(d => d.id));
+    const results = await Promise.allSettled([syncHouseVotes(stored), syncSenateVotes(legislators, stored)]);
     const failures = results.filter(r => r.status === "rejected").map(r => r.reason?.message || String(r.reason));
     failures.forEach(msg => console.error("Vote sync failed:", msg));
 
@@ -72,37 +86,41 @@ export async function handler(event, context) {
   }
 }
 
-async function syncHouseVotes() {
-  const latest = (await listHouseVotes(CONGRESS_NUM, CONGRESS_API_KEY)).slice(0, VOTES_PER_RUN);
+// House: every roll call in the Congress.gov list that isn't stored yet.
+export async function syncHouseVotes(stored) {
+  const all = await listHouseVotes(CONGRESS_NUM, CONGRESS_API_KEY); // newest first
+  const missing = all.filter(v => !stored.has(houseVoteId(CONGRESS_NUM, v.sessionNumber, v.rollCallNumber)));
+  const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
+  if (missing.length > todo.length) console.warn(`House: ${missing.length} missing votes; ingesting ${todo.length}, the rest next run`);
   const billIds = [];
-  for (const voteItem of latest) {
+  await pool(todo, 5, async voteItem => {
     const doc = await buildHouseVoteDoc(voteItem, CONGRESS_NUM, CONGRESS_API_KEY);
-    await db.collection("votes").doc(doc.vote_id).set({
-      ...doc,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-    console.log(`Ingested House Roll Call Vote #${doc.roll_call_number} (${doc.date})`);
+    await db.collection("votes").doc(doc.vote_id).set({ ...doc, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     if (doc.bill_id) billIds.push(doc.bill_id);
-  }
+  });
+  console.log(`House: ingested ${todo.length} new votes`);
   return billIds;
 }
 
-async function syncSenateVotes(legislators) {
+// Senate: every roll call in the senate.gov vote menus that isn't stored yet.
+export async function syncSenateVotes(legislators, stored) {
   const lisToBioguide = new Map((legislators || [])
     .filter(l => l.id?.lis && l.id?.bioguide)
     .map(l => [l.id.lis, l.id.bioguide]));
 
-  const votes = await fetchLatestSenateVotes(VOTES_PER_RUN, lisToBioguide);
+  const { session } = currentCongress();
+  const entries = await listSenateVotes(CONGRESS_NUM, session === 2 ? [2, 1] : [1]); // newest first
+  const missing = entries.filter(e => !stored.has(senateVoteId(e)));
+  const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
+  if (missing.length > todo.length) console.warn(`Senate: ${missing.length} missing votes; ingesting ${todo.length}, the rest next run`);
   const billIds = [];
-  for (const { doc, unmapped } of votes) {
-    await db.collection("votes").doc(doc.vote_id).set({
-      ...doc,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+  await pool(todo, 3, async entry => {
+    const { doc, unmapped } = await fetchSenateVote(entry, lisToBioguide);
+    await db.collection("votes").doc(doc.vote_id).set({ ...doc, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     if (unmapped) console.warn(`Senate vote ${doc.vote_id}: ${unmapped} senator(s) without a bioguide mapping`);
-    console.log(`Ingested Senate Roll Call Vote #${doc.roll_call_number} (${doc.date})`);
     if (doc.bill_id) billIds.push(doc.bill_id);
-  }
+  });
+  console.log(`Senate: ingested ${todo.length} new votes`);
   return billIds;
 }
 
