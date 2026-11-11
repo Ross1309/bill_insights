@@ -13,6 +13,7 @@ import {
   fetchRecentBills,
   makeBillId,
   summaryUpdate,
+  fetchBillEnrichment,
 } from '../lib/bills.js';
 
 const BILLS_PER_RUN = 10;
@@ -63,11 +64,18 @@ export default async () => {
     for (let i = 0; i < billsList.length; i++) {
       const item = billsList[i];
       const meta = billMetadata(details[i], item);
+      // Issue tracker: CRS subjects, stage (keeps "became law" current) and topic tags.
+      const enrichment = details[i]?.number
+        ? await fetchBillEnrichment(details[i], CONGRESS_API_KEY).catch(err => {
+            console.error(`Enrichment failed for ${item.type} ${item.number}: ${err.message}`);
+            return {};
+          })
+        : {};
       const billRef = db.collection('bills').doc(makeBillId(item.type, item.number, item.congress));
       const snap = await billRef.get();
       const existingSummary = snap.exists ? snap.data().ai_summary : null;
 
-      const update = { ...meta, synced_at: FieldValue.serverTimestamp() };
+      const update = { ...meta, ...enrichment, synced_at: FieldValue.serverTimestamp() };
       for (const field of FABRICATED_FIELDS) update[field] = FieldValue.delete();
 
       if (summarized < MAX_SUMMARIES) {
@@ -84,10 +92,14 @@ export default async () => {
     let rechecked = 0;
     if (summarized < MAX_SUMMARIES) {
       const recent = new Set(billsList.map(item => makeBillId(item.type, item.number, item.congress)));
-      const waiting = (await db.collection('bills').where('crs_summary_available', '==', false).limit(100).get()).docs
+      // Never-checked bills first (enriched by ingest-votes, marked null), then bills
+      // that had no CRS summary last time (re-checked at most every 3 days).
+      const neverChecked = (await db.collection('bills').where('crs_summary_available', '==', null).limit(RECHECK_PER_RUN).get()).docs
+        .filter(d => !recent.has(d.id));
+      const stale = (await db.collection('bills').where('crs_summary_available', '==', false).limit(100).get()).docs
         .filter(d => !recent.has(d.id) && Date.now() - Date.parse(d.data().crs_checked_at || 0) > RECHECK_AFTER_MS)
-        .sort((a, b) => (a.data().crs_checked_at || '').localeCompare(b.data().crs_checked_at || ''))
-        .slice(0, RECHECK_PER_RUN);
+        .sort((a, b) => (a.data().crs_checked_at || '').localeCompare(b.data().crs_checked_at || ''));
+      const waiting = [...neverChecked, ...stale].slice(0, RECHECK_PER_RUN);
       for (const d of waiting) {
         if (summarized >= MAX_SUMMARIES) break;
         const result = await summaryUpdate(d.data(), d.data().ai_summary, keys);

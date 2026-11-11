@@ -69,6 +69,7 @@
   <nav class="sticky top-0 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar" role="tablist">
       <button id="nav-overview" role="tab" class="nav-tab">Overview</button>
+      <button id="nav-issues" role="tab" class="nav-tab">Issues</button>
       <button id="nav-bills" role="tab" class="nav-tab">Bills &amp; Summaries</button>
       <button id="nav-votes" role="tab" class="nav-tab">Roll-Call Votes</button>
       <button id="nav-members" role="tab" class="nav-tab">Legislators</button>
@@ -87,6 +88,27 @@
         <div class="text-center py-12">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading overview...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 0b: ISSUES -->
+    <section id="view-issues" class="tab-view hidden">
+      <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 class="font-serif text-2xl font-bold text-gray-900" id="issue-title">Issues</h2>
+          <p class="text-sm text-gray-500">What Congress has done on the issues people follow most, in plain language.</p>
+        </div>
+        <div id="issue-topics" class="flex flex-wrap gap-2" role="tablist" aria-label="Issue">
+          <button type="button" role="tab" data-topic="economy" class="filter-chip">Economy</button>
+          <button type="button" role="tab" data-topic="healthcare" class="filter-chip">Healthcare</button>
+          <button type="button" role="tab" data-topic="foreign-affairs" class="filter-chip">Foreign Affairs</button>
+        </div>
+      </div>
+      <div id="issue-container" class="min-h-[300px]">
+        <div class="text-center py-12">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <p class="text-gray-500">Loading...</p>
         </div>
       </div>
     </section>

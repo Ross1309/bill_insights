@@ -213,3 +213,70 @@ export async function summaryUpdate(bill, existingSummary, { congressKey, openai
   if (!summary) return { fields: {}, generated: false, status: 'error', error: 'OpenAI request failed' };
   return { fields: { ...checked, crs_summary_available: true, ai_summary: summary }, generated: true, status: 'generated' };
 }
+
+// --- Issue-tracker enrichment: CRS subjects, legislative stage, sponsor, topics ---
+
+import { topicTags } from './topics.js';
+
+// Stages in order. Concurrent/simple resolutions stop at passed_both / passed_one.
+export const STAGES = ['introduced', 'committee', 'passed_one', 'passed_both', 'to_president', 'law'];
+
+// Stage from the action history. Library of Congress action text starts with
+// "Passed/agreed to in House: …" on success and "Failed of passage/not agreed to in
+// House: …" on failure, so match at the start (a substring test confuses the two).
+export function stageFromActions(actions = [], { isLaw = false } = {}) {
+  const texts = actions.map(a => (a.text || '').trim().toLowerCase());
+  const has = re => texts.some(t => re.test(t));
+  const passedHouse = has(/^passed\/agreed to in house/);
+  const passedSenate = has(/^passed\/agreed to in senate/);
+  let stage = 'introduced';
+  if (has(/referred to/)) stage = 'committee';
+  if (passedHouse || passedSenate) stage = 'passed_one';
+  if (passedHouse && passedSenate) stage = 'passed_both';
+  if (has(/presented to president/)) stage = 'to_president';
+  if (isLaw || has(/became public law/)) stage = 'law';
+  return {
+    stage,
+    passed_house: passedHouse,
+    passed_senate: passedSenate,
+    failed_house: has(/^failed of passage\/not agreed to in house/),
+    failed_senate: has(/^failed of passage\/not agreed to in senate/),
+    vetoed: has(/vetoed by president/),
+  };
+}
+
+// Extra fields for the issue tracker (3 Congress.gov requests: detail is passed in,
+// plus subjects and actions). `detail` is the bill-detail response's `bill`.
+export async function fetchBillEnrichment(detail, apiKey) {
+  const congress = detail.congress;
+  const type = String(detail.type || '').toLowerCase();
+  const number = detail.number;
+  const base = `${API}/bill/${congress}/${type}/${number}`;
+  const [subjects, actions] = await Promise.all([
+    getJson(`${base}/subjects?api_key=${apiKey}&format=json&limit=250`),
+    getJson(`${base}/actions?api_key=${apiKey}&format=json&limit=250`),
+  ]);
+  const subjectNames = (subjects.subjects?.legislativeSubjects || []).map(s => s.name).filter(Boolean);
+  const lawNumber = detail.laws?.[0]?.number || null;
+  const sponsor = detail.sponsors?.[0];
+  const policyArea = detail.policyArea?.name || subjects.subjects?.policyArea?.name || null;
+  return {
+    subjects: subjectNames,
+    subject_count: subjectNames.length,
+    law_number: lawNumber,
+    sponsor: sponsor
+      ? { bioguideId: sponsor.bioguideId || null, name: [sponsor.firstName, sponsor.lastName].filter(Boolean).join(' ') || null, party: sponsor.party || null, state: sponsor.state || null }
+      : null,
+    cosponsors_count: detail.cosponsors?.count ?? null,
+    ...stageFromActions(actions.actions || [], { isLaw: Boolean(lawNumber) }),
+    ...topicTags({ policy_area: policyArea, subjects: subjectNames, title: detail.title || '' }),
+    enriched_at: new Date().toISOString(),
+  };
+}
+
+// Full doc fields for one bill: metadata + enrichment (4 requests).
+export async function fetchEnrichedBill(congress, type, number, apiKey) {
+  const detail = await fetchBillDetail(congress, type, number, apiKey);
+  const meta = billMetadata(detail, { congress, type, number });
+  return { ...meta, ...(await fetchBillEnrichment({ ...detail, congress, type, number }, apiKey)) };
+}

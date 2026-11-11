@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foreign Affairs (mockup) · Congress Watcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Same theme tokens as public/index.html.
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], serif: ['"Source Serif 4"', 'ui-serif', 'Georgia', 'serif'] },
+      colors: {
+        gray: { 50: '#2c2c2c', 100: '#333333', 200: '#444444', 300: '#555555', 400: '#a0a0a0', 500: '#b0b0b0', 600: '#c4c4c4', 700: '#d4d4d4', 800: '#e4e4e4', 900: '#f3f3f3' },
+        surface: { DEFAULT: '#363636', deep: '#232323' }, ink: '#2c2c2c',
+        accent: { DEFAULT: '#a8dadc', light: '#cdebec' }, pink: { DEFAULT: '#ffc1cc' }, cta: { DEFAULT: '#b39cd0', light: '#c8b6df' },
+        green: { 50: '#26331c', 100: '#30451f', 200: '#456230', 700: '#b5e48c', 800: '#c9eda8' },
+        red: { 50: '#3a2a22', 100: '#523226', 200: '#6e4130', 500: '#f4a07a', 600: '#f6ad8d', 700: '#f4a07a', 800: '#f8b89c' },
+        yellow: { 50: '#373220', 100: '#4a4126', 800: '#f0db8c' },
+        party: { r: '#f59a9a', d: '#a3b4f7', i: '#c4c4c4' },
+      },
+    } } };
+  </script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+  <div class="bg-yellow-50 border-b border-yellow-100 text-yellow-800 text-xs sm:text-sm px-4 py-2 text-center">
+    <strong>Mockup for review.</strong> Real data snapshot from Congress.gov, the House Clerk and senate.gov (<span id="snap-date"></span>). Layout and wording are proposals; nothing here is live.
+  </div>
+
+  <header class="bg-surface-deep">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <p class="text-xs uppercase tracking-wide text-pink font-semibold">Issue tracker</p>
+      <h1 class="font-serif text-3xl sm:text-4xl font-bold text-white mt-1">Foreign Affairs</h1>
+      <p class="text-sm text-gray-600 mt-2 max-w-3xl">What the 119th Congress has done on foreign policy, trade and international aid: what became law, what's moving, how members voted. Everything here comes from the official record.</p>
+      <div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <span class="text-gray-500">Your members:</span>
+        <span class="px-2.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-800">Washington ▾</span>
+        <span id="my-members" class="text-gray-600"></span>
+        <span class="text-[11px] text-gray-400">(state picker remembered per browser in the real page)</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+    <!-- 1. AT A GLANCE -->
+    <section>
+      <h2 class="font-serif text-2xl font-bold text-gray-900">At a glance</h2>
+      <p id="glance-sentence" class="text-base sm:text-lg text-gray-800 mt-2 max-w-3xl"></p>
+      <div id="journey" class="mt-5 bg-surface border border-gray-200 rounded-xl p-5"></div>
+      <p class="text-xs text-gray-500 mt-2">Most bills are referred to a committee and never get a floor vote. That's normal, and they aren't shown here. <button class="text-accent hover:underline" data-explain="no-vote">Why most bills never get a vote</button></p>
+    </section>
+
+    <!-- 2. WATCHLISTS -->
+    <section>
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 class="font-serif text-2xl font-bold text-gray-900">Watchlists</h2>
+          <p class="text-sm text-gray-500">Narrower topics inside foreign affairs, defined by official CRS subject tags.</p>
+        </div>
+        <div id="watch-tabs" class="flex flex-wrap gap-2" role="tablist"></div>
+      </div>
+      <div id="watch-panel" class="mt-4"></div>
+    </section>
+
+    <!-- 3. BECAME LAW -->
+    <section>
+      <h2 class="font-serif text-2xl font-bold text-gray-900">What became law</h2>
+      <p class="text-sm text-gray-500">Foreign-affairs bills signed into law this Congress, with how each chamber voted.</p>
+      <div id="laws" class="grid gap-4 md:grid-cols-2 mt-4"></div>
+    </section>
+
+    <!-- 4. KEY VOTES -->
+    <section>
+      <h2 class="font-serif text-2xl font-bold text-gray-900">Recent key votes</h2>
+      <p class="text-sm text-gray-500">The latest recorded floor votes on foreign-affairs measures, explained, with how your members voted.</p>
+      <div id="votes" class="space-y-4 mt-4"></div>
+    </section>
+
+    <!-- 5. PARTY AGREEMENT -->
+    <section>
+      <h2 class="font-serif text-2xl font-bold text-gray-900">Do the parties agree on foreign affairs?</h2>
+      <p class="text-sm text-gray-500">Share of these votes where most Democrats and most Republicans voted the same way, compared with all votes this Congress.</p>
+      <div id="agreement" class="mt-4 bg-surface border border-gray-200 rounded-xl p-5"></div>
+    </section>
+
+    <!-- 6. EXPLAINERS -->
+    <section>
+      <h2 class="font-serif text-2xl font-bold text-gray-900">Understanding the process</h2>
+      <div id="explainers" class="grid gap-4 md:grid-cols-3 mt-4"></div>
+      <div class="mt-4 flex flex-wrap gap-2 text-xs" id="glossary"></div>
+    </section>
+
+    <!-- 7. DEFINITION & SOURCES -->
+    <section class="text-xs text-gray-500 border-t border-gray-200 pt-5 space-y-1.5" id="definition"></section>
+  </main>
+
+  <div id="tip" class="fixed z-40 pointer-events-none hidden max-w-xs px-2.5 py-1.5 text-xs rounded-md bg-surface-deep text-gray-800 border border-gray-200 shadow-lg"></div>
+  <div id="explain-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"></div>
+
+  <script id="snapshot" type="application/json">__DATA__</script>
+  <script>
+  const D = JSON.parse(document.getElementById("snapshot").textContent);
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const day = iso => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
+  const C = { succeeded: "#6fa326", failed: "#c04637", accent: "#13a5b2" };
+  const PARTY_CHIP = { D: "ring-party-d/70 text-party-d", R: "ring-party-r/70 text-party-r", I: "ring-party-i/60 text-party-i" };
+  const PARTY_NAME = { D: "Democratic", R: "Republican", I: "Independent" };
+  const label = b => `${b.type.replace(/^HCONRES$/, "H.Con.Res.").replace(/^HRES$/, "H.Res.").replace(/^SJRES$/, "S.J.Res.").replace(/^HJRES$/, "H.J.Res.").replace(/^HR$/, "H.R.").replace(/^S$/, "S.")} ${b.number}`;
+  const congressUrl = b => `https://www.congress.gov/bill/119th-congress/${{ HR: "house-bill", S: "senate-bill", HRES: "house-resolution", SRES: "senate-resolution", HJRES: "house-joint-resolution", SJRES: "senate-joint-resolution", HCONRES: "house-concurrent-resolution", SCONRES: "senate-concurrent-resolution" }[b.type]}/${b.number}`;
+  const passed = r => /passed|agreed|confirmed|adopted|sustained/i.test(r || "") && !/not agreed|failed|rejected|defeated|not sustained/i.test(r || "");
+
+  $("snap-date").textContent = day(D.generated);
+  const bills = D.bills;
+  const byId = Object.fromEntries(bills.map(b => [b.id, b]));
+  const fa = bills.filter(b => b.fa);
+  const votesFor = id => D.votes.filter(v => v.bill_id === id).sort((a, b) => a.date.localeCompare(b.date));
+  const myNames = [...new Map(D.votes.flatMap(v => v.mine || []).map(m => [m.id, m])).values()];
+  $("my-members").textContent = myNames.map(m => m.name.split(",")[0]).join(", ");
+
+  // Plain-English meaning of each kind of question.
+  function explainQuestion(v) {
+    const q = (v.question || "").toLowerCase();
+    if (q.includes("concur in")) return "A vote to accept the other chamber's version of the bill. Agreeing usually sends it to the President.";
+    if (q.includes("cloture")) return "A vote on whether to end debate and move forward. It needs 60 of 100 senators.";
+    if (q.includes("suspend the rules")) return "A fast-track vote for less controversial bills. It needs two-thirds of the House to pass.";
+    if (q.includes("recommit")) return "The minority party's last chance to send the bill back to committee before the final vote.";
+    if (q.includes("table")) return "A vote to set a measure aside, which usually ends it.";
+    if (q.includes("discharge")) return "A vote to pull a measure out of committee so the full chamber can consider it.";
+    if (q.includes("amendment")) return "A vote on changing the bill's text.";
+    if (q.includes("passage") || q.includes("pass the bill")) return "The final vote on whether this chamber passes the bill.";
+    if (q.includes("resolution")) return "The vote on whether this chamber adopts the resolution.";
+    return "A recorded floor vote on this measure.";
+  }
+
+  // ---- 1. At a glance
+  const law = fa.filter(b => b.stage === "law").length;
+  const both = fa.filter(b => b.stage === "passed_both" || b.stage === "to_president").length;
+  const one = fa.filter(b => b.stage === "passed_one").length;
+  const none = fa.length - law - both - one;
+  const faVotes = D.votes.filter(v => byId[v.bill_id]?.fa);
+  $("glance-sentence").innerHTML = `This Congress, <strong>${fa.length}</strong> foreign-affairs measures reached a floor vote or became law. <strong>${law}</strong> became law, <strong>${both + one}</strong> more passed at least one chamber, and <strong>${none}</strong> didn't pass either. Members cast <strong>${faVotes.length}</strong> recorded votes on them.`;
+  const steps = [
+    ["Reached the floor or became law", fa.length],
+    ["Passed at least one chamber", law + both + one],
+    ["Passed both chambers", law + both],
+    ["Became law", law],
+  ];
+  $("journey").innerHTML = `
+    <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-3">How far they got</p>
+    <div class="space-y-2.5">${steps.map(([lbl, n], i) => `
+      <div data-tip="${esc(`${lbl}: ${n} of ${fa.length} measures`)}">
+        <div class="flex justify-between text-sm"><span class="text-gray-800">${i ? "→ " : ""}${esc(lbl)}</span><span class="font-semibold text-gray-900 tabular-nums">${n}</span></div>
+        <div class="h-2.5 mt-1 rounded-full bg-gray-100"><div class="h-2.5 rounded-full" style="width:${Math.max(1.5, (n / fa.length) * 100)}%;background:${C.accent}"></div></div>
+      </div>`).join("")}
+    </div>
+    <p class="text-[11px] text-gray-400 mt-3">Concurrent resolutions (H.Con.Res.) don't go to the President, so "passed both chambers" is as far as they can go.</p>`;
+
+  // ---- 2. Watchlists
+  const WATCH_TITLE = { iran: /iran/i, israel: /israel/i, aid: /foreign aid|assistance|\baid\b/i };
+  const isFocused = (b, key) => b.subjects.length <= 10 || WATCH_TITLE[key].test(b.title);
+  const STAGE_TEXT = { law: "Became law", passed_both: "Passed both chambers", to_president: "Sent to President", passed_one: "Passed one chamber", committee: "Didn't pass", introduced: "Introduced" };
+  const stageChip = b => {
+    const failed = b.failedHouse || b.failedSenate;
+    const text = b.stage === "passed_one" && (b.failedSenate || b.failedHouse) ? `Passed ${b.passedHouse ? "House" : "Senate"}, failed ${b.failedSenate ? "Senate" : "House"}`
+      : b.stage === "committee" && failed ? `Failed in ${b.failedHouse ? "House" : "Senate"}` : STAGE_TEXT[b.stage];
+    const tone = b.stage === "law" || b.stage === "passed_both" ? "bg-green-100 text-green-800" : failed && b.stage !== "passed_one" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-700";
+    return `<span class="text-[11px] font-semibold px-2 py-0.5 rounded ${tone}">${esc(text)}</span>`;
+  };
+
+  function timeline(focusedBills) {
+    const vs = focusedBills.flatMap(b => votesFor(b.id).map(v => ({ ...v, bill: b })));
+    if (!vs.length) return "";
+    const sorted = [...vs].sort((a, b) => a.date.localeCompare(b.date));
+    const t0 = new Date(sorted[0].date).getTime(), t1 = new Date(sorted.at(-1).date).getTime();
+    const span = Math.max(1, t1 - t0);
+    const row = ch => `
+      <div class="flex items-center gap-3">
+        <span class="w-14 text-xs text-gray-500">${ch}</span>
+        <div class="relative flex-1 h-12 border-b border-gray-200">
+          ${sorted.filter(v => v.chamber === ch).map((v, i) => {
+            const x = ((new Date(v.date).getTime() - t0) / span) * 100;
+            const ok = passed(v.result);
+            const tip = `${day(v.date)} · ${ch} · ${label(v.bill)}: ${v.result} ${v.tallies.yea}–${v.tallies.nay}`;
+            return `<span data-tip="${esc(tip)}" class="absolute bottom-0 -translate-x-1/2 flex flex-col items-center" style="left:${Math.min(98, Math.max(2, x))}%">
+              <span class="hidden sm:block text-[10px] tabular-nums text-gray-500 ${i % 2 ? "mb-4" : "mb-0.5"}">${v.tallies.yea}–${v.tallies.nay}</span>
+              <span class="w-3 h-3 rounded-full ring-2 ring-surface" style="background:${ok ? C.succeeded : C.failed}"></span>
+            </span>`;
+          }).join("")}
+        </div>
+      </div>`;
+    const passCount = vs.filter(v => passed(v.result)).length;
+    return `
+      <div class="bg-surface border border-gray-200 rounded-xl p-5">
+        <div class="flex flex-wrap justify-between gap-2">
+          <p class="text-sm font-semibold text-gray-900">Floor votes on these measures over time</p>
+          <div class="flex gap-4 text-xs text-gray-600">
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:${C.succeeded}"></span>Passed / agreed to</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:${C.failed}"></span>Failed / rejected</span>
+          </div>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">${vs.length} recorded votes, ${passCount} passed. Numbers are Yea–Nay<span class="sm:hidden">; tap a dot for details</span>.</p>
+        <div class="mt-4 space-y-3">${row("House")}${row("Senate")}</div>
+        <div class="flex justify-between text-[10px] text-gray-400 mt-1 pl-[4.25rem]"><span>${day(sorted[0].date)}</span><span>${day(sorted.at(-1).date)}</span></div>
+      </div>`;
+  }
+
+  function billRow(b) {
+    const vs = votesFor(b.id);
+    return `
+      <li class="py-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="${congressUrl(b)}" target="_blank" rel="noopener" class="text-xs font-semibold text-accent hover:underline">${label(b)}</a>
+          ${stageChip(b)}
+          ${b.sponsor ? `<span class="text-[11px] text-gray-500">Sponsor: ${esc(b.sponsor.name)} <span class="ring-1 ring-inset ${PARTY_CHIP[b.sponsor.party] || ""} px-1 rounded">${esc(b.sponsor.party)}-${esc(b.sponsor.state)}</span></span>` : ""}
+        </div>
+        <p class="text-sm text-gray-900 mt-1">${esc(b.title)}</p>
+        ${vs.length ? `<p class="text-xs text-gray-500 mt-1">${vs.map(v => `${v.chamber} ${day(v.date)}: <span class="${passed(v.result) ? "text-green-700" : "text-red-700"}">${esc(v.result)}</span> ${v.tallies.yea}–${v.tallies.nay}`).join(" · ")}</p>` : ""}
+      </li>`;
+  }
+
+  const WATCH_INTRO = {
+    iran: "Measures CRS tagged <em>Iran</em>. Much of this year's activity is War Powers Resolution votes on removing U.S. forces from hostilities with Iran.",
+    israel: "Measures CRS tagged <em>Israel</em>. Most are large spending or defense bills that include Israel-related provisions.",
+    aid: "Measures CRS tagged <em>Foreign aid and international relief</em> or <em>Military assistance, sales, and agreements</em>.",
+  };
+  function renderWatch(key) {
+    const w = D.watch[key];
+    const all = bills.filter(b => b.watch.includes(key));
+    const focused = all.filter(b => isFocused(b, key)).sort((a, b) => (votesFor(b.id)[0]?.date || b.introduced || "").localeCompare(votesFor(a.id)[0]?.date || a.introduced || ""));
+    const broad = all.filter(b => !isFocused(b, key));
+    const fLaw = focused.filter(b => b.stage === "law").length;
+    const fVotes = focused.flatMap(b => votesFor(b.id));
+    $("watch-panel").innerHTML = `
+      <p class="text-sm text-gray-600 max-w-3xl">${WATCH_INTRO[key]}</p>
+      <p class="text-base text-gray-900 mt-3"><strong>${focused.length}</strong> measures focused on ${esc(w.label)} reached the floor or became law${fLaw ? ` (${fLaw} became law)` : ""}, with <strong>${fVotes.length}</strong> recorded votes. Another <strong>${broad.length}</strong> broad bills include ${esc(w.label)} provisions.</p>
+      <div class="mt-4">${timeline(focused)}</div>
+      <div class="grid gap-4 lg:grid-cols-2 mt-4">
+        <div class="bg-surface border border-gray-200 rounded-xl p-5">
+          <p class="text-sm font-semibold text-gray-900">Focused on ${esc(w.label)} (${focused.length})</p>
+          <ul class="divide-y divide-gray-100">${focused.map(billRow).join("") || `<li class="py-3 text-sm text-gray-500">None reached the floor.</li>`}</ul>
+        </div>
+        <div class="bg-surface border border-gray-200 rounded-xl p-5">
+          <p class="text-sm font-semibold text-gray-900">Broad bills that include ${esc(w.label)} provisions (${broad.length})</p>
+          <p class="text-xs text-gray-500 mt-1">Large packages, like appropriations and defense authorization bills, that cover many subjects. ${esc(w.label)} is one of them.</p>
+          <ul class="divide-y divide-gray-100 mt-1">${broad.map(b => `<li class="py-2 flex flex-wrap items-center gap-2"><a href="${congressUrl(b)}" target="_blank" rel="noopener" class="text-xs font-semibold text-accent hover:underline">${label(b)}</a>${stageChip(b)}<span class="text-sm text-gray-800 w-full">${esc(b.title)}</span><span class="text-[11px] text-gray-500 w-full">${b.subjects.length} CRS subjects</span></li>`).join("")}</ul>
+        </div>
+      </div>`;
+    document.querySelectorAll("#watch-tabs [data-watch]").forEach(t => {
+      const on = t.dataset.watch === key;
+      t.setAttribute("aria-selected", on);
+      t.className = `px-3 py-1.5 text-xs font-semibold rounded-full ${on ? "bg-cta text-ink" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
+    });
+  }
+  $("watch-tabs").innerHTML = ["iran", "israel", "aid"].map(k => `<button role="tab" data-watch="${k}">${esc(D.watch[k].label)} (${bills.filter(b => b.watch.includes(k)).length})</button>`).join("");
+  $("watch-tabs").addEventListener("click", e => { const t = e.target.closest("[data-watch]"); if (t) renderWatch(t.dataset.watch); });
+  renderWatch("iran");
+
+  // ---- 3. Became law
+  function summaryBlock(b) {
+    if (b.aiSummary?.length) return `<ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">${b.aiSummary.map(p => `<li>${esc(p)}</li>`).join("")}</ul><p class="text-[11px] text-gray-400 mt-1">AI summary of the official CRS summary</p>`;
+    if (b.crsSummary) return `<p class="text-sm text-gray-700">${esc(b.crsSummary.slice(0, 320))}${b.crsSummary.length > 320 ? "…" : ""}</p><p class="text-[11px] text-gray-400 mt-1">Official CRS summary (excerpt)</p>`;
+    return `<p class="text-sm text-gray-500">No official summary yet.</p>`;
+  }
+  const chamberLine = (b, ch) => {
+    const v = votesFor(b.id).filter(x => x.chamber === ch && /passage|pass the bill|suspend|agreeing to the resolution|on the (joint |concurrent )?resolution|concur/i.test(x.question)).at(-1);
+    if (v) return `${ch}: <span class="text-gray-900 tabular-nums">${v.tallies.yea}–${v.tallies.nay}</span>`;
+    const did = ch === "House" ? b.passedHouse : b.passedSenate;
+    return did ? `${ch}: passed without a recorded roll call` : `${ch}: —`;
+  };
+  $("laws").innerHTML = fa.filter(b => b.stage === "law").map(b => `
+    <article class="bg-surface border border-gray-200 rounded-xl p-5">
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="${congressUrl(b)}" target="_blank" rel="noopener" class="text-xs font-semibold text-accent hover:underline">${label(b)}</a>
+        ${stageChip(b)}${typeof b.law === "string" ? `<span class="text-[11px] text-gray-500">Public Law ${esc(b.law)}</span>` : ""}
+      </div>
+      <h3 class="font-serif text-lg font-bold text-gray-900 mt-2 leading-snug">${esc(b.title)}</h3>
+      <div class="mt-2">${summaryBlock(b)}</div>
+      <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-0.5">
+        <p>${chamberLine(b, "House")} · ${chamberLine(b, "Senate")}</p>
+        ${b.sponsor ? `<p>Sponsor: ${esc(b.sponsor.name)} (${esc(b.sponsor.party)}-${esc(b.sponsor.state)}) · ${b.cosponsors} cosponsors</p>` : ""}
+      </div>
+    </article>`).join("");
+
+  // ---- 4. Key votes
+  const partyRow = (p, c) => {
+    const n = c.yea + c.nay;
+    return `
+      <div class="flex items-center gap-2 text-xs" data-tip="${esc(`${PARTY_NAME[p]}: ${c.yea} Yea, ${c.nay} Nay${c.not_voting ? `, ${c.not_voting} not voting` : ""}`)}">
+        <span class="w-24 shrink-0"><span class="inline-block px-1.5 py-0.5 rounded ring-1 ring-inset ${PARTY_CHIP[p]} font-semibold">${PARTY_NAME[p]}</span></span>
+        <div class="flex-1 flex h-3 gap-[2px]">
+          ${c.yea ? `<div class="rounded-l-sm" style="flex:${c.yea};background:${C.succeeded}"></div>` : ""}
+          ${c.nay ? `<div class="rounded-r-sm" style="flex:${c.nay};background:${C.failed}"></div>` : ""}
+          ${!n ? `<div class="flex-1 bg-gray-200 rounded-sm"></div>` : ""}
+        </div>
+        <span class="w-20 text-right tabular-nums text-gray-600">${c.yea} Y · ${c.nay} N</span>
+      </div>`;
+  };
+  const posBadge = pos => /yea|aye/i.test(pos) ? "bg-green-100 text-green-800" : /nay|no/i.test(pos) ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-700";
+  $("votes").innerHTML = [...faVotes].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map(v => {
+    const b = byId[v.bill_id];
+    const pb = v.party_breakdown || {};
+    return `
+      <article class="bg-surface border border-gray-200 rounded-xl p-5">
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-gray-500">${esc(v.chamber)} · ${day(v.date)} · <a href="${congressUrl(b)}" target="_blank" rel="noopener" class="text-accent hover:underline">${label(b)}</a></p>
+            <h3 class="font-serif text-lg font-bold text-gray-900 mt-1 leading-snug">${esc(b.title.length > 140 ? b.title.slice(0, 140) + "…" : b.title)}</h3>
+            <p class="text-sm text-gray-600 mt-1"><span class="text-gray-800 font-medium">${esc(v.question)}.</span> ${esc(explainQuestion(v))}</p>
+          </div>
+          <div class="flex items-center gap-2 sm:flex-col sm:items-end shrink-0">
+            <span class="inline-block px-2.5 py-1 text-xs font-bold rounded ${passed(v.result) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">${esc(v.result)}</span>
+            <span class="text-sm text-gray-900 tabular-nums">${v.tallies.yea}–${v.tallies.nay}</span>
+          </div>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 mt-4">
+          <div class="space-y-1.5">${["D", "R", "I"].filter(p => pb[p]).map(p => partyRow(p, pb[p])).join("")}</div>
+          <div>
+            <p class="text-xs text-gray-500 mb-1.5">Your members</p>
+            <div class="flex flex-wrap gap-2">${(v.mine || []).map(m => `<span class="text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200"><span class="text-gray-800">${esc(m.name.split(",")[0])}</span> <span class="font-bold px-1 rounded ${posBadge(m.position)}">${esc(m.position)}</span></span>`).join("") || `<span class="text-xs text-gray-500">Your senators don't vote on House roll calls (and vice versa).</span>`}</div>
+          </div>
+        </div>
+      </article>`;
+  }).join("");
+
+  // ---- 5. Party agreement
+  function align(pb) {
+    const side = p => { const c = pb?.[p]; if (!c || c.yea === c.nay || c.yea + c.nay === 0) return null; return c.yea > c.nay ? "y" : "n"; };
+    const d = side("D"), r = side("R");
+    return !d || !r ? "unclear" : d === r ? "same" : "opposed";
+  }
+  const OVERALL = { House: { same: 204, opposed: 474 }, Senate: { same: 73, opposed: 843 } }; // from stats/overview
+  $("agreement").innerHTML = ["House", "Senate"].map(ch => {
+    const c = { same: 0, opposed: 0 };
+    faVotes.filter(v => v.chamber === ch).forEach(v => { const a = align(v.party_breakdown); if (a !== "unclear") c[a]++; });
+    const n = c.same + c.opposed, o = OVERALL[ch], on = o.same + o.opposed;
+    const bar = (same, total, lbl) => `
+      <div data-tip="${esc(`${lbl}: majorities agreed on ${same} of ${total} votes`)}">
+        <div class="flex justify-between text-xs"><span class="text-gray-700">${lbl}</span><span class="text-gray-900 font-semibold tabular-nums">${pct(same, total)}% agreed</span></div>
+        <div class="h-2.5 mt-1 rounded-full bg-gray-100"><div class="h-2.5 rounded-full" style="width:${pct(same, total)}%;background:${C.accent}"></div></div>
+      </div>`;
+    return `<div class="${ch === "Senate" ? "mt-5" : ""}"><p class="text-sm font-semibold text-gray-900 mb-2">${ch}</p><div class="space-y-2">${bar(c.same, n, `Foreign-affairs votes (${n})`)}${bar(o.same, on, `All ${ch} votes this Congress (${on})`)}</div></div>`;
+  }).join("") + `<p class="text-[11px] text-gray-400 mt-4">"Agreed" means the majority of Democrats and the majority of Republicans voted the same way (Yea/Nay only).</p>`;
+
+  // ---- 6. Explainers + glossary (DRAFT copy for review)
+  const EXPLAIN = {
+    "war-powers": ["How War Powers Resolution votes work",
+      "The War Powers Resolution (1973) requires the President to notify Congress within 48 hours of sending U.S. forces into hostilities, and generally limits that use of force to 60 days without congressional authorization (plus 30 days to withdraw). Section 5(c) lets Congress direct the removal of forces with a concurrent resolution, which needs both chambers but doesn't go to the President. Since the Supreme Court's 1983 decision in INS v. Chadha, whether such concurrent resolutions are legally binding has been disputed. Congress has also used joint resolutions, which go to the President and can be vetoed."],
+    "resolutions": ["Bills, joint and concurrent resolutions",
+      "Bills (H.R./S.) and joint resolutions (H.J.Res./S.J.Res.) must pass both chambers and be signed by the President (or survive a veto) to become law. Concurrent resolutions (H.Con.Res./S.Con.Res.) need both chambers but don't go to the President; they usually concern how Congress itself operates. Simple resolutions (H.Res./S.Res.) involve one chamber only."],
+    "no-vote": ["Why most bills never get a vote",
+      "Thousands of bills are introduced each Congress. Most are referred to a committee and never move further: committees and chamber leaders decide what reaches the floor. A bill that never gets a vote hasn't been rejected; it just didn't advance. This page focuses on measures that reached a floor vote or became law."],
+  };
+  $("explainers").innerHTML = Object.entries(EXPLAIN).map(([k, [t, body]]) => `
+    <article class="bg-surface border border-gray-200 rounded-xl p-5">
+      <span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-800">Draft — needs your review</span>
+      <h3 class="font-serif text-lg font-bold text-gray-900 mt-2">${esc(t)}</h3>
+      <p class="text-sm text-gray-700 mt-2">${esc(body.slice(0, 190))}… <button class="text-accent hover:underline" data-explain="${k}">Read more</button></p>
+    </article>`).join("");
+  const GLOSSARY = {
+    "Cloture": "A Senate vote to end debate. Needs 60 votes. Without it, most bills can't get a final vote.",
+    "Suspension of the rules": "A House fast track for less controversial bills: limited debate, no amendments, two-thirds needed to pass.",
+    "Motion to recommit": "The House minority's last chance to send a bill back to committee before the final vote.",
+    "Motion to table": "A vote to set something aside; adopting it usually ends that measure.",
+    "Motion to discharge": "A vote to pull a measure out of committee for consideration by the full chamber.",
+    "Appropriations": "Bills that provide the actual money. Authorization bills set policy and allow spending; appropriations fund it.",
+  };
+  $("glossary").innerHTML = `<span class="text-gray-500 mr-1 py-1">Glossary:</span>` + Object.entries(GLOSSARY).map(([t, d]) => `<button class="px-2.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-700 hover:border-accent/60" data-tip="${esc(d)}">${esc(t)}</button>`).join("");
+  document.addEventListener("click", e => {
+    const k = e.target.closest("[data-explain]")?.dataset.explain;
+    const m = $("explain-modal");
+    if (k) {
+      const [t, body] = EXPLAIN[k];
+      m.innerHTML = `<div class="bg-surface rounded-2xl max-w-lg w-full p-6 border border-gray-200"><span class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-800">Draft — needs your review</span><h3 class="font-serif text-xl font-bold text-gray-900 mt-2">${esc(t)}</h3><p class="text-sm text-gray-700 mt-3 leading-relaxed">${esc(body)}</p><button class="mt-4 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cta text-ink" data-close>Close</button></div>`;
+      m.classList.remove("hidden"); m.classList.add("flex");
+    } else if (e.target === m || e.target.closest("[data-close]")) { m.classList.add("hidden"); m.classList.remove("flex"); }
+  });
+
+  // ---- 7. Definition & sources
+  $("definition").innerHTML = `
+    <p><strong class="text-gray-700">What counts as foreign affairs here:</strong> measures whose CRS policy area is <em>${D.faAreas.join("</em> or <em>")}</em>. Watchlists use CRS subject tags (Iran: <em>Iran</em>; Israel: <em>Israel</em>; Foreign aid: <em>${D.watch.aid.subjects.join("</em>, <em>")}</em>) and can include bills from other policy areas, such as defense and appropriations.</p>
+    <p><strong class="text-gray-700">Focused vs. broad:</strong> a watchlist measure counts as focused if CRS assigned it 10 or fewer subjects or its title names the topic; otherwise it's a broad bill that includes the topic.</p>
+    <p><strong class="text-gray-700">Coverage in this mockup:</strong> the ${D.counts.lawsTotal} laws enacted and ${D.counts.votedBillsTotal} measures that got a recorded floor vote in the 119th Congress. Bills that never reached the floor aren't included yet.</p>
+    <p><strong class="text-gray-700">Sources:</strong> Congress.gov (bills, CRS subjects and summaries, actions, laws), Office of the Clerk of the U.S. House, U.S. Senate (senate.gov).</p>`;
+
+  // ---- tooltips
+  const tip = $("tip");
+  // Touch has no hover: a tap shows the tooltip.
+  document.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse") return;
+    const t = e.target.closest("[data-tip]");
+    if (!t) return tip.classList.add("hidden");
+    tip.textContent = t.dataset.tip; tip.classList.remove("hidden");
+    tip.style.left = `${Math.min(innerWidth - tip.offsetWidth - 8, Math.max(8, e.clientX - tip.offsetWidth / 2))}px`;
+    tip.style.top = `${Math.max(8, e.clientY - tip.offsetHeight - 12)}px`;
+  });
+  document.addEventListener("pointermove", e => {
+    if (e.pointerType !== "mouse") return;
+    const t = e.target.closest("[data-tip]");
+    if (!t) return tip.classList.add("hidden");
+    tip.textContent = t.dataset.tip; tip.classList.remove("hidden");
+    tip.style.left = `${Math.min(innerWidth - tip.offsetWidth - 8, Math.max(8, e.clientX - tip.offsetWidth / 2))}px`;
+    tip.style.top = `${Math.max(8, e.clientY - tip.offsetHeight - 12)}px`;
+  });
+  </script>
+</body>
+</html>

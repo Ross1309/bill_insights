@@ -3,6 +3,7 @@ import { getFirestore, collection, doc, getDoc, getDocs, getCountFromServer, que
 
 import { STATES, DELEGATE_JURISDICTIONS } from "./states.js";
 import { renderOverview } from "./overview.js";
+import { renderIssue } from "./issues.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyB53n86BTG9co1S8Ek0Acvx4onbzvXQD8Y",
@@ -26,11 +27,13 @@ const stateSelect = document.getElementById("state-select");
 
 // Tab Navigation Elements
 const navOverview = document.getElementById("nav-overview");
+const navIssues = document.getElementById("nav-issues");
 const navBills = document.getElementById("nav-bills");
 const navVotes = document.getElementById("nav-votes");
 const navMembers = document.getElementById("nav-members");
 
 const viewOverview = document.getElementById("view-overview");
+const viewIssues = document.getElementById("view-issues");
 const viewBills = document.getElementById("view-bills");
 const viewVotes = document.getElementById("view-votes");
 const viewMembers = document.getElementById("view-members");
@@ -41,6 +44,54 @@ let allBills = [];
 const billCache = new Map();
 let votesLoaded = false;
 let overviewLoaded = false;
+
+// --- Issues tab: one precomputed doc per topic (stats/topic-<slug>) -------------
+// The chosen topic and "your members" state are remembered per browser.
+const store = {
+  get(k, fallback) { try { return localStorage.getItem(k) ?? fallback; } catch { return fallback; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode etc. */ } },
+};
+const ISSUE_TOPICS = ["economy", "healthcare", "foreign-affairs"];
+let currentIssue = ISSUE_TOPICS.includes(store.get("cw-issue", "")) ? store.get("cw-issue", "") : "economy";
+let issueLoaded = false;
+let issueRequest = 0;
+const issueCache = new Map();
+
+async function loadIssue(slug) {
+  const container = document.getElementById("issue-container");
+  const request = ++issueRequest;
+  currentIssue = slug;
+  store.set("cw-issue", slug);
+  setChipGroup("issue-topics", "topic", slug);
+  try {
+    if (!issueCache.has(slug)) {
+      container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>`;
+      const snap = await getDoc(doc(db, "stats", `topic-${slug}`));
+      if (!snap.exists()) throw new Error("This issue page hasn't been built yet.");
+      issueCache.set(slug, snap.data());
+    }
+    if (request !== issueRequest) return;
+    const stats = issueCache.get(slug);
+    document.getElementById("issue-title").textContent = stats.label;
+    issueLoaded = true;
+    renderIssue(container, stats, {
+      state: store.get("cw-state", DEFAULT_STATE),
+      onStateChange: code => store.set("cw-state", code),
+      getVote,
+    });
+  } catch (err) {
+    if (request !== issueRequest) return;
+    console.error("Error loading issue:", err);
+    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load this issue: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function setupIssues() {
+  document.getElementById("issue-topics")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-topic]");
+    if (b && b.dataset.topic !== currentIssue) loadIssue(b.dataset.topic);
+  });
+}
 
 // --- Overview tab: one small precomputed doc (stats/overview) ------------------
 async function loadOverview() {
@@ -74,12 +125,14 @@ async function init() {
   setupVoteFilters();
   setupBillFilters();
   setupModals();
+  setupIssues();
   loadHeadlineStats();
   await loadBills({ reset: true });
 }
 
 function setupTabs() {
   navOverview.addEventListener("click", () => switchTab("overview"));
+  navIssues.addEventListener("click", () => switchTab("issues"));
   navBills.addEventListener("click", () => switchTab("bills"));
   navVotes.addEventListener("click", () => switchTab("votes"));
   navMembers.addEventListener("click", () => {
@@ -93,7 +146,7 @@ const TAB_ACTIVE = `${TAB_BASE} text-gray-900 border-pink`;
 const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-800`;
 
 function switchTab(tabName) {
-  const tabs = { overview: [navOverview, viewOverview], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers] };
+  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers] };
   for (const [name, [nav, view]] of Object.entries(tabs)) {
     const active = name === tabName;
     nav.className = active ? TAB_ACTIVE : TAB_IDLE;
@@ -102,6 +155,7 @@ function switchTab(tabName) {
   }
   if (tabName === "votes" && !votesLoaded) fetchVotes();
   if (tabName === "overview" && !overviewLoaded) loadOverview();
+  if (tabName === "issues" && !issueLoaded) loadIssue(currentIssue);
   // If the sticky tab bar is pinned (scrolled past the header), start the new tab
   // at its top instead of mid-way down.
   // (The bar sits right under the header, so the header's height is where it pins.)

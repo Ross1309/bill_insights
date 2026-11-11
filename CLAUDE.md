@@ -46,6 +46,11 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
 public/index.html, public/app.js   UI (no build step)
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
 public/overview.js                 Overview tab charts (plain SVG/HTML) from stats/overview
+public/issues.js                   Issues tab topic pages from stats/topic-<slug> (+ explainers, glossary)
+netlify/lib/topics.js              Topic + watchlist definitions (CRS policy areas / subjects)
+netlify/lib/topic-stats.js         computeTopicStats(): one stats/topic-<slug> doc per topic
+scripts/import-topic-bills.js      Store + enrich every law and voted-on bill (resumable)
+mockups/                           Design mockups (static, not deployed; `mockups` launch config)
 firestore.indexes.json             Composite indexes the UI's queries need
 netlify/functions/sync-bills.js    Syncs recent bills + AI summaries (was sync-votes.js)
 netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House
@@ -85,7 +90,8 @@ node scripts/backfill-bills.js --write [--summaries]
 node scripts/import-votes.js [--write] [--chamber house|senate] [--congress 118] [--limit N]
 node scripts/import-bills.js [--write] [--limit 2000]
 node scripts/summarize-bills.js [--write] [--limit N] [--recheck-days 3]
-node scripts/build-stats.js [--backfill]
+node scripts/build-stats.js [--backfill]          # stats/overview + stats/topic-*
+node scripts/import-topic-bills.js [--write] [--force]
 ```
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
@@ -103,7 +109,13 @@ category ("Economy" | "Healthcare" | "Foreign Affairs" | "Other" | "Uncategorize
 introduced_date, update_date, latestAction { actionDate, text },
 congress_gov_url,
 ai_summary { bullet_points[], source: "crs_summary", model, generated_at } (or absent),
-crs_summary_available (bool, absent = never checked), crs_checked_at (ISO),
+crs_summary_available (bool; null = enriched but never checked; absent on old docs),
+crs_checked_at (ISO),
+issue tracker (from fetchBillEnrichment): subjects[] (CRS legislative subjects),
+subject_count, stage (introduced|committee|passed_one|passed_both|to_president|law),
+passed_house, passed_senate, failed_house, failed_senate, vetoed, law_number,
+sponsor { bioguideId, name, party, state }, cosponsors_count,
+topics[] (topic + watchlist slugs), topic_focus { <watchlist>: bool }, enriched_at,
 synced_at
 ```
 
@@ -146,6 +158,16 @@ votes_without_party_breakdown, generated_at
 ```
 Built from `select()`ed small vote fields (needs `party_breakdown` on every vote).
 
+**`stats/topic-<slug>`** — one per topic in `topics.js` (economy, healthcare,
+foreign-affairs), rebuilt with stats/overview (same `writeOverviewStats` call)
+```
+slug, label, intro, policy_areas, explainers, counts { measures, law, passed_both,
+passed_one, none, votes }, laws [compact bill + chamber_votes {House|Senate: {yea,nay}}],
+key_votes [5 latest, with party_breakdown + bill], agreement {House|Senate: {same,opposed}},
+overall_agreement, watchlists { <slug>: { label, intro, subjects, counts, focused [bill +
+votes], broad [bill] } }, watchlist_order, congress, generated_at
+```
+
 **`members`** — doc id = bioguideId, written by `ingest-votes.js`
 ```
 bioguideId, name ("Last, First"), state ("WA"), state_name ("Washington"),
@@ -183,6 +205,33 @@ Pending / known issues:
   parallel and AI summaries are capped at 3 per run.
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
+
+## Issues tab (frontend)
+
+Plain-language topic pages, built from the approved mockup (`mockups/foreign-affairs.html`).
+- **Topics** (`netlify/lib/topics.js`): Economy, Healthcare, Foreign Affairs by CRS policy
+  area. Foreign Affairs has **watchlists** Iran, Israel, Foreign aid: CRS subject tag OR the
+  topic named in the title (H.R. 5334 "…Russia and Iran Act" has no *Iran* subject tag).
+  A watchlist bill is **focused** if its title names the topic or it has ≤10 CRS subjects,
+  otherwise **broad** (appropriations/NDAA with ~250 subjects). Pages print these rules.
+- **Measures** = bills tagged with the topic that became law or got a recorded vote.
+  Bills that never reached the floor aren't counted (coverage: `import-topic-bills.js`).
+- **Stage** comes from actions; only actions *starting* "Passed/agreed to in …" count as
+  passing ("Failed of passage/not agreed to in …" also contains "agreed to in").
+- Sections: At a glance (template sentence + funnel), Watchlists (vote timeline, focused
+  vs broad), What became law, Recent key votes (plain-English meaning of each question via
+  `explainQuestion`, party Yea/Nay bars, members from the chosen state), party agreement vs
+  all votes, explainers + glossary, definitions & sources.
+- "Members from <state>" (no district info, so it's the whole delegation); topic and state
+  are remembered in localStorage (`cw-issue`, `cw-state`). Key-vote positions are loaded
+  from the 5 vote docs on demand (`getVote`).
+- Explainer texts (`EXPLAINERS` in issues.js) are our own words. They were approved as part
+  of the mockup on 2026-11-11; edit them there, carefully (War Powers text mentions
+  INS v. Chadha).
+- Nightly: `ingest-votes` enriches bills that new votes refer to (no OpenAI; marks
+  `crs_summary_available: null`); `sync-bills` enriches its 10 recent bills (keeps "became
+  law" current) and summarizes never-checked (null) bills first within its 3-summary
+  budget. `ingest-votes` ran ~7s locally after this change.
 
 ## Overview tab (frontend, default tab)
 
@@ -402,9 +451,9 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 - Docs-only commits can skip a credit-costing deploy with `[skip netlify]` in the message.
 
 ### Proposed next
-- Issue tracker (Economy / Healthcare / Foreign Affairs + watchlists such as Israel, Iran,
-  foreign aid) defined by CRS policy areas + legislative subject terms; needs bill
-  subjects, sponsor party and stage data. See the discussion of 2026-11-11.
+- Issue tracker follow-ups: more topics (Immigration, Defense?) = add to topics.js +
+  chip in index.html; "moving now" section; bills that never reached the floor would need
+  the complete (~20k bill) enrichment.
 - Voting Record scaling: `voter_ids` array + `array-contains` query (see Detail modals).
 - Waiting bills only get re-checked 5 per sync run; with ~1,000 waiting, run
   `summarize-bills.js --write` occasionally (or schedule it) to catch new CRS summaries.

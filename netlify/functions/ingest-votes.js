@@ -4,6 +4,7 @@ import { STATE_CODES } from '../../public/states.js';
 import { fetchLatestSenateVotes } from '../lib/senate-votes.js';
 import { listHouseVotes, buildHouseVoteDoc } from '../lib/house-votes.js';
 import { writeOverviewStats } from '../lib/overview.js';
+import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -33,7 +34,17 @@ export async function handler(event, context) {
     const failures = results.filter(r => r.status === "rejected").map(r => r.reason?.message || String(r.reason));
     failures.forEach(msg => console.error("Vote sync failed:", msg));
 
-    // 4. Rebuild the Overview tab's precomputed stats (small fields only).
+    // 4. Issue tracker: enrich the bills these votes are on (sync-bills summarizes them).
+    try {
+      const billIds = results.filter(r => r.status === "fulfilled").flatMap(r => r.value || []);
+      const n = await enrichVotedBills(billIds);
+      if (n) console.log(`Enriched ${n} newly voted-on bills`);
+    } catch (err) {
+      failures.push(`enrich: ${err.message}`);
+      console.error("Bill enrichment failed:", err);
+    }
+
+    // 5. Rebuild the Overview tab's precomputed stats (small fields only).
     try {
       const stats = await writeOverviewStats(db, admin, { congress: CONGRESS_NUM });
       console.log(`stats/overview rebuilt from ${stats.votes} votes`);
@@ -61,6 +72,7 @@ export async function handler(event, context) {
 
 async function syncHouseVotes() {
   const latest = (await listHouseVotes(CONGRESS_NUM, CONGRESS_API_KEY)).slice(0, VOTES_PER_RUN);
+  const billIds = [];
   for (const voteItem of latest) {
     const doc = await buildHouseVoteDoc(voteItem, CONGRESS_NUM, CONGRESS_API_KEY);
     await db.collection("votes").doc(doc.vote_id).set({
@@ -68,7 +80,9 @@ async function syncHouseVotes() {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
     console.log(`Ingested House Roll Call Vote #${doc.roll_call_number} (${doc.date})`);
+    if (doc.bill_id) billIds.push(doc.bill_id);
   }
+  return billIds;
 }
 
 async function syncSenateVotes(legislators) {
@@ -77,6 +91,7 @@ async function syncSenateVotes(legislators) {
     .map(l => [l.id.lis, l.id.bioguide]));
 
   const votes = await fetchLatestSenateVotes(VOTES_PER_RUN, lisToBioguide);
+  const billIds = [];
   for (const { doc, unmapped } of votes) {
     await db.collection("votes").doc(doc.vote_id).set({
       ...doc,
@@ -84,7 +99,32 @@ async function syncSenateVotes(legislators) {
     }, { merge: true });
     if (unmapped) console.warn(`Senate vote ${doc.vote_id}: ${unmapped} senator(s) without a bioguide mapping`);
     console.log(`Ingested Senate Roll Call Vote #${doc.roll_call_number} (${doc.date})`);
+    if (doc.bill_id) billIds.push(doc.bill_id);
   }
+  return billIds;
+}
+
+// Bills a new vote refers to: store + enrich them if they aren't yet (stage, subjects,
+// topics). No OpenAI here (keeps this run fast): a bill that has never been checked
+// for a CRS summary is marked crs_summary_available: null, and sync-bills summarizes
+// those first. Already-enriched bills get their stage refreshed by sync-bills when
+// they show up as recently updated.
+async function enrichVotedBills(ids) {
+  const unique = [...new Set(ids)].filter(id => parseBillId(id));
+  const snaps = await Promise.all(unique.map(id => db.collection("bills").doc(id).get()));
+  const todo = unique.map((id, i) => [id, snaps[i]]).filter(([, s]) => !s.exists || !s.data().enriched_at);
+  await Promise.all(todo.map(async ([id, snap]) => {
+    const { congress, type, number } = parseBillId(id);
+    const fields = await fetchEnrichedBill(congress, type, number, CONGRESS_API_KEY);
+    const data = snap.exists ? snap.data() : {};
+    const neverChecked = !data.ai_summary && data.crs_summary_available === undefined;
+    await db.collection("bills").doc(id).set({
+      ...fields,
+      ...(neverChecked ? { crs_summary_available: null } : {}),
+      synced_at: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }));
+  return todo.length;
 }
 
 const CHAMBERS = { 'House of Representatives': 'House', 'Senate': 'Senate' };
