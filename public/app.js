@@ -1,237 +1,268 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyB53n86BTG9co1S8Ek0Acvx4onbzvXQD8Y",
+    authDomain: "congress-watcher-b0dd3.firebaseapp.com",
+    projectId: "congress-watcher-b0dd3",
+    storageBucket: "congress-watcher-b0dd3.firebasestorage.app",
+    messagingSenderId: "775303136240",
+    appId: "1:775303136240:web:ab13bd736700a29cfe5335"
+};
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// State caches to minimize Firestore reads
+// DOM Elements
+const billsContainer = document.getElementById("bills-container");
+const votesContainer = document.getElementById("votes-container");
+const membersContainer = document.getElementById("members-container");
+const searchInput = document.getElementById("search-input");
+const stateSelect = document.getElementById("state-select");
+
+// Tab Navigation Elements
+const navBills = document.getElementById("nav-bills");
+const navVotes = document.getElementById("nav-votes");
+const navMembers = document.getElementById("nav-members");
+
+const viewBills = document.getElementById("view-bills");
+const viewVotes = document.getElementById("view-votes");
+const viewMembers = document.getElementById("view-members");
+
 let allBills = [];
-let allVotes = [];
-let allMembers = [];
-let currentCategory = 'all';
-let searchQuery = '';
-let activeTab = 'bills';
+let activeCategory = "all";
 
-async function initApp() {
-  setupTabNavigation();
-  setupEventListeners();
-  await loadBillsData();
+async function init() {
+  setupTabs();
+  setupStateListener();
+  setupBillFilters();
+  await fetchBills();
 }
 
-// --- TAB SWITCHING LOGIC ---
-function setupTabNavigation() {
-  const tabs = {
-    'nav-bills': 'view-bills',
-    'nav-votes': 'view-votes',
-    'nav-members': 'view-members'
-  };
+function setupTabs() {
+  navBills.addEventListener("click", () => switchTab("bills"));
+  navVotes.addEventListener("click", () => switchTab("votes"));
+  navMembers.addEventListener("click", () => {
+    switchTab("members");
+    fetchMembers(stateSelect ? stateSelect.value : "WA");
+  });
+}
 
-  Object.keys(tabs).forEach(navId => {
-    document.getElementById(navId).addEventListener('click', async (e) => {
-      // Update tab button styles
-      Object.keys(tabs).forEach(id => {
-        const btn = document.getElementById(id);
-        btn.className = "nav-tab pb-3 font-semibold text-gray-500 hover:text-gray-700 focus:outline-none transition";
-      });
-      e.target.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
-
-      // Hide all views, show active view
-      Object.values(tabs).forEach(viewId => {
-        document.getElementById(viewId).classList.add('hidden');
-      });
-      const activeView = tabs[navId];
-      document.getElementById(activeView).classList.remove('hidden');
-
-      // Lazy load data if switching tabs
-      if (navId === 'nav-votes' && allVotes.length === 0) {
-        await loadVotesData();
-      } else if (navId === 'nav-members' && allMembers.length === 0) {
-        await loadMembersData(document.getElementById('state-select').value);
-      }
+function setupStateListener() {
+  if (stateSelect) {
+    stateSelect.addEventListener("change", (e) => {
+      fetchMembers(e.target.value);
     });
+  }
+}
+
+function switchTab(tabName) {
+  [navBills, navVotes, navMembers].forEach(el => {
+    el.className = "nav-tab pb-3 font-semibold text-gray-500 hover:text-gray-700 focus:outline-none transition border-b-2 border-transparent";
   });
-}
+  [viewBills, viewVotes, viewMembers].forEach(el => el.classList.add("hidden"));
 
-// --- DATA FETCHERS ---
-async function loadBillsData() {
-  const container = document.getElementById('bills-container');
-  try {
-    const q = query(collection(db, "bills"), limit(20));
-    const snapshot = await getDocs(q);
-    allBills = [];
-    snapshot.forEach(doc => allBills.push({ id: doc.id, ...doc.data() }));
-    renderBills();
-  } catch (err) {
-    console.error("Error loading bills:", err);
-    container.innerHTML = `<p class="text-center text-red-500 py-8">Failed to load bills: ${err.message}</p>`;
+  if (tabName === "bills") {
+    navBills.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
+    viewBills.classList.remove("hidden");
+  } else if (tabName === "votes") {
+    navVotes.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
+    viewVotes.classList.remove("hidden");
+    renderVotesFromBills(allBills);
+  } else if (tabName === "members") {
+    navMembers.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
+    viewMembers.classList.remove("hidden");
   }
 }
 
-async function loadVotesData() {
-  const container = document.getElementById('votes-container');
+async function fetchBills() {
   try {
-    const q = query(collection(db, "votes"), limit(15));
+    const billsRef = collection(db, "bills");
+    const q = query(billsRef, limit(50));
     const snapshot = await getDocs(q);
-    allVotes = [];
-    snapshot.forEach(doc => allVotes.push({ id: doc.id, ...doc.data() }));
-    renderVotes();
+
+    if (snapshot.empty) {
+      billsContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No bills found in database.</p>`;
+      return;
+    }
+
+    allBills = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => billDate(b).localeCompare(billDate(a)));
+
+    applyBillFilters();
   } catch (err) {
-    console.error("Error loading votes:", err);
-    container.innerHTML = `<p class="text-center text-red-500 py-8">Failed to load votes: ${err.message}</p>`;
+    console.error("Error fetching bills:", err);
+    billsContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load bills: ${escapeHtml(err.message)}</p>`;
   }
 }
 
-async function loadMembersData(stateCode) {
-  const container = document.getElementById('members-container');
-  container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-4"></div><p class="text-gray-500">Loading legislators for ${stateCode}...</p></div>`;
+// --- Bill field helpers (schema written by netlify/functions/sync-votes.js) ---
 
-  try {
-    const q = query(collection(db, "members"), where("state", "==", stateCode));
-    const snapshot = await getDocs(q);
-    allMembers = [];
-    snapshot.forEach(doc => allMembers.push({ id: doc.id, ...doc.data() }));
-    renderMembers();
-  } catch (err) {
-    console.error("Error loading members:", err);
-    container.innerHTML = `<p class="text-center text-red-500 py-8">Failed to load members: ${err.message}</p>`;
-  }
+function billLabel(bill) {
+  if (bill.bill_number) return bill.bill_number;
+  if (bill.type || bill.number) return `${bill.type || ''} ${bill.number || ''}`.trim();
+  return 'BILL';
 }
 
-// --- RENDER FUNCTIONS ---
-function renderBills() {
-  const container = document.getElementById('bills-container');
-  const filtered = allBills.filter(bill => {
-    const matchesCategory = currentCategory === 'all' || bill.category === currentCategory;
-    const matchesSearch = !searchQuery || 
-      (bill.title && bill.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (bill.bill_number && bill.bill_number.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesSearch;
-  });
+function billDate(bill) {
+  return bill.latestAction?.actionDate || bill.update_date || '';
+}
 
-  if (filtered.length === 0) {
-    container.innerHTML = `<p class="text-center text-gray-500 py-12">No matching bills found.</p>`;
+const SUMMARY_SOURCE_LABELS = {
+  crs_summary: 'AI summary of the official CRS summary',
+  title_only: 'AI summary from the title only — no official summary yet',
+};
+
+function renderSummary(bill) {
+  const points = bill.ai_summary?.bullet_points;
+  if (!points || points.length === 0) {
+    return `<p class="text-gray-500 text-sm italic">Summary pending.</p>`;
+  }
+  const label = SUMMARY_SOURCE_LABELS[bill.ai_summary.source] || 'AI-generated summary';
+  return `
+    <ul class="list-disc pl-5 space-y-1 text-gray-600 text-sm">
+      ${points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+    </ul>
+    <p class="text-[11px] text-gray-400 mt-2">${escapeHtml(label)}</p>
+  `;
+}
+
+function renderBills(bills) {
+  if (bills.length === 0) {
+    billsContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No matching bills found.</p>`;
     return;
   }
 
-  let html = '<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">';
-  filtered.forEach((bill) => {
-    const bullets = bill.ai_summary?.bullet_points || [];
-    html += `
-      <div class="border rounded-xl p-5 shadow-sm bg-white flex flex-col justify-between hover:shadow-md transition">
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800">${bill.category || 'General'}</span>
-            <span class="text-xs font-semibold text-gray-500">${bill.bill_number || ''}</span>
-          </div>
-          <h3 class="font-bold text-lg mb-3 text-gray-900 leading-snug">${bill.title || 'Untitled Bill'}</h3>
-          <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 mb-4">
-            ${bullets.map(b => `<li>${b}</li>`).join('')}
-          </ul>
-        </div>
-        <div class="text-xs text-gray-400 border-t pt-3 flex justify-between">
-          <span>Chamber: ${bill.chamber || 'N/A'}</span>
-          <span>Date: ${bill.date_voted || 'N/A'}</span>
-        </div>
-      </div>
-    `;
-  });
-  html += '</div>';
-  container.innerHTML = html;
-}
-
-function renderVotes() {
-  const container = document.getElementById('votes-container');
-  if (allVotes.length === 0) {
-    container.innerHTML = `<p class="text-center text-gray-500 py-12">No roll-call vote records found in database. Run your ingestion function to populate.</p>`;
-    return;
-  }
-
-  let html = '<div class="space-y-6">';
-  allVotes.forEach(vote => {
-    const tallies = vote.tallies || { yea: 0, nay: 0, not_voting: 0 };
-    html += `
-      <div class="border rounded-xl p-6 shadow-sm bg-white">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b gap-2">
+  billsContainer.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      ${bills.map(bill => `
+        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
           <div>
-            <span class="text-xs font-semibold px-2.5 py-0.5 rounded bg-purple-100 text-purple-800">${vote.chamber} Roll Call #${vote.roll_call_number}</span>
-            <h3 class="font-bold text-lg text-gray-900 mt-1">${vote.question || 'Legislative Vote'}</h3>
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
+              <span class="bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded uppercase">${escapeHtml(billLabel(bill))}</span>
+              <span>${escapeHtml(String(bill.congress || ''))}${bill.congress ? 'th Congress' : ''}</span>
+            </div>
+            ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
+            <h3 class="font-bold text-gray-900 text-lg mb-3">${escapeHtml(bill.title || 'Untitled Bill')}</h3>
+            ${renderSummary(bill)}
           </div>
-          <div class="text-right">
-            <span class="inline-block px-3 py-1 text-xs font-bold rounded ${vote.result === 'Passed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${vote.result}</span>
-            <p class="text-xs text-gray-400 mt-1">Date: ${vote.date || 'N/A'}</p>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-4 my-4 text-center">
-          <div class="bg-green-50 p-3 rounded-lg border border-green-100">
-            <p class="text-xs text-green-600 font-semibold uppercase">Yeas</p>
-            <p class="text-xl font-bold text-green-700">${tallies.yea || 0}</p>
-          </div>
-          <div class="bg-red-50 p-3 rounded-lg border border-red-100">
-            <p class="text-xs text-red-600 font-semibold uppercase">Nays</p>
-            <p class="text-xl font-bold text-red-700">${tallies.nay || 0}</p>
-          </div>
-          <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <p class="text-xs text-gray-500 font-semibold uppercase">Not Voting</p>
-            <p class="text-xl font-bold text-gray-700">${tallies.not_voting || 0}</p>
+          <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+            ${bill.latestAction?.text ? `<p><strong class="text-gray-700">Latest action${bill.latestAction.actionDate ? ` (${escapeHtml(bill.latestAction.actionDate)})` : ''}:</strong> ${escapeHtml(bill.latestAction.text)}</p>` : ''}
+            ${bill.congress_gov_url ? `<a href="${escapeHtml(bill.congress_gov_url)}" target="_blank" rel="noopener" class="inline-block text-blue-600 hover:underline">View on Congress.gov →</a>` : ''}
           </div>
         </div>
-      </div>
-    `;
-  });
-  html += '</div>';
-  container.innerHTML = html;
+      `).join('')}
+    </div>
+  `;
 }
 
-function renderMembers() {
-  const container = document.getElementById('members-container');
-  if (allMembers.length === 0) {
-    container.innerHTML = `<p class="text-center text-gray-500 py-12">No members found for this state. Ensure your ingestion script has synced members.</p>`;
+function renderVotesFromBills(bills) {
+  // Even if specific vote fields are missing, display bill actions/titles as roll-call entries
+  if (!bills || bills.length === 0) {
+    votesContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No vote or action records found.</p>`;
     return;
   }
 
-  let html = '<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">';
-  allMembers.forEach(member => {
-    html += `
-      <div class="border rounded-xl p-5 shadow-sm bg-white flex items-center space-x-4">
-        <img src="${member.imageUrl}" alt="${member.name}" class="w-16 h-20 object-cover rounded-lg bg-gray-100 border" onerror="this.src='https://via.placeholder.com/150?text=No+Photo'" />
-        <div>
-          <span class="text-xs font-semibold px-2 py-0.5 rounded ${member.party === 'Democratic' ? 'bg-blue-100 text-blue-800' : member.party === 'Republican' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">${member.party || 'Independent'}</span>
-          <h4 class="font-bold text-base text-gray-900 mt-1">${member.name}</h4>
-          <p class="text-xs text-gray-500 mt-0.5">${member.chamber} • ${member.state} ${member.district ? `(District ${member.district})` : ''}</p>
+  votesContainer.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      ${bills.map(bill => `
+        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
+              <span class="bg-purple-50 text-purple-600 font-semibold px-2 py-0.5 rounded uppercase">Action / Vote</span>
+              <span>${escapeHtml(billLabel(bill))}</span>
+            </div>
+            <h3 class="font-bold text-gray-900 text-lg mb-2">${escapeHtml(bill.title || 'Legislative Item')}</h3>
+            <p class="text-gray-600 text-sm mb-3"><strong>Latest Action:</strong> ${escapeHtml(bill.latestAction?.text || bill.actionText || 'No action text recorded.')}</p>
+            ${bill.latestAction?.actionDate ? `<p class="text-xs text-gray-400">Date: ${escapeHtml(bill.latestAction.actionDate)}</p>` : ''}
+          </div>
         </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function fetchMembers(stateCode) {
+  try {
+    membersContainer.innerHTML = `
+      <div class="text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-4"></div>
+        <p class="text-gray-500">Loading members for ${stateCode}...</p>
       </div>
     `;
-  });
-  html += '</div>';
-  container.innerHTML = html;
+
+    const membersRef = collection(db, "members");
+    // Query Firestore filtering by state field
+    const q = query(membersRef, where("state", "==", stateCode), limit(50));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      membersContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No members found for ${stateCode}.</p>`;
+      return;
+    }
+
+    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    membersContainer.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        ${members.map(m => `
+          <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+            <h3 class="font-bold text-gray-900 text-lg">${escapeHtml(m.name || m.fullName || 'Member')}</h3>
+            <p class="text-sm text-gray-500">${escapeHtml(m.state || '')} — <span class="font-medium text-blue-600">${escapeHtml(m.party || '')}</span></p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (err) {
+    console.error("Error fetching members:", err);
+    membersContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load members: ${escapeHtml(err.message)}</p>`;
+  }
 }
 
-// --- EVENT LISTENERS ---
-function setupEventListeners() {
-  // Search
-  document.getElementById('search-input').addEventListener('input', (e) => {
-    searchQuery = e.target.value.trim();
-    renderBills();
-  });
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
-  // Category filters
-  const filterButtons = document.querySelectorAll('.filter-btn');
-  filterButtons.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      filterButtons.forEach(b => {
-        b.classList.remove('bg-blue-600', 'text-white');
-        b.classList.add('bg-gray-200', 'text-gray-700');
+function setupBillFilters() {
+  if (searchInput) {
+    searchInput.addEventListener("input", applyBillFilters);
+  }
+
+  document.querySelectorAll("#category-filters .filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeCategory = btn.dataset.category;
+      document.querySelectorAll("#category-filters .filter-btn").forEach(b => {
+        const active = b === btn;
+        b.classList.toggle("bg-blue-600", active);
+        b.classList.toggle("text-white", active);
+        b.classList.toggle("bg-gray-200", !active);
+        b.classList.toggle("text-gray-700", !active);
+        b.classList.toggle("hover:bg-gray-300", !active);
       });
-      e.target.classList.remove('bg-gray-200', 'text-gray-700');
-      e.target.classList.add('bg-blue-600', 'text-white');
-
-      currentCategory = e.target.getAttribute('data-category');
-      renderBills();
+      applyBillFilters();
     });
   });
-
-  // State dropdown change
-  document.getElementById('state-select').addEventListener('change', async (e) => {
-    const selectedState = e.target.value;
-    await loadMembersData(selectedState);
-  });
 }
 
-initApp();
+function applyBillFilters() {
+  const term = (searchInput?.value || "").trim().toLowerCase();
+  // "HR 1234", "hr1234" and "1234" should all match bill HR 1234
+  const compactTerm = term.replace(/[\s.]/g, "");
+
+  const filtered = allBills.filter(bill => {
+    if (activeCategory !== "all" && bill.category !== activeCategory) return false;
+    if (!term) return true;
+    const title = (bill.title || "").toLowerCase();
+    const policyArea = (bill.policy_area || "").toLowerCase();
+    const label = billLabel(bill).toLowerCase().replace(/[\s.]/g, "");
+    return title.includes(term) || policyArea.includes(term) || label.includes(compactTerm);
+  });
+
+  renderBills(filtered);
+}
+
+init();
