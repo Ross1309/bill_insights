@@ -914,13 +914,15 @@ const POSITION_BADGES = {
   present: "bg-gray-100 text-gray-700", not_voting: "bg-yellow-50 text-yellow-800",
 };
 const functionCache = new Map();
+// Rate-limited functions are served at their own paths (see each function's config).
+const FUNCTION_PATHS = { "member-profile": "/api/member-profile", "bill-detail": "/api/bill-detail" };
 let modalStack = []; // entries: { kind, id, tab, data: {}, errors: {}, filter: {} }
 let lastFocused = null;
 
 function fetchFunction(name, id) {
   const key = `${name}:${id}`;
   if (!functionCache.has(key)) {
-    functionCache.set(key, fetch(`/.netlify/functions/${name}?id=${encodeURIComponent(id)}`)
+    functionCache.set(key, fetch(`${FUNCTION_PATHS[name] || `/.netlify/functions/${name}`}?id=${encodeURIComponent(id)}`)
       .then(async res => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);

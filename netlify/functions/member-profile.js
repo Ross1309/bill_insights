@@ -117,9 +117,19 @@ export default async (req) => {
       cosponsoredCount: m.cosponsoredLegislation?.count ?? null,
       sponsored: sponsored ? (sponsored.sponsoredLegislation || []).map(shapeSponsored) : null,
       bioguideUrl: `https://bioguide.congress.gov/search/bio/${id}`,
-    }, 200, { 'Cache-Control': 'public, max-age=3600' });
+    }, 200, { 'Cache-Control': 'public, max-age=3600', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=21600, stale-while-revalidate=86400' });
   } catch (err) {
     console.error(`member-profile ${id}:`, err);
-    return json({ error: err.status === 404 ? 'Member not found.' : 'Could not load member profile.' }, err.status === 404 ? 404 : 502);
+    if (err.status === 404) return json({ error: 'Member not found.' }, 404, { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
+    return json({ error: 'Could not load member profile.' }, 502);
   }
+};
+
+// Public, unauthenticated, and each call spends Congress.gov quota: cache answers on
+// Netlify's CDN (durable, shared across edge nodes; the ?id= query is part of the
+// cache key) and rate-limit per visitor. Rate-limited functions need an explicit
+// path, so this function is served at /api/member-profile (not /.netlify/functions/…).
+export const config = {
+  path: '/api/member-profile',
+  rateLimit: { windowLimit: 60, windowSize: 60, aggregateBy: ['ip', 'domain'] },
 };

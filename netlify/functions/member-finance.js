@@ -82,12 +82,12 @@ export default async (req) => {
   try {
     const snap = await getDb().collection('members').doc(id).get();
     const member = snap.exists ? snap.data() : null;
-    if (!member) return json({ error: 'Member not found.' }, 404);
+    if (!member) return json({ error: 'Member not found.' }, 404, { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
 
     const candidateId = pickCandidateId(member.fec_ids || [], member.chamber);
     if (!candidateId) {
       return json({ available: false, reason: 'No FEC candidate id is on file for this member yet.' }, 200,
-        { 'Cache-Control': 'public, max-age=3600' });
+        { 'Cache-Control': 'public, max-age=3600', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
     }
 
     const candidate = (await fec(`/candidate/${candidateId}/`, key)).results?.[0] || {};
@@ -106,7 +106,7 @@ export default async (req) => {
     }
     if (!totals) {
       return json({ available: false, reason: 'No receipts have been reported to the FEC for this period yet.' }, 200,
-        { 'Cache-Control': 'public, max-age=3600' });
+        { 'Cache-Control': 'public, max-age=3600', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
     }
 
     const q = `candidate_id=${candidateId}&cycle=${year}&election_full=true`;
@@ -166,7 +166,7 @@ export default async (req) => {
           }
         : null,
       sourceUrl: `https://www.fec.gov/data/candidate/${candidateId}/?cycle=${year}&election_full=true`,
-    }, 200, { 'Cache-Control': 'public, max-age=43200' });
+    }, 200, { 'Cache-Control': 'public, max-age=43200', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=43200, stale-while-revalidate=86400' });
   } catch (err) {
     console.error(`member-finance ${id}:`, err);
     if (err.status === 429) return json({ error: 'The FEC rate limit was reached. Try again later.' }, 503);

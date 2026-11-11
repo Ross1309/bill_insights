@@ -113,10 +113,19 @@ export default async (req) => {
       crsSummary,
       actionsCount: detail.actions?.count ?? null,
       actions: actionsRes ? shapeActions(actionsRes.actions || []) : null,
-    }, 200, { 'Cache-Control': 'public, max-age=3600' });
+    }, 200, { 'Cache-Control': 'public, max-age=3600', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=21600, stale-while-revalidate=86400' });
   } catch (err) {
     console.error(`bill-detail ${billId}:`, err);
-    const notFound = err.status === 404;
-    return json({ error: notFound ? 'Bill not found.' : 'Could not load bill details.' }, notFound ? 404 : 502);
+    if (err.status === 404) return json({ error: 'Bill not found.' }, 404, { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
+    return json({ error: 'Could not load bill details.' }, 502);
   }
+};
+
+// Public, unauthenticated, and each call spends Congress.gov quota: cache answers on
+// Netlify's CDN (durable, shared across edge nodes; the ?id= query is part of the
+// cache key) and rate-limit per visitor. Rate-limited functions need an explicit
+// path, so this function is served at /api/bill-detail (not /.netlify/functions/…).
+export const config = {
+  path: '/api/bill-detail',
+  rateLimit: { windowLimit: 60, windowSize: 60, aggregateBy: ['ip', 'domain'] },
 };
