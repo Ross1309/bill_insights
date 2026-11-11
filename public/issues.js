@@ -19,7 +19,7 @@ const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 const billLink = b => `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="text-xs font-semibold text-accent hover:underline">${esc(b.label)}</button>`;
 
 // Plain-English meaning of each kind of floor question.
-function explainQuestion(question = "") {
+export function explainQuestion(question = "") {
   const q = question.toLowerCase();
   if (q.includes("concur in")) return "A vote to accept the other chamber's version of the bill. Agreeing usually sends it to the President.";
   if (q.includes("cloture")) return "A vote on whether to end debate and move forward. It needs 60 of 100 senators.";

@@ -1,5 +1,5 @@
 [build]
-  command = "npm install"
+  command = "npm install && npm test"  # unit tests gate every deploy
   publish = "public"
   functions = "netlify/functions"
 
