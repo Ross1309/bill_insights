@@ -19,6 +19,16 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
   Bills before the 93rd Congress (1973) are treated as having no CRS summary (none exist,
   and Congress.gov's summaries endpoint 500s for them).
 - Never commit `.env` (Firebase service account + OpenAI key). It's in `.gitignore`.
+- **Firestore security rules** (`firestore.rules`, published 2026-11-11): public *read* of
+  `bills`, `votes`, `members`, `directory`, `stats`; no browser writes anywhere. Before
+  that the project was `allow read, write: if true`, so anyone could change or delete data.
+  The site only reads; all writes go through firebase-admin (functions/scripts), which
+  bypasses rules. **Adding a new collection the site reads? Add a read rule** and
+  republish (Firebase console → Firestore → Rules, or the Rules API).
+- The Firebase *web* config in `public/app.js` (`apiKey: "AIza…"`) is public by design.
+  Netlify's secret scanner flags it, so `netlify.toml` exempts that one value via
+  `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`. Never exempt or disable scanning for
+  anything else.
 
 ## Stack
 
@@ -384,6 +394,12 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
   **can't be called by URL in production**, so nobody can trigger OpenAI/Firestore
   spend from outside. Trigger manually with **Run now** on the function's page in the
   Netlify UI; locally `node run-ingest.js` / `netlify dev` + curl still work.
+- First successful deploy of this session's work: `7ce0ecf` (2026-11-11). Verified live:
+  every tab, `member-profile` / `bill-detail` / `member-finance` return 200; `sync-bills`
+  and `ingest-votes` return 403 from outside (scheduled-only); old `sync-votes` 404.
+  The first scheduled runs are 10:00/10:30 UTC on 2026-11-12. Check them in the Netlify
+  UI (Functions → logs) or `netlify logs --function ingest-votes --since 24h`.
+- Docs-only commits can skip a credit-costing deploy with `[skip netlify]` in the message.
 
 ### Proposed next
 - Issue tracker (Economy / Healthcare / Foreign Affairs + watchlists such as Israel, Iran,
