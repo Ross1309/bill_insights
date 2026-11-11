@@ -64,6 +64,8 @@ netlify/lib/overview.js            writeOverviewStats(): rebuild stats/overview 
 netlify/lib/member-votes.js        member_votes docs: per-member totals + latest 50 (applyNewMemberVotes)
 netlify/lib/vote-index.js          vote_index docs: compact fields of every vote (stats + ingest read these)
 netlify/lib/health.js              recordRun(): stats/health, latest run of each scheduled sync
+netlify/lib/tracked-bills.js       sync_state/tracked: enriched bill ids + stored laws (markTracked)
+scripts/build-tracked-bills.js     Rebuild sync_state/tracked from `bills` [--write]
 netlify/lib/http.js                fetchWithRetry/getJson/getText (timeouts, retries, key masking), json()
 scripts/build-member-votes.js      Rebuild member_votes + vote_index from full votes [--write] [--congress N]
 scripts/build-stats.js             Rebuild stats/overview [--backfill party_breakdown]
@@ -148,10 +150,13 @@ individual_votes[].lis_member_id
 - Congress.gov bill action histories lag senate.gov by about a day, so a brand-new Senate
   vote may not be linked from the bill's Actions tab yet.
 
-**`stats/overview`** — single doc (~12 KB), rebuilt by every `ingest-votes.js` run and by
-`scripts/build-stats.js`; read once by the Overview tab
+**`stats/overview`** — single doc (~12 KB), rebuilt by `ingest-votes.js` (only when votes,
+bills or members changed, or the last run failed), `sync-bills` (when it refreshed bills)
+and `scripts/build-stats.js`; read once per visit, shared by the Overview tab and header cards
 ```
-congress, first_vote_date, last_vote_date, totals { House, Senate },
+congress, headline { senate|house|delegates: { count, parties { Republican: n, … } },
+  bills, votes } (header cards; bills/votes are all-Congress counts),
+first_vote_date, last_vote_date, totals { House, Senate },
 weekly [{ week (Monday, ET), House, Senate }] (continuous, zeros = no votes),
 monthly [{ month, House|Senate: { same, opposed, unclear } }],
 alignment_totals { House|Senate: { same, opposed, unclear } },
@@ -237,7 +242,9 @@ pushed**. Firestore's free 50k reads/day ran out on 2026-11-11 (resets midnight 
 Do these in order:
 1. After the 10:00 UTC scheduled ingest (still old code, which writes votes without
    `members_applied`): `node scripts/build-member-votes.js --write`. It builds
-   member_votes + vote_index and flags every vote applied.
+   member_votes + vote_index and flags every vote applied. Then
+   `node scripts/build-tracked-bills.js --write` (sync_state/tracked, ~2,500 small reads)
+   and `node scripts/build-stats.js` (adds `headline` to stats/overview).
 2. Publish `firestore.rules` (adds the `member_votes` read rule), with the user's OK,
    **before** the deploy, or the Voting Record tab gets permission errors.
 3. Verify locally (Voting Record, Overview numbers ≈1,600 votes, footer), then push all
@@ -265,7 +272,17 @@ A full review found four must-fix problems; all fixed:
 Plus: `npm test` (tests/rules.test.js, node:test) runs in the Netlify build command, so a
 broken rule fails the deploy.
 
-`sync_state` is server-only (no read rule in firestore.rules, so browsers are denied).
+`sync_state` is server-only (no read rule in firestore.rules, so browsers are denied):
+- `sync_state/bills`: `last_refresh` window for sync-bills.
+- `sync_state/members`: a 12-char fingerprint per current member + the directory's, so the
+  nightly member sync writes only what changed (1 read instead of ~545 reads + writes).
+- `sync_state/tracked`: `ids` (bills with `enriched_at`), `laws` (stored with stage law),
+  `complete` (set only by the build script; until then callers fall back to reading the
+  bills). sync-bills checks the day's 250–750 updated bills + 140 laws against it.
+
+**Firestore read budget (free tier: 50k/day).** A visit costs ~2 reads (stats/overview,
+stats/health); Bills loads on its tab, the 100 KB directory on Legislators. Nightly runs
+cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting day).
 
 ### Review: second tier (done 2026-11-11)
 - Shared `netlify/lib/http.js` (timeouts + retries everywhere); `node-fetch`,
@@ -377,8 +394,9 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   chamber chips (Senate / House = voting reps / Delegates). 48 cards per page + "Show more".
   Scoped search with no hits offers "Search all states instead".
 - Headline cards under the page title: senators and representatives with party split and
-  House vacancies (out of 435), delegates, bills tracked and votes synced (via
-  `getCountFromServer`). Member cards are clickable and set the directory filters.
+  House vacancies (out of 435), delegates, bills tracked and votes synced, all from
+  `stats/overview.headline` (falls back to the directory doc + `getCountFromServer` if
+  the stats doc predates it). Member cards are clickable and set the directory filters.
 
 ## Campaign finance (member modal → Campaign Finance tab)
 
