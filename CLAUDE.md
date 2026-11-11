@@ -371,10 +371,24 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
   `crs_summary_available: false`. `sync-bills` re-checks up to 5 waiting bills per run
   (oldest check first, at most every 3 days) within its 3-summary budget.
 
+### Deploy & schedules (2026-11-11)
+- Netlify project **congress-watcher** (https://congress-watcher.netlify.app) auto-deploys
+  `main` from GitHub `Ross1309/bill_insights`. Env vars set there: `CONGRESS_API_KEY`,
+  `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY` (FEC reuses the Congress key).
+- **Credits:** Personal credit plan, 1,000 credits per period (resets on the 11th, Pacific).
+  Builds are blocked when usage is exceeded. That happened Nov 10–11: three deploys were
+  "Skipped due to account credit usage exceeded". Every production deploy costs credits,
+  so batch commits and push less often. Check usage in the Netlify UI (Billing → Usage).
+- `netlify.toml` schedules: `ingest-votes` 10:00 UTC, `sync-bills` 10:30 UTC daily.
+  Scheduled functions get **30 s** (not 10 s), only run on the published deploy, and
+  **can't be called by URL in production**, so nobody can trigger OpenAI/Firestore
+  spend from outside. Trigger manually with **Run now** on the function's page in the
+  Netlify UI; locally `node run-ingest.js` / `netlify dev` + curl still work.
+
 ### Proposed next
-- Deploy and verify on Netlify: env vars, every function, and `ingest-votes` runtime vs the
-  10s limit (split members / House / Senate into separate functions if needed).
-- Schedule the syncs (Netlify scheduled functions) for `sync-bills` and `ingest-votes`.
+- Issue tracker (Economy / Healthcare / Foreign Affairs + watchlists such as Israel, Iran,
+  foreign aid) defined by CRS policy areas + legislative subject terms; needs bill
+  subjects, sponsor party and stage data. See the discussion of 2026-11-11.
 - Voting Record scaling: `voter_ids` array + `array-contains` query (see Detail modals).
 - Waiting bills only get re-checked 5 per sync run; with ~1,000 waiting, run
   `summarize-bills.js --write` occasionally (or schedule it) to catch new CRS summaries.
