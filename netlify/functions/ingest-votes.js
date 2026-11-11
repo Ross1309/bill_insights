@@ -106,6 +106,22 @@ export async function handler(event, context) {
 
 const CHAMBERS = { 'House of Representatives': 'House', 'Senate': 'Senate' };
 
+// bioguideId -> FEC candidate ids, from the public-domain congress-legislators
+// dataset (Congress.gov doesn't carry FEC ids). Returns null if unavailable.
+const LEGISLATORS_URL = 'https://unitedstates.github.io/congress-legislators/legislators-current.json';
+
+async function fetchFecIdMap() {
+  try {
+    const res = await fetch(LEGISLATORS_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const list = await res.json();
+    return new Map(list.filter(l => l.id?.bioguide).map(l => [l.id.bioguide, l.id.fec || []]));
+  } catch (err) {
+    console.warn(`FEC id mapping unavailable (${err.message}); leaving fec_ids unchanged.`);
+    return null;
+  }
+}
+
 // Writes every sitting member (all states, plus non-voting delegates) and marks
 // members already in Firestore who are no longer serving as `current: false`.
 async function syncCurrentMembers() {
@@ -116,6 +132,8 @@ async function syncCurrentMembers() {
     members.push(...items);
     if (items.length < 250 || members.length >= (page.pagination?.count ?? 0)) break;
   }
+
+  const fecIds = await fetchFecIdMap();
 
   const ops = [];
   const currentIds = new Set();
@@ -150,6 +168,8 @@ async function syncCurrentMembers() {
       chamber,
       district: m.district ?? null,
       imageUrl: m.depiction?.imageUrl || null,
+      // Only written when the mapping loaded, so a failed fetch never wipes it.
+      ...(fecIds ? { fec_ids: fecIds.get(m.bioguideId) || [] } : {}),
       current: true,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }]);

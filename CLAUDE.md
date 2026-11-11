@@ -34,6 +34,8 @@ netlify/functions/sync-votes.js    Syncs recent BILLS (name is historical) + AI 
 netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House votes
 netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
+netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
+                                   donation-size buckets, itemized by state (needs FEC_API_KEY)
 netlify/functions/bill-detail.js   GET ?id={bill_id}: sponsor, cosponsor count, latest CRS
                                    summary, action history (works for bills not in `bills`)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
@@ -56,7 +58,10 @@ node scripts/backfill-bills.js                      # dry run
 node scripts/backfill-bills.js --write [--summaries]
 ```
 
-Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`.
+Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
+`FEC_API_KEY` (free from api.data.gov; **not set yet**. Under `netlify dev` the finance
+function falls back to the public `DEMO_KEY`, ~30 requests/hour per IP; in production it
+returns 503 "not configured" without a key). Set the same vars in Netlify's site settings.
 
 ## Firestore schema
 
@@ -88,7 +93,8 @@ through the whole congress and takes the newest by `startDate`.
 bioguideId, name ("Last, First"), state ("WA"), state_name ("Washington"),
 party ("Democratic" | "Republican" | "Independent"), chamber ("House" | "Senate"),
 district (number, null/0 for senators and at-large), imageUrl (Congress.gov depiction or null),
-current (bool), updatedAt
+fec_ids (FEC candidate ids, from the public-domain unitedstates/congress-legislators
+dataset; 537/539 have one), current (bool), updatedAt
 ```
 Synced from `/member?currentMember=true` (3 pages, ~539 incl. 6 delegates). Members no
 longer in that list are set `current: false`, never deleted; the UI queries
@@ -133,6 +139,24 @@ Pending / known issues:
   `getCountFromServer`). Member cards are clickable and set the directory filters.
 - On phones the five headline cards take most of the first screen; revisit in the visual
   refresh.
+
+## Campaign finance (member modal → Campaign Finance tab)
+
+- `member-finance` picks the member's FEC candidate id for their current chamber (H/S
+  prefix), then the election period for their next election (`election_full=true`: the
+  full 2-year House / 6-year Senate period). If nothing is reported for it yet, it uses
+  the previous election. 4 FEC requests per member, in-memory cache 12h on warm instances +
+  `Cache-Control: max-age=43200`.
+- Shows: raised / spent / cash on hand / debts; receipts by source (unitemized vs
+  itemized individuals, PACs, party, candidate's own money, other); individual
+  contributions by FEC size bucket; itemized contributions by state (in-state share, top 5).
+- The tab only calls the function when opened. Captions spell out the caveats: committee
+  filings only (no super PACs), state is known only for itemized (>$200) gifts.
+- No employer/"top donor" lists on purpose: they invite misreading (employers of
+  individual donors aren't the companies giving) and need more FEC calls.
+- Verified live for a House member (Jayapal). The Senate path (6-year period) and the
+  "previous election" fallback have NOT been exercised against live data yet (DEMO_KEY
+  ran out); check them once `FEC_API_KEY` is set.
 
 ## Detail modals (frontend)
 
@@ -207,6 +231,6 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 3. ~~Server-side ordering + pagination~~ Done (see Bills paging above).
 4. ~~Detail modals~~ Done for members, bills and votes (see Detail modals above).
 5. ~~Directory filters and headline counts~~ Done (see Legislators tab above).
-6. Money & donors tab via OpenFEC.
+6. ~~Money & donors via OpenFEC~~ Done as the member Campaign Finance tab (needs `FEC_API_KEY`).
 7. Visual refresh.
 8. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).
