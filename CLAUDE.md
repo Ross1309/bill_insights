@@ -30,8 +30,10 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
 public/index.html, public/app.js   UI (no build step)
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
 firestore.indexes.json             Composite indexes the UI's queries need
-netlify/functions/sync-votes.js    Syncs recent BILLS (name is historical) + AI summaries
-netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House votes
+netlify/functions/sync-bills.js    Syncs recent bills + AI summaries (was sync-votes.js)
+netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House
+                                   and 5 latest Senate roll-call votes
+netlify/lib/senate-votes.js        senate.gov LIS XML -> `votes` docs (menu, vote parse, ET->UTC)
 netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
@@ -53,7 +55,7 @@ as a function; esbuild bundles it via imports.
 ```
 netlify dev                                         # app + functions on :8888
 node run-ingest.js                                  # all current members + House votes
-curl localhost:8888/.netlify/functions/sync-votes   # bill sync (10 bills, ≤3 summaries/run)
+curl localhost:8888/.netlify/functions/sync-bills   # bill sync (10 bills, ≤3 summaries/run)
 node scripts/backfill-bills.js                      # dry run
 node scripts/backfill-bills.js --write [--summaries]
 ```
@@ -76,17 +78,28 @@ ai_summary { bullet_points[], source: "crs_summary"|"title_only", model, generat
 synced_at
 ```
 
-**`votes`** — doc id `{congress}-{session}-house-vote-{rollCall}` (roll-call numbers restart
-each session), written by `ingest-votes.js`
+**`votes`** — doc id `{congress}-{session}-{house|senate}-vote-{rollCall}` (roll-call numbers
+restart each session), written by `ingest-votes.js`
 ```
-vote_id, bill_id (bills doc id format, or null), legislation ("HR 9612" or null), chamber,
-congress, session, roll_call_number, date (UTC ISO), question, vote_type, result,
-tallies { yea, nay, present, not_voting } (Aye/No counted as yea/nay),
+vote_id, bill_id (bills doc id format, or null), legislation ("HR 9612", "PN 1129", or null),
+chamber ("House" | "Senate"), congress, session, roll_call_number, date (UTC ISO), question,
+vote_type, result, tallies { yea, nay, present, not_voting } (Aye/No counted as yea/nay),
 individual_votes [{ bioguideId, name, state, party ("R"/"D"/"I"), position }],
-source_url (House Clerk XML), updatedAt
+source_url (House Clerk XML / senate.gov vote page), updatedAt
+Senate only: document_title (bill title or nomination text), amendment, title,
+individual_votes[].lis_member_id
 ```
-Congress.gov's `house-vote` list ignores `sort` and is unordered, so the ingest pages
-through the whole congress and takes the newest by `startDate`.
+- House: Congress.gov's `house-vote` list ignores `sort` and is unordered, so the ingest
+  pages through the whole congress and takes the newest by `startDate`.
+- Senate: Congress.gov has no Senate vote endpoint (404 as of 2026-11-10), so votes come
+  from senate.gov LIS XML (`vote_menu_{c}_{s}.xml`, newest first, then each
+  `vote_{c}_{s}_{00000}.xml`). Senators are identified by LIS id and mapped to bioguideId
+  via congress-legislators `id.lis` (100/100 mapped). Times are Eastern, converted to UTC
+  with DST. Nominations (`PN`) get `legislation` + `document_title` but no `bill_id`.
+- House and Senate syncs run in parallel and independently (`Promise.allSettled`).
+  A full ingest took ~5s locally; watch Netlify's 10s function limit.
+- Congress.gov bill action histories lag senate.gov by about a day, so a brand-new Senate
+  vote may not be linked from the bill's Actions tab yet.
 
 **`members`** — doc id = bioguideId, written by `ingest-votes.js`
 ```
@@ -123,7 +136,7 @@ Backfill has been run (verified 2026-11-10: no fake fields, all summaries source
 Pending / known issues:
 - Title-only AI summaries can still speculate despite the prompt (e.g. HRES 1650: "It is
   likely to affect…"). Tighten the prompt or skip AI summaries until a CRS summary exists.
-- `sync-votes.js` must stay under Netlify's function timeout: detail fetches run in
+- `sync-bills.js` must stay under Netlify's function timeout: detail fetches run in
   parallel and AI summaries are capped at 3 per run.
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
@@ -196,7 +209,7 @@ Pending / known issues:
   modals still show Firestore data plus a Retry button.
 - Voting Record = latest 50 `votes` (shared `getRecentVotes`) filtered to the member;
   "voted with party majority" = matches most of their party's Yea/Nay on that roll call
-  (ties and Independents excluded). Senators: "Senate votes aren't tracked yet".
+  (ties and Independents excluded). Only votes from the member's own chamber count.
 - Scaling note: once many votes accumulate, filtering the latest 50 client-side will
   miss older votes. Then add a `voter_ids` array to vote docs and query
   `array-contains` + `orderBy('date')` (needs a composite index).
@@ -253,4 +266,13 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 5. ~~Directory filters and headline counts~~ Done (see Legislators tab above).
 6. ~~Money & donors via OpenFEC~~ Done as the member Campaign Finance tab.
 7. ~~Visual refresh~~ Done (see Visual design above).
-8. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).
+8. ~~Rename `sync-votes.js` → `sync-bills.js`~~ Done 2026-11-10 (no schedules or callers in
+   the repo; any external cron hitting `/.netlify/functions/sync-votes` must be updated).
+   Senate roll-call votes added at the same time (see `votes` schema).
+
+### Proposed next
+- Deploy and verify on Netlify: env vars, every function, and `ingest-votes` runtime vs the
+  10s limit (split members / House / Senate into separate functions if needed).
+- Schedule the syncs (Netlify scheduled functions) for `sync-bills` and `ingest-votes`.
+- Voting Record scaling: `voter_ids` array + `array-contains` query (see Detail modals).
+- Title-only AI summaries still speculate (see Pending).

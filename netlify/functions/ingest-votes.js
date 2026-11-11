@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import { getDb, admin } from '../lib/firebase.js';
 import { STATE_CODES } from '../../public/states.js';
+import { fetchLatestSenateVotes } from '../lib/senate-votes.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -36,63 +37,24 @@ export async function handler(event, context) {
   try {
     console.log("Starting Congressional backend data ingestion...");
 
+    // congress-legislators: bioguide -> FEC ids and Senate LIS ids. Optional.
+    const legislators = await fetchLegislators();
+
     // 1. Sync all current members of Congress
-    await syncCurrentMembers();
+    await syncCurrentMembers(legislators);
 
-    // 2. Fetch the most recent House roll-call votes
-    const latest = await fetchLatestHouseVotes(VOTES_PER_RUN);
-
-    for (const voteItem of latest) {
-      const session = voteItem.sessionNumber;
-      const voteNumber = voteItem.rollCallNumber;
-      // Roll-call numbers restart each session, so the session is part of the id.
-      const voteId = `${CONGRESS_NUM}-${session}-house-vote-${voteNumber}`;
-
-      const detailUrl = `${API}/house-vote/${CONGRESS_NUM}/${session}/${voteNumber}/members?api_key=${CONGRESS_API_KEY}&format=json`;
-      const detail = (await getJson(detailUrl)).houseRollCallVoteMemberVotes || {};
-
-      const memberVotes = (detail.results || []).map(m => ({
-        bioguideId: m.bioguideID,
-        name: [m.lastName, m.firstName].filter(Boolean).join(', '),
-        state: m.voteState || null,
-        party: m.voteParty || null,
-        position: m.voteCast || null,
-      }));
-
-      // "Aye"/"No" (recorded votes) are counted with "Yea"/"Nay".
-      const tallies = memberVotes.reduce((acc, m) => {
-        const key = TALLY_KEYS[(m.position || '').toLowerCase()] || 'other';
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      }, { yea: 0, nay: 0, present: 0, not_voting: 0 });
-
-      const legType = (voteItem.legislationType || '').toUpperCase();
-      const isBill = BILL_TYPES.has(legType) && voteItem.legislationNumber;
-
-      await db.collection("votes").doc(voteId).set({
-        vote_id: voteId,
-        bill_id: isBill ? `${legType.toLowerCase()}${voteItem.legislationNumber}-${CONGRESS_NUM}` : null,
-        legislation: legType && voteItem.legislationNumber ? `${legType} ${voteItem.legislationNumber}` : null,
-        chamber: "House",
-        congress: CONGRESS_NUM,
-        session: session,
-        roll_call_number: voteNumber,
-        date: voteItem.startDate ? new Date(voteItem.startDate).toISOString() : null,
-        question: detail.voteQuestion || null,
-        vote_type: voteItem.voteType || null,
-        result: voteItem.result || null,
-        tallies: tallies,
-        individual_votes: memberVotes,
-        source_url: voteItem.sourceDataURL || null,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      console.log(`Ingested Roll Call Vote #${voteNumber} (${voteItem.startDate})`);
-    }
+    // 2 + 3. Latest House and Senate roll-call votes. Independent, so one source
+    // failing doesn't block the other.
+    const results = await Promise.allSettled([syncHouseVotes(), syncSenateVotes(legislators)]);
+    const failures = results.filter(r => r.status === "rejected").map(r => r.reason?.message || String(r.reason));
+    failures.forEach(msg => console.error("Vote sync failed:", msg));
 
     return {
-      statusCode: 200,
-      body: JSON.stringify({ message: "Successfully ingested members and roll-call votes!" }),
+      statusCode: failures.length === results.length ? 500 : 200,
+      body: JSON.stringify({
+        message: failures.length ? "Ingested with errors." : "Successfully ingested members and roll-call votes!",
+        errors: failures,
+      }),
     };
 
   } catch (error) {
@@ -104,27 +66,94 @@ export async function handler(event, context) {
   }
 }
 
+async function syncHouseVotes() {
+  const latest = await fetchLatestHouseVotes(VOTES_PER_RUN);
+
+  for (const voteItem of latest) {
+    const session = voteItem.sessionNumber;
+    const voteNumber = voteItem.rollCallNumber;
+    // Roll-call numbers restart each session, so the session is part of the id.
+    const voteId = `${CONGRESS_NUM}-${session}-house-vote-${voteNumber}`;
+
+    const detailUrl = `${API}/house-vote/${CONGRESS_NUM}/${session}/${voteNumber}/members?api_key=${CONGRESS_API_KEY}&format=json`;
+    const detail = (await getJson(detailUrl)).houseRollCallVoteMemberVotes || {};
+
+    const memberVotes = (detail.results || []).map(m => ({
+      bioguideId: m.bioguideID,
+      name: [m.lastName, m.firstName].filter(Boolean).join(', '),
+      state: m.voteState || null,
+      party: m.voteParty || null,
+      position: m.voteCast || null,
+    }));
+
+    // "Aye"/"No" (recorded votes) are counted with "Yea"/"Nay".
+    const tallies = memberVotes.reduce((acc, m) => {
+      const key = TALLY_KEYS[(m.position || '').toLowerCase()] || 'other';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, { yea: 0, nay: 0, present: 0, not_voting: 0 });
+
+    const legType = (voteItem.legislationType || '').toUpperCase();
+    const isBill = BILL_TYPES.has(legType) && voteItem.legislationNumber;
+
+    await db.collection("votes").doc(voteId).set({
+      vote_id: voteId,
+      bill_id: isBill ? `${legType.toLowerCase()}${voteItem.legislationNumber}-${CONGRESS_NUM}` : null,
+      legislation: legType && voteItem.legislationNumber ? `${legType} ${voteItem.legislationNumber}` : null,
+      chamber: "House",
+      congress: CONGRESS_NUM,
+      session: session,
+      roll_call_number: voteNumber,
+      date: voteItem.startDate ? new Date(voteItem.startDate).toISOString() : null,
+      question: detail.voteQuestion || null,
+      vote_type: voteItem.voteType || null,
+      result: voteItem.result || null,
+      tallies: tallies,
+      individual_votes: memberVotes,
+      source_url: voteItem.sourceDataURL || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    console.log(`Ingested House Roll Call Vote #${voteNumber} (${voteItem.startDate})`);
+  }
+}
+
+async function syncSenateVotes(legislators) {
+  const lisToBioguide = new Map((legislators || [])
+    .filter(l => l.id?.lis && l.id?.bioguide)
+    .map(l => [l.id.lis, l.id.bioguide]));
+
+  const votes = await fetchLatestSenateVotes(VOTES_PER_RUN, lisToBioguide);
+  for (const { doc, unmapped } of votes) {
+    await db.collection("votes").doc(doc.vote_id).set({
+      ...doc,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    if (unmapped) console.warn(`Senate vote ${doc.vote_id}: ${unmapped} senator(s) without a bioguide mapping`);
+    console.log(`Ingested Senate Roll Call Vote #${doc.roll_call_number} (${doc.date})`);
+  }
+}
+
 const CHAMBERS = { 'House of Representatives': 'House', 'Senate': 'Senate' };
 
-// bioguideId -> FEC candidate ids, from the public-domain congress-legislators
-// dataset (Congress.gov doesn't carry FEC ids). Returns null if unavailable.
+// Public-domain congress-legislators dataset: maps bioguideId to FEC candidate ids
+// and Senate LIS ids (Congress.gov carries neither). Returns null if unavailable.
 const LEGISLATORS_URL = 'https://unitedstates.github.io/congress-legislators/legislators-current.json';
 
-async function fetchFecIdMap() {
+async function fetchLegislators() {
   try {
     const res = await fetch(LEGISLATORS_URL);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const list = await res.json();
-    return new Map(list.filter(l => l.id?.bioguide).map(l => [l.id.bioguide, l.id.fec || []]));
+    return await res.json();
   } catch (err) {
-    console.warn(`FEC id mapping unavailable (${err.message}); leaving fec_ids unchanged.`);
+    console.warn(`congress-legislators unavailable (${err.message}); fec_ids left unchanged, Senate votes unmapped.`);
     return null;
   }
 }
 
 // Writes every sitting member (all states, plus non-voting delegates) and marks
 // members already in Firestore who are no longer serving as `current: false`.
-async function syncCurrentMembers() {
+async function syncCurrentMembers(legislators) {
   const members = [];
   for (let offset = 0; ; offset += 250) {
     const page = await getJson(`${API}/member?api_key=${CONGRESS_API_KEY}&format=json&currentMember=true&limit=250&offset=${offset}`);
@@ -133,7 +162,9 @@ async function syncCurrentMembers() {
     if (items.length < 250 || members.length >= (page.pagination?.count ?? 0)) break;
   }
 
-  const fecIds = await fetchFecIdMap();
+  const fecIds = legislators
+    ? new Map(legislators.filter(l => l.id?.bioguide).map(l => [l.id.bioguide, l.id.fec || []]))
+    : null;
 
   const ops = [];
   const currentIds = new Set();

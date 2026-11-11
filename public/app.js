@@ -44,6 +44,7 @@ async function init() {
   setupTabs();
   switchTab("bills");
   setupMemberFilters();
+  setupVoteFilters();
   setupBillFilters();
   setupModals();
   loadHeadlineStats();
@@ -158,7 +159,7 @@ function renderLoadMore() {
   document.getElementById("bills-load-more").addEventListener("click", () => loadBills());
 }
 
-// --- Bill field helpers (schema written by netlify/functions/sync-votes.js) ---
+// --- Bill field helpers (schema written by netlify/functions/sync-bills.js) ---
 
 function billLabel(bill) {
   if (bill.bill_number) return bill.bill_number;
@@ -233,11 +234,13 @@ function getRecentVotes() {
   return recentVotesPromise;
 }
 
+let voteChamber = "";
+
 async function fetchVotes() {
   try {
     const votes = await getRecentVotes();
     votesLoaded = true;
-    renderVotes(votes);
+    renderVotes(voteChamber ? votes.filter(v => v.chamber === voteChamber) : votes);
   } catch (err) {
     console.error("Error fetching votes:", err);
     votesContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load votes: ${escapeHtml(err.message)}</p>`;
@@ -297,8 +300,9 @@ function formatVoteDate(iso) {
 
 function resultBadgeClass(result) {
   const r = (result || "").toLowerCase();
-  if (/(passed|agreed|adopted)/.test(r)) return "bg-green-100 text-green-800";
-  if (/(failed|rejected|not agreed)/.test(r)) return "bg-red-100 text-red-800";
+  // Check the negative forms first: "Not Agreed to" also contains "agreed".
+  if (/(failed|rejected|not agreed|not sustained|defeated)/.test(r)) return "bg-red-100 text-red-800";
+  if (/(passed|agreed|adopted|confirmed|sustained|ratified)/.test(r)) return "bg-green-100 text-green-800";
   return "bg-gray-100 text-gray-700";
 }
 
@@ -334,13 +338,22 @@ function voteTalliesHtml(vote) {
 }
 
 // Bill reference for a vote: opens the bill modal (which also links out).
+const SOURCE_LABELS = { House: "Official record (House Clerk)", Senate: "Official record (Senate.gov)" };
+const sourceLabel = vote => SOURCE_LABELS[vote.chamber] || "Official record";
+
 function voteBillLine(vote) {
   const bill = voteBillInfo(vote);
-  if (!bill) return `<p class="text-sm text-gray-400 mt-1">No bill associated with this vote</p>`;
+  if (!bill) {
+    // Nominations (PN …) and other non-bill questions: show what was voted on.
+    if (vote.legislation || vote.document_title) {
+      return `<p class="text-sm text-gray-600 mt-1">${vote.legislation ? `<span class="font-semibold">${escapeHtml(vote.legislation)}</span>` : ""}${vote.legislation && vote.document_title ? " — " : ""}${escapeHtml(vote.document_title || "")}</p>`;
+    }
+    return `<p class="text-sm text-gray-400 mt-1">No bill associated with this vote</p>`;
+  }
   return `
     <p class="text-sm text-gray-600 mt-1">
       <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="font-semibold text-brand-700 hover:underline">${escapeHtml(bill.label)}</button>
-      ${bill.title ? ` — ${escapeHtml(bill.title)}` : ""}
+      ${bill.title || vote.document_title ? ` — ${escapeHtml(bill.title || vote.document_title)}` : ""}
     </p>`;
 }
 
@@ -348,9 +361,20 @@ function voteHeadingBadge(vote) {
   return `${escapeHtml(vote.chamber || "House")} Roll Call #${escapeHtml(String(vote.roll_call_number ?? "?"))}${vote.session ? ` · Session ${escapeHtml(String(vote.session))}` : ""}`;
 }
 
+function setupVoteFilters() {
+  setChipGroup("vote-chamber-filters", "chamber", voteChamber);
+  document.getElementById("vote-chamber-filters")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-chamber]");
+    if (!b) return;
+    voteChamber = b.dataset.chamber;
+    setChipGroup("vote-chamber-filters", "chamber", voteChamber);
+    fetchVotes();
+  });
+}
+
 function renderVotes(votes) {
   if (votes.length === 0) {
-    votesContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No roll-call votes have been synced yet.</p>`;
+    votesContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No ${voteChamber ? `${voteChamber} ` : ""}roll-call votes have been synced yet.</p>`;
     return;
   }
 
@@ -373,7 +397,7 @@ function renderVotes(votes) {
           ${voteTalliesHtml(vote)}
           <div class="flex flex-wrap items-center gap-4 mt-3 text-xs">
             ${vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-brand-700 hover:underline">How each member voted →</button>` : ""}
-            ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">Official record (House Clerk) →</a>` : ""}
+            ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">${escapeHtml(sourceLabel(vote))} →</a>` : ""}
           </div>
         </div>`).join("")}
     </div>
@@ -652,7 +676,7 @@ async function loadHeadlineStats() {
     cards.push(card(delegates.length, "Delegates", "Non-voting: DC, PR and territories", "Delegates"));
   }
   if (bills.status === "fulfilled") cards.push(card(bills.value.data().count, "Bills tracked", "Synced from Congress.gov"));
-  if (votes.status === "fulfilled") cards.push(card(votes.value.data().count, "Roll-call votes", "House votes synced"));
+  if (votes.status === "fulfilled") cards.push(card(votes.value.data().count, "Roll-call votes", "House + Senate, synced"));
   el.innerHTML = cards.join("");
   if (!el.dataset.wired) {
     el.dataset.wired = "1";
@@ -725,10 +749,11 @@ async function getVotesForBill(billId) {
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }
 
-// Vote doc id for an action's recorded House vote, matching ingest-votes.js.
-function houseVoteId(rv) {
-  if (rv.chamber !== "House" || !rv.congress || !rv.session || !rv.rollNumber) return null;
-  return `${rv.congress}-${rv.session}-house-vote-${rv.rollNumber}`;
+// Vote doc id for an action's recorded vote, matching ingest-votes.js.
+function recordedVoteId(rv) {
+  const chamber = { House: "house", Senate: "senate" }[rv.chamber];
+  if (!chamber || !rv.congress || !rv.session || !rv.rollNumber) return null;
+  return `${rv.congress}-${rv.session}-${chamber}-vote-${rv.rollNumber}`;
 }
 
 // --- shared bits
@@ -952,21 +977,21 @@ const memberModal = {
     }],
     ["votes", "Voting Record", e => {
       const m = e.data.member;
-      if (m?.chamber === "Senate") {
-        return `<p class="text-sm text-gray-500 py-8 text-center">Senate roll-call votes aren't tracked yet. Only House votes are synced so far.</p>`;
-      }
       if (e.errors.votes) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load votes: ${escapeHtml(e.errors.votes)}</p>`;
       if (!e.data.votes) return spinner("Loading votes…");
 
-      const votes = e.data.votes;
+      // Only the member's own chamber votes on a roll call.
+      const chamber = m?.chamber || null;
+      const votes = chamber ? e.data.votes.filter(v => v.chamber === chamber) : e.data.votes;
+      const where = chamber ? `${chamber} ` : "";
       const rec = memberVotingRecord(e.id, votes);
       if (!rec.rows.length) {
-        return `<p class="text-sm text-gray-500 py-8 text-center">No record of this member in the ${votes.length} most recent synced House votes.</p>`;
+        return `<p class="text-sm text-gray-500 py-8 text-center">No record of this member in the ${votes.length} most recent synced ${where}votes.</p>`;
       }
       const c = rec.counts;
       const stat = (label, value, cls) => `<div class="${cls} border rounded-lg p-2 text-center"><p class="text-[11px] font-semibold uppercase">${label}</p><p class="text-lg font-bold">${value}</p></div>`;
       return `
-        <p class="text-xs text-gray-500 mb-3">Based on the ${votes.length} most recent House roll-call votes synced from the House Clerk.</p>
+        <p class="text-xs text-gray-500 mb-3">Based on the ${votes.length} most recent ${where}roll-call votes synced from the official record.</p>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
           ${stat("Yea", c.yea, "bg-green-50 border-green-100 text-green-700")}
           ${stat("Nay", c.nay, "bg-red-50 border-red-100 text-red-700")}
@@ -983,7 +1008,7 @@ const memberModal = {
                 <button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="text-sm font-semibold text-gray-900 hover:text-brand-900 hover:underline text-left">${escapeHtml(vote.question || "Question not available")}</button>
                 <p class="text-xs text-gray-500 mt-0.5">
                   Roll call #${escapeHtml(String(vote.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(vote.date))}
-                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="text-brand-700 hover:underline">${escapeHtml(bill.label)}</button>` : ""}
+                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="text-brand-700 hover:underline">${escapeHtml(bill.label)}</button>` : vote.legislation ? ` · ${escapeHtml(vote.legislation)}` : ""}
                   · ${escapeHtml(vote.result || "Result pending")}
                 </p>
                 ${partyMajority && group !== partyMajority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
@@ -1101,10 +1126,11 @@ const billModal = {
               <p class="text-xs text-gray-500">${escapeHtml(a.actionDate || "")}${a.source ? ` · ${escapeHtml(a.source)}` : ""}</p>
               <p class="text-sm text-gray-800">${escapeHtml(a.text)}</p>
               ${a.recordedVotes.map(rv => {
-                const id = houseVoteId(rv);
-                return id
-                  ? `<button type="button" data-open="vote" data-id="${escapeHtml(id)}" class="text-xs font-semibold text-brand-700 hover:underline mr-3">Roll call #${escapeHtml(String(rv.rollNumber))}: how members voted →</button>`
-                  : rv.url ? `<a href="${escapeHtml(rv.url)}" target="_blank" rel="noopener" class="text-xs text-brand-700 hover:underline mr-3">${escapeHtml(rv.chamber || "")} roll call #${escapeHtml(String(rv.rollNumber ?? "?"))} →</a>` : "";
+                const id = recordedVoteId(rv);
+                return `<span class="inline-flex flex-wrap gap-x-3 mr-3">
+                  ${id ? `<button type="button" data-open="vote" data-id="${escapeHtml(id)}" class="text-xs font-semibold text-brand-700 hover:underline">${escapeHtml(rv.chamber || "")} roll call #${escapeHtml(String(rv.rollNumber))}: how members voted →</button>` : ""}
+                  ${rv.url ? `<a href="${escapeHtml(rv.url)}" target="_blank" rel="noopener" class="text-xs text-gray-500 hover:underline">official record</a>` : ""}
+                </span>`;
               }).join("")}
             </li>`).join("")}
         </ol>`;
@@ -1187,12 +1213,12 @@ const voteModal = {
       const v = e.data.vote;
       if (e.errors.vote) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load vote: ${escapeHtml(e.errors.vote)}</p>`;
       if (v === undefined) return spinner("Loading vote…");
-      if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This roll call hasn't been synced yet. Only the most recent House votes are stored so far.</p>`;
+      if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This roll call hasn't been synced yet. Only the most recent House and Senate votes are stored so far.</p>`;
       return `
         ${voteBillLine(v)}
         ${v.vote_type ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(v.vote_type)}</p>` : ""}
         ${voteTalliesHtml(v)}
-        <div class="flex flex-wrap gap-4 mt-4 text-sm">${externalLink(v.source_url, "Official record (House Clerk)")}</div>`;
+        <div class="flex flex-wrap gap-4 mt-4 text-sm">${externalLink(v.source_url, sourceLabel(v))}</div>`;
     }],
     ["members", "How members voted", e => {
       const v = e.data.vote;

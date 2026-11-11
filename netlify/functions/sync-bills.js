@@ -1,5 +1,4 @@
 // Syncs the most recently updated bills from Congress.gov into Firestore.
-// (Name kept for compatibility with existing scheduling/URLs; it syncs bills.)
 //
 // For each bill it stores real metadata (type, number, policy area, latest action)
 // and, for up to MAX_SUMMARIES bills per run, a plain-language AI summary based on

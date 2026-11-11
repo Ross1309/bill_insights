@@ -99,8 +99,13 @@
     <!-- VIEW 2: ROLL-CALL VOTES -->
     <section id="view-votes" class="tab-view hidden">
       <div class="mb-6">
-        <h2 class="font-serif text-2xl font-bold text-gray-900">Recent House Roll-Call Votes</h2>
-        <p class="text-sm text-gray-500">Official results from the House Clerk via Congress.gov, with a breakdown by party.</p>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Recent Roll-Call Votes</h2>
+        <p class="text-sm text-gray-500">Official results from the House Clerk (via Congress.gov) and the Senate (senate.gov), with a breakdown by party.</p>
+      </div>
+      <div id="vote-chamber-filters" class="flex flex-wrap gap-2 mb-6" role="group" aria-label="Chamber">
+        <button type="button" data-chamber="" class="filter-chip">Both chambers</button>
+        <button type="button" data-chamber="House" class="filter-chip">House</button>
+        <button type="button" data-chamber="Senate" class="filter-chip">Senate</button>
       </div>
       <div id="votes-container" class="min-h-[300px]">
         <div class="text-center py-12">
@@ -165,9 +170,10 @@
         <p class="font-semibold text-white">Data sources</p>
         <ul class="mt-2 space-y-1">
           <li><a class="underline decoration-brand-500 hover:text-white" href="https://api.congress.gov/" target="_blank" rel="noopener">Congress.gov API</a>: bills, actions, CRS summaries, members</li>
-          <li><a class="underline decoration-brand-500 hover:text-white" href="https://clerk.house.gov/Votes" target="_blank" rel="noopener">Office of the Clerk, U.S. House</a>: roll-call votes</li>
+          <li><a class="underline decoration-brand-500 hover:text-white" href="https://clerk.house.gov/Votes" target="_blank" rel="noopener">Office of the Clerk, U.S. House</a>: House roll-call votes</li>
+          <li><a class="underline decoration-brand-500 hover:text-white" href="https://www.senate.gov/legislative/votes_new.htm" target="_blank" rel="noopener">U.S. Senate (senate.gov)</a>: Senate roll-call votes</li>
           <li><a class="underline decoration-brand-500 hover:text-white" href="https://api.open.fec.gov/developers/" target="_blank" rel="noopener">FEC (OpenFEC)</a>: campaign finance filings</li>
-          <li><a class="underline decoration-brand-500 hover:text-white" href="https://github.com/unitedstates/congress-legislators" target="_blank" rel="noopener">congress-legislators</a>: member ↔ FEC id mapping</li>
+          <li><a class="underline decoration-brand-500 hover:text-white" href="https://github.com/unitedstates/congress-legislators" target="_blank" rel="noopener">congress-legislators</a>: member ↔ FEC and Senate id mapping</li>
         </ul>
       </div>
     </div>
