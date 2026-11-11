@@ -20,7 +20,7 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
   and Congress.gov's summaries endpoint 500s for them).
 - Never commit `.env` (Firebase service account + OpenAI key). It's in `.gitignore`.
 - **Firestore security rules** (`firestore.rules`, published 2026-11-11): public *read* of
-  `bills`, `votes`, `members`, `directory`, `stats`; no browser writes anywhere. Before
+  `bills`, `votes`, `members`, `directory`, `stats`, `member_votes`; no browser writes anywhere. Before
   that the project was `allow read, write: if true`, so anyone could change or delete data.
   The site only reads; all writes go through firebase-admin (functions/scripts), which
   bypasses rules. **Adding a new collection the site reads? Add a read rule** and
@@ -61,6 +61,11 @@ netlify/lib/senate-votes.js        senate.gov LIS XML -> `votes` docs (menu, vot
 netlify/lib/house-votes.js         Congress.gov House votes -> `votes` docs (list + build doc)
 netlify/lib/vote-stats.js          party_breakdown, alignment/category/outcome rules, computeOverview
 netlify/lib/overview.js            writeOverviewStats(): rebuild stats/overview (ingest + script)
+netlify/lib/member-votes.js        member_votes docs: per-member totals + latest 50 (applyNewMemberVotes)
+netlify/lib/vote-index.js          vote_index docs: compact fields of every vote (stats + ingest read these)
+netlify/lib/health.js              recordRun(): stats/health, latest run of each scheduled sync
+netlify/lib/http.js                fetchWithRetry/getJson/getText (timeouts, retries, key masking), json()
+scripts/build-member-votes.js      Rebuild member_votes + vote_index from full votes [--write] [--congress N]
 scripts/build-stats.js             Rebuild stats/overview [--backfill party_breakdown]
 scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
 scripts/import-bills.js            Backfill the N most recently updated bills (resumable)
@@ -167,6 +172,38 @@ overall_agreement, watchlists { <slug>: { label, intro, subjects, counts, focuse
 votes], broad [bill] } }, watchlist_order, congress, generated_at
 ```
 
+**`member_votes`** — doc id = bioguideId, public read. One per member for the current Congress
+```
+bioguideId, congress, chamber, name, party, state,
+totals { votes, yea, nay, present, not_voting, with_party, party_comparable },
+recent [latest 50: { id, date, chamber, roll, question, result, bill_id, legislation,
+  position, group (yea|nay|present|not_voting|other), party_majority }], updated_at
+```
+The member modal's Voting Record reads this one doc. Each `votes` doc has `members_applied`
+(false when written by ingest/import, true once counted). Every ingest applies all
+unapplied votes of the Congress to member_votes **and** vote_index, then flags them, so
+a failed run is retried next time. Totals reset when `congress` changes.
+`scripts/build-member-votes.js --write` rebuilds both from scratch (~1,600 full-vote reads).
+Votes written by code that doesn't set `members_applied` (anything older than commit
+a547327) are never applied: re-run the build script after such a run.
+
+**`vote_index/{congress}-{session}-{house|senate}`** — server-only (no read rule)
+```
+congress, session, chamber, count, entries [{ id, date, roll, question, result, bill_id,
+tallies, party_breakdown }] (oldest first), updated_at
+```
+`writeOverviewStats` reads these 4 docs instead of every vote (falls back to a `select()`
+query when a Congress has no index). The ingest treats ids in the index as stored and
+`getAll`s only the rest, so a vote stored but not yet applied is never re-fetched.
+About 300 bytes per vote, so a session's doc stays far below the 1 MB limit.
+
+**`stats/health`** — public read, written by both scheduled syncs (`recordRun`)
+```
+ingest_votes | sync_bills: { last_run, last_success, ok, failed_steps[], counts }
+```
+Step names only, no error text. The footer shows "Data last updated"; a notice appears
+when either sync's last success is more than 36 h old.
+
 **`members`** — doc id = bioguideId, written by `ingest-votes.js`
 ```
 bioguideId, name ("Last, First"), state ("WA"), state_name ("Washington"),
@@ -215,14 +252,18 @@ broken rule fails the deploy.
 
 `sync_state` is server-only (no read rule in firestore.rules, so browsers are denied).
 
+### Review: second tier (done 2026-11-11)
+- Shared `netlify/lib/http.js` (timeouts + retries everywhere); `node-fetch`,
+  FABRICATED_FIELDS cleanup and `scripts/backfill-bills.js` removed; firebase-admin 13.10
+  (`npm audit` still shows 8 moderate in unused Google Cloud deps; the fix needs
+  firebase-admin 14 / Node 22+).
+- Per-member `member_votes` docs (Voting Record = 1 read, whole-Congress totals).
+- Nightly reads cut: `vote_index` replaces ~3 x 1,600 vote reads per night with ~8 doc reads.
+  (Firestore's free tier is 50k reads/day; it ran out on 2026-11-11 during backfills.)
+- `stats/health` + "Data last updated" footer + stale-data notice.
+
 ### Review: remaining recommendations (not done yet)
-- Per-member votes doc: a member's Voting Record downloads 50 full vote docs (~1.5 MB);
-  a compact precomputed doc fixes that and enables Phase 2 (participation, party trend).
-- Run health doc + visible "data as of"; alert on failed scheduled runs.
-- Timeouts/retries in the other fetch helpers (bills.js has a 15 s timeout); dedupe the
-  copied getJson/json/ordinal helpers into one lib; drop `node-fetch`, the old
-  FABRICATED_FIELDS cleanup and `scripts/backfill-bills.js`; upgrade firebase-admin
-  (`npm audit`: 8 moderate, all in unused Google Cloud storage deps).
+- Alert on failed scheduled runs (email/webhook); today the site notice is the signal.
 - Frontend: split the 1,700-line app.js into modules; Tailwind build step (CDN warns in
   production); URL routing for shareable links; modal focus trap.
 - Product: find-your-representative by address (Census geocoder); shareable links;
@@ -365,12 +406,9 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   or party; names open member modals). Unsynced roll calls say so.
 - Functions are cached per id in the page and for 1h via `Cache-Control`. If they fail,
   modals still show Firestore data plus a Retry button.
-- Voting Record = latest 50 `votes` (shared `getRecentVotes`) filtered to the member;
-  "voted with party majority" = matches most of their party's Yea/Nay on that roll call
-  (ties and Independents excluded). Only votes from the member's own chamber count.
-- Scaling note: once many votes accumulate, filtering the latest 50 client-side will
-  miss older votes. Then add a `voter_ids` array to vote docs and query
-  `array-contains` + `orderBy('date')` (needs a composite index).
+- Voting Record = the member's `member_votes` doc: participation and party agreement over
+  the whole Congress, plus the latest 50 votes. "Voted with party majority" = matches most
+  of their party's Yea/Nay on that roll call (ties and Independents excluded).
 - Not done: Tab-key focus trap inside the modal; deep links (e.g. `#bill/hr9612-119`).
 
 ## Votes paging (frontend)
@@ -382,8 +420,7 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   (`failed-precondition`), `queryVotes` switches to paging all votes 30 at a time and
   filtering by chamber in the browser, so the chips still work (pages are just uneven).
   The index was created in the Firebase console on 2026-11-10; the fallback is a safety net.
-- Member Voting Record uses `getRecentVotes(chamber)`: the member's own chamber's latest
-  50 votes. `voteCache` holds every vote seen; the vote modal checks it before Firestore.
+- `voteCache` holds every vote seen; the vote modal checks it before Firestore.
 
 ## Bills paging (frontend)
 
@@ -480,6 +517,5 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 - Issue tracker follow-ups: more topics (Immigration, Defense?) = add to topics.js +
   chip in index.html; "moving now" section; bills that never reached the floor would need
   the complete (~20k bill) enrichment.
-- Voting Record scaling: `voter_ids` array + `array-contains` query (see Detail modals).
 - Waiting bills only get re-checked 5 per sync run; with ~1,000 waiting, run
   `summarize-bills.js --write` occasionally (or schedule it) to catch new CRS summaries.
