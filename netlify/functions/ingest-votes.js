@@ -6,6 +6,7 @@ import { listHouseVotes, buildHouseVoteDoc, houseVoteId } from '../lib/house-vot
 import { writeOverviewStats } from '../lib/overview.js';
 import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
 import { currentCongress } from '../lib/congress.js';
+import { applyNewMemberVotes } from '../lib/member-votes.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -44,7 +45,17 @@ export async function handler(event, context) {
     const failures = results.filter(r => r.status === "rejected").map(r => r.reason?.message || String(r.reason));
     failures.forEach(msg => console.error("Vote sync failed:", msg));
 
-    // 4. Issue tracker: enrich the bills these votes are on (sync-bills summarizes them).
+    // 4. Per-member voting records: count every vote not yet applied (incl. any a
+    //    failed earlier run left behind).
+    try {
+      const applied = await applyNewMemberVotes(db, admin, CONGRESS_NUM);
+      if (applied.votes) console.log(`Member records: applied ${applied.votes} votes to ${applied.members} members`);
+    } catch (err) {
+      failures.push(`member votes: ${err.message}`);
+      console.error("Member vote records failed:", err);
+    }
+
+    // 5. Issue tracker: enrich the bills these votes are on (sync-bills summarizes them).
     try {
       const billIds = results.filter(r => r.status === "fulfilled").flatMap(r => r.value || []);
       const n = await enrichVotedBills(billIds);
@@ -54,7 +65,7 @@ export async function handler(event, context) {
       console.error("Bill enrichment failed:", err);
     }
 
-    // 5. Rebuild the Overview tab's precomputed stats (small fields only).
+    // 6. Rebuild the Overview tab's precomputed stats (small fields only).
     try {
       const stats = await writeOverviewStats(db, admin, { congress: CONGRESS_NUM });
       console.log(`stats rebuilt for the ${stats.congress}th Congress from ${stats.votes} votes`);
@@ -89,7 +100,7 @@ export async function syncHouseVotes(stored) {
   const billIds = [];
   await pool(todo, 5, async voteItem => {
     const doc = await buildHouseVoteDoc(voteItem, CONGRESS_NUM, CONGRESS_API_KEY);
-    await db.collection("votes").doc(doc.vote_id).set({ ...doc, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    await db.collection("votes").doc(doc.vote_id).set({ ...doc, members_applied: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     if (doc.bill_id) billIds.push(doc.bill_id);
   });
   console.log(`House: ingested ${todo.length} new votes`);
@@ -110,7 +121,7 @@ export async function syncSenateVotes(legislators, stored) {
   const billIds = [];
   await pool(todo, 3, async entry => {
     const { doc, unmapped } = await fetchSenateVote(entry, lisToBioguide);
-    await db.collection("votes").doc(doc.vote_id).set({ ...doc, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    await db.collection("votes").doc(doc.vote_id).set({ ...doc, members_applied: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     if (unmapped) console.warn(`Senate vote ${doc.vote_id}: ${unmapped} senator(s) without a bioguide mapping`);
     if (doc.bill_id) billIds.push(doc.bill_id);
   });

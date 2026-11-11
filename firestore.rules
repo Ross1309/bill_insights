@@ -10,6 +10,7 @@ service cloud.firestore {
     match /members/{id}   { allow read: if true; }
     match /directory/{id} { allow read: if true; }
     match /stats/{id}     { allow read: if true; }
+    match /member_votes/{id} { allow read: if true; }
 
     // Everything else (and all writes): denied to browsers.
     match /{document=**} { allow read, write: if false; }

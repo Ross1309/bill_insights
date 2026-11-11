@@ -358,27 +358,6 @@ async function queryVotes({ chamber = "", cursor = null, size }) {
   }
 }
 
-// Latest synced votes for one chamber (or both), for member voting records.
-const RECENT_VOTES_LIMIT = 50;
-const recentVotesByChamber = new Map();
-
-function getRecentVotes(chamber = "") {
-  if (!recentVotesByChamber.has(chamber)) {
-    recentVotesByChamber.set(chamber, (async () => {
-      const out = [];
-      let cursor = null;
-      while (out.length < RECENT_VOTES_LIMIT) {
-        const page = await queryVotes({ chamber, cursor, size: RECENT_VOTES_LIMIT });
-        out.push(...page.votes);
-        cursor = page.cursor;
-        if (page.done) break;
-      }
-      return out.slice(0, RECENT_VOTES_LIMIT);
-    })().catch(err => { recentVotesByChamber.delete(chamber); throw err; }));
-  }
-  return recentVotesByChamber.get(chamber);
-}
-
 async function loadVotes({ reset = false } = {}) {
   const st = votesState;
   if (reset) {
@@ -1004,155 +983,11 @@ function externalLink(url, label) {
 
 // --- member
 
-// For each synced vote this member took part in: their position, and whether
-// it matched the majority of their party's Yea/Nay votes on that roll call.
-function memberVotingRecord(bioguideId, votes) {
-  const rows = [];
-  const counts = { yea: 0, nay: 0, present: 0, not_voting: 0 };
-  let withParty = 0, partyComparable = 0;
-
-  for (const vote of votes) {
-    const own = (vote.individual_votes || []).find(v => v.bioguideId === bioguideId);
-    if (!own) continue;
-    const group = POSITION_GROUPS[(own.position || "").toLowerCase()] || null;
-    if (group) counts[group]++;
-
-    let partyMajority = null;
-    if (own.party && own.party !== "I" && (group === "yea" || group === "nay")) {
-      let y = 0, n = 0;
-      for (const v of vote.individual_votes) {
-        if (v.party !== own.party) continue;
-        const g = POSITION_GROUPS[(v.position || "").toLowerCase()];
-        if (g === "yea") y++; else if (g === "nay") n++;
-      }
-      if (y !== n) {
-        partyMajority = y > n ? "yea" : "nay";
-        partyComparable++;
-        if (partyMajority === group) withParty++;
-      }
-    }
-    rows.push({ vote, position: own.position || null, group, partyMajority });
-  }
-  return { rows, counts, withParty, partyComparable };
-}
-
-// --- campaign finance (FEC) helpers
-
-const usdCompact = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 });
-const usdExact = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const money = v => (typeof v === "number" ? usdCompact.format(v) : "—");
-const moneyExact = v => (typeof v === "number" ? usdExact.format(v) : "not reported");
-const SIZE_LABELS = { 0: "$200 and under", 200: "$200.01 – $499.99", 500: "$500 – $999.99", 1000: "$1,000 – $1,999.99", 2000: "$2,000 and over" };
-
-function formatDay(iso) {
-  if (!iso) return "?";
-  const d = new Date(`${iso}T12:00:00`);
-  return isNaN(d) ? iso : d.toLocaleDateString(undefined, { dateStyle: "medium" });
-}
-
-// One-hue horizontal bars, each a share of `total`; amounts as text, exact on hover.
-function shareBars(rows, total) {
-  return rows.map(({ label, value }) => {
-    const pct = total > 0 && value > 0 ? (value / total) * 100 : 0;
-    const pctText = pct >= 1 || pct === 0 ? `${Math.round(pct)}%` : "<1%";
-    return `
-      <div class="py-1.5" title="${escapeHtml(`${label}: ${moneyExact(value)}`)}">
-        <div class="flex justify-between gap-3 text-sm">
-          <span class="text-gray-700">${escapeHtml(label)}</span>
-          <span class="text-gray-900 font-semibold tabular-nums whitespace-nowrap">${money(value)} <span class="text-gray-500 font-normal">${escapeHtml(pctText)}</span></span>
-        </div>
-        <div class="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true"><div class="h-2 rounded-full bg-accent" style="width:${pct.toFixed(1)}%"></div></div>
-      </div>`;
-  }).join("");
-}
-
-function renderFinanceTab(e) {
-  if (!e.financeRequested) {
-    e.financeRequested = true; // only call the FEC when this tab is opened
-    loadInto(e, "finance", fetchFunction("member-finance", e.id));
-  }
-  if (e.errors.finance) return errorBlock(e.errors.finance, "Couldn't load campaign finance data from the FEC right now.");
-  const f = e.data.finance;
-  if (!f) return spinner("Loading FEC filings…");
-  if (!f.available) return `<p class="text-sm text-gray-500 py-8 text-center">${escapeHtml(f.reason || "Campaign finance data isn't available for this member.")}</p>`;
-
-  const t = f.totals;
-  const tile = (label, value) => `
-    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3" title="${escapeHtml(moneyExact(value))}">
-      <p class="text-xs text-gray-500 uppercase font-semibold">${label}</p>
-      <p class="text-xl font-bold text-gray-900 tabular-nums">${money(value)}</p>
-    </div>`;
-
-  const self = (t.candidateSelf || 0) + (t.candidateLoans || 0);
-  const sources = [
-    { label: "Individuals, unitemized ($200 or less)", value: t.individualUnitemized },
-    { label: "Individuals, itemized (over $200)", value: t.individualItemized },
-    { label: "PACs and other committees", value: t.pacs },
-    { label: "Party committees", value: t.partyCommittees },
-    { label: "Candidate's own money (incl. loans)", value: self },
-    { label: "Transfers from other authorized committees (e.g. joint fundraising)", value: t.transfersIn },
-    { label: "Other receipts (dividends, interest, etc.)", value: t.otherReceipts },
-    { label: "Offsets to operating expenditures", value: t.offsets },
-  ];
-  // Anything the FEC totals include that isn't itemized above (e.g. other loans).
-  const known = sources.reduce((sum, r) => sum + (r.value || 0), 0);
-  const other = (t.receipts || 0) - known;
-  if (t.receipts && other / t.receipts > 0.005) sources.push({ label: "Other (loans, etc.)", value: other });
-  const sourceRows = sources.filter(r => typeof r.value === "number" && r.value > 0);
-
-  const sizes = (f.bySize || []).filter(r => typeof r.total === "number" && r.total > 0)
-    .sort((a, b) => a.size - b.size);
-  const sizeTotal = sizes.reduce((sum, r) => sum + r.total, 0);
-
-  const st = f.byState;
-  const home = STATE_NAMES[st?.homeState] || st?.homeState;
-  const inPct = st?.itemizedTotal ? Math.round((st.inState / st.itemizedTotal) * 100) : null;
-
-  return `
-    <p class="text-xs text-gray-500">
-      FEC election cycle ending ${escapeHtml(String(f.candidate.electionYear))} · reported ${escapeHtml(formatDay(f.period.start))} – ${escapeHtml(formatDay(f.period.end))}
-      · ${externalLink(f.sourceUrl, "FEC filings")}
-    </p>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-      ${tile("Raised", t.receipts)}
-      ${tile("Spent", t.disbursements)}
-      ${tile("Cash on hand", t.cashOnHand)}
-      ${tile("Debts", t.debts)}
-    </div>
-
-    ${sourceRows.length ? `
-      <section class="mt-5">
-        <h3 class="text-sm font-bold text-gray-900">Where the money came from</h3>
-        <p class="text-xs text-gray-500">Share of ${escapeHtml(money(t.receipts))} total receipts.</p>
-        <div class="mt-2">${shareBars(sourceRows, t.receipts)}</div>
-      </section>` : ""}
-
-    ${sizes.length ? `
-      <section class="mt-5">
-        <h3 class="text-sm font-bold text-gray-900">Individual contributions by size</h3>
-        <p class="text-xs text-gray-500">Grouped by each donor's total to the campaign, as the FEC aggregates them.</p>
-        <div class="mt-2">${shareBars(sizes.map(r => ({ label: SIZE_LABELS[r.size] || `${r.size}+`, value: r.total })), sizeTotal)}</div>
-      </section>` : ""}
-
-    ${st && st.itemizedTotal ? `
-      <section class="mt-5">
-        <h3 class="text-sm font-bold text-gray-900">Itemized contributions by state</h3>
-        <p class="text-xs text-gray-500">The FEC records a donor's state only for itemized contributions (over $200).</p>
-        <p class="text-sm text-gray-800 mt-2"><strong>${inPct}%</strong> from ${escapeHtml(home || "the home state")}, ${100 - inPct}% from elsewhere.</p>
-        <div class="mt-1">${shareBars(st.top.map(r => ({ label: STATE_NAMES[r.state] || r.name, value: r.total })), st.itemizedTotal)}</div>
-      </section>` : ""}
-
-    <p class="text-[11px] text-gray-400 mt-5">
-      Figures are as reported to the FEC by the candidate's campaign committee. They don't include
-      outside spending such as super PACs. Amounts are rounded; hover for exact figures.
-    </p>`;
-}
-
 const memberModal = {
   load(e) {
     loadInto(e, "member", getMember(e.id));
     loadInto(e, "profile", fetchFunction("member-profile", e.id));
-    loadInto(e, "votes", getMember(e.id).then(m => getRecentVotes(m?.chamber || "")));
+    loadInto(e, "record", getFirestoreDoc("member_votes", e.id));
     if (e.financeRequested) loadInto(e, "finance", fetchFunction("member-finance", e.id)); // Retry
   },
   header(e) {
@@ -1192,44 +1027,42 @@ const memberModal = {
         : e.errors.profile ? errorBlock(e.errors.profile) : spinner("Loading details from Congress.gov…")}`;
     }],
     ["votes", "Voting Record", e => {
-      const m = e.data.member;
-      if (e.errors.votes) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load votes: ${escapeHtml(e.errors.votes)}</p>`;
-      if (!e.data.votes) return spinner("Loading votes…");
-
-      // Only the member's own chamber votes on a roll call.
-      const chamber = m?.chamber || null;
-      const votes = chamber ? e.data.votes.filter(v => v.chamber === chamber) : e.data.votes;
-      const where = chamber ? `${chamber} ` : "";
-      const rec = memberVotingRecord(e.id, votes);
-      if (!rec.rows.length) {
-        return `<p class="text-sm text-gray-500 py-8 text-center">No record of this member in the ${votes.length} most recent synced ${where}votes.</p>`;
+      // Precomputed per member (netlify/lib/member-votes.js): totals over every
+      // roll call this Congress + the latest 50 votes.
+      if (e.errors.record) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load votes: ${escapeHtml(e.errors.record)}</p>`;
+      if (e.data.record === undefined) return spinner("Loading votes…");
+      const r = e.data.record;
+      if (!r || !r.totals?.votes) {
+        return `<p class="text-sm text-gray-500 py-8 text-center">No recorded roll-call votes for this member in the current Congress yet.</p>`;
       }
-      const c = rec.counts;
-      const stat = (label, value, cls) => `<div class="${cls} border rounded-lg p-2 text-center"><p class="text-[11px] font-semibold uppercase">${label}</p><p class="text-lg font-bold">${value}</p></div>`;
+      const t = r.totals;
+      const cast = t.yea + t.nay + t.present;
+      const stat = (label, value, cls) => `<div class="${cls} border rounded-lg p-2 text-center"><p class="text-[11px] font-semibold uppercase">${label}</p><p class="text-lg font-bold tabular-nums">${value}</p></div>`;
       return `
-        <p class="text-xs text-gray-500 mb-3">Based on the ${votes.length} most recent ${where}roll-call votes synced from the official record.</p>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          ${stat("Yea", c.yea, "bg-green-50 border-green-200 text-green-700")}
-          ${stat("Nay", c.nay, "bg-red-50 border-red-200 text-red-700")}
-          ${stat("Present", c.present, "bg-gray-50 border-gray-200 text-gray-700")}
-          ${stat("Not voting", c.not_voting, "bg-yellow-50 border-yellow-100 text-yellow-800")}
+        <p class="text-sm text-gray-800">In the ${escapeHtml(ordinal(r.congress))} Congress, voted on <strong>${cast} of ${t.votes}</strong> ${escapeHtml(r.chamber || "")} roll calls they were eligible for (${Math.round((cast / t.votes) * 100)}%).</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+          ${stat("Yea", t.yea, "bg-green-50 border-green-200 text-green-700")}
+          ${stat("Nay", t.nay, "bg-red-50 border-red-200 text-red-700")}
+          ${stat("Present", t.present, "bg-gray-50 border-gray-200 text-gray-700")}
+          ${stat("Not voting", t.not_voting, "bg-yellow-50 border-yellow-100 text-yellow-800")}
         </div>
-        ${rec.partyComparable ? `<p class="text-sm text-gray-700 mt-3">Voted with the majority of their party on <strong>${rec.withParty} of ${rec.partyComparable}</strong> votes where they voted Yea or Nay.</p>` : ""}
-        <ul class="mt-4 divide-y divide-gray-100">
-          ${rec.rows.map(({ vote, position, group, partyMajority }) => {
-            const bill = voteBillInfo(vote);
+        ${t.party_comparable ? `<p class="text-sm text-gray-700 mt-3">Voted with the majority of their party on <strong>${t.with_party} of ${t.party_comparable}</strong> votes where they voted Yea or Nay (${Math.round((t.with_party / t.party_comparable) * 100)}%).</p>` : ""}
+        <p class="text-xs text-gray-500 mt-3">Counts cover every recorded vote this Congress, from the House Clerk and senate.gov. Below: the latest ${r.recent.length}.</p>
+        <ul class="mt-2 divide-y divide-gray-100">
+          ${r.recent.map(v => {
+            const bill = voteBillInfo(v);
             return `
             <li class="py-3 flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(vote.question || "Question not available")}</button>
+                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
                 <p class="text-xs text-gray-500 mt-0.5">
-                  Roll call #${escapeHtml(String(vote.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(vote.date))}
-                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="text-accent hover:underline">${escapeHtml(bill.label)}</button>` : vote.legislation ? ` · ${escapeHtml(vote.legislation)}` : ""}
-                  · ${escapeHtml(vote.result || "Result pending")}
+                  Roll call #${escapeHtml(String(v.roll ?? "?"))} · ${escapeHtml(formatVoteDate(v.date))}
+                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(v.bill_id)}" class="text-accent hover:underline">${escapeHtml(bill.label)}</button>` : v.legislation ? ` · ${escapeHtml(v.legislation)}` : ""}
+                  · ${escapeHtml(v.result || "Result pending")}
                 </p>
-                ${partyMajority && group !== partyMajority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
+                ${v.party_majority && v.group !== v.party_majority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
               </div>
-              <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${POSITION_BADGES[group] || "bg-gray-100 text-gray-700"}">${escapeHtml(position || "Not recorded")}</span>
+              <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${POSITION_BADGES[v.group] || "bg-gray-100 text-gray-700"}">${escapeHtml(v.position || "Not recorded")}</span>
             </li>`;
           }).join("")}
         </ul>`;

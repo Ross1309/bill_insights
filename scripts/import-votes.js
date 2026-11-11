@@ -121,7 +121,7 @@ async function main() {
     pool(house, 4, async ({ item }) => {
       try {
         const doc = await buildHouseVoteDoc(item, CONGRESS, CONGRESS_API_KEY);
-        writer.set(db.collection('votes').doc(doc.vote_id), { ...doc, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        writer.set(db.collection('votes').doc(doc.vote_id), { ...doc, members_applied: false, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         counts.House++;
       } catch (err) {
         console.error(`  ✗ House ${item.sessionNumber}/${item.rollCallNumber}: ${err.message}`);
@@ -132,7 +132,7 @@ async function main() {
     pool(senate, 2, async ({ entry }) => {
       try {
         const { doc, unmapped } = await fetchSenateVote(entry, lisToBioguide);
-        writer.set(db.collection('votes').doc(doc.vote_id), { ...doc, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        writer.set(db.collection('votes').doc(doc.vote_id), { ...doc, members_applied: false, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         counts.Senate++;
         counts.unmapped += unmapped;
       } catch (err) {
