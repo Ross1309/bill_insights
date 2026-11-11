@@ -31,7 +31,7 @@ public/index.html, public/app.js   UI (no build step)
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
 firestore.indexes.json             Composite indexes the UI's queries need
 netlify/functions/sync-votes.js    Syncs recent BILLS (name is historical) + AI summaries
-netlify/functions/ingest-votes.js  Syncs all current members + 5 latest House roll-call votes
+netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House votes
 netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/bill-detail.js   GET ?id={bill_id}: sponsor, cosponsor count, latest CRS
@@ -92,7 +92,16 @@ current (bool), updatedAt
 ```
 Synced from `/member?currentMember=true` (3 pages, ~539 incl. 6 delegates). Members no
 longer in that list are set `current: false`, never deleted; the UI queries
-`state ==` + `current == true`.
+`state ==` + `current == true` only as a fallback (see `directory`).
+
+**`directory/members`** — single doc, rewritten by every `ingest-votes.js` run (~100 KB)
+```
+members [{ id, name, state, party, chamber, district, imageUrl }] (all current members,
+sorted by name), count, updatedAt
+```
+The Legislators tab and headline counts read this one doc (1 read instead of ~540) and
+search/filter client-side. If it's missing or unreadable, the tab falls back to the
+per-state `members` query and says nationwide search is unavailable.
 
 ## Current state (as of 2026-11-10)
 
@@ -112,6 +121,18 @@ Pending / known issues:
   parallel and AI summaries are capped at 3 per run.
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
+
+## Legislators tab + headline counts (frontend)
+
+- Filters: search (accent-insensitive name, state name/code, or district like "WA-7" /
+  "WY-AL"), state dropdown (default WA, or "All states and territories"), party chips,
+  chamber chips (Senate / House = voting reps / Delegates). 48 cards per page + "Show more".
+  Scoped search with no hits offers "Search all states instead".
+- Headline cards under the page title: senators and representatives with party split and
+  House vacancies (out of 435), delegates, bills tracked and votes synced (via
+  `getCountFromServer`). Member cards are clickable and set the directory filters.
+- On phones the five headline cards take most of the first screen; revisit in the visual
+  refresh.
 
 ## Detail modals (frontend)
 
@@ -185,7 +206,7 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 2. ~~Members for all states.~~ Done (all states + delegates, current only, real photos).
 3. ~~Server-side ordering + pagination~~ Done (see Bills paging above).
 4. ~~Detail modals~~ Done for members, bills and votes (see Detail modals above).
-5. Directory filters (name search, party, chamber) and headline counts.
+5. ~~Directory filters and headline counts~~ Done (see Legislators tab above).
 6. Money & donors tab via OpenFEC.
 7. Visual refresh.
 8. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).

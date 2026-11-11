@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-import { getFirestore, collection, doc, getDoc, getDocs, query, where, limit, orderBy, startAfter } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, getCountFromServer, query, where, limit, orderBy, startAfter } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 import { STATES, DELEGATE_JURISDICTIONS } from "./states.js";
 
@@ -42,9 +42,10 @@ let activeCategory = "all";
 async function init() {
   populateStateSelect();
   setupTabs();
-  setupStateListener();
+  setupMemberFilters();
   setupBillFilters();
   setupModals();
+  loadHeadlineStats();
   await loadBills({ reset: true });
 }
 
@@ -53,16 +54,8 @@ function setupTabs() {
   navVotes.addEventListener("click", () => switchTab("votes"));
   navMembers.addEventListener("click", () => {
     switchTab("members");
-    fetchMembers(stateSelect ? stateSelect.value : DEFAULT_STATE);
+    showDirectory();
   });
-}
-
-function setupStateListener() {
-  if (stateSelect) {
-    stateSelect.addEventListener("change", (e) => {
-      fetchMembers(e.target.value);
-    });
-  }
 }
 
 function switchTab(tabName) {
@@ -396,6 +389,7 @@ function populateStateSelect() {
   const options = list => list.map(([code, name]) =>
     `<option value="${code}"${code === DEFAULT_STATE ? " selected" : ""}>${escapeHtml(name)} (${code})</option>`).join("");
   stateSelect.innerHTML = `
+    <option value="">All states and territories</option>
     <optgroup label="States">${options(STATES)}</optgroup>
     <optgroup label="Non-voting delegates">${options(DELEGATE_JURISDICTIONS)}</optgroup>
   `;
@@ -437,49 +431,235 @@ function memberPhoto(m) {
     onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'w-16 h-20 rounded-lg bg-gray-100 border shrink-0'}))" />`;
 }
 
-async function fetchMembers(stateCode) {
-  const request = ++membersRequest;
-  const stateName = STATE_NAMES[stateCode] || stateCode;
-  try {
+// --- Directory: all current members from one `directory/members` doc ----------
+// (written by ingest-votes.js; ~100 KB, so search + filters run client-side with a
+// single read). If that doc can't be read, fall back to a per-state query.
+
+const MEMBERS_PAGE = 48;
+const memberFilters = { text: "", state: DEFAULT_STATE, party: "", chamber: "" };
+let membersShown = MEMBERS_PAGE;
+let directoryPromise = null;
+let directoryFallbackRequest = 0;
+const PARTY_ABBR = { Democratic: "D", Republican: "R", Independent: "I" };
+
+function loadDirectory() {
+  directoryPromise ??= getDoc(doc(db, "directory", "members")).then(snap => {
+    if (!snap.exists()) throw new Error("Directory has not been built yet.");
+    const data = snap.data();
+    for (const m of data.members || []) if (!memberById.has(m.id)) memberById.set(m.id, m);
+    return { members: data.members || [], updatedAt: data.updatedAt?.toDate?.() || null };
+  }).catch(err => { directoryPromise = null; throw err; });
+  return directoryPromise;
+}
+
+const isDelegate = m => DELEGATE_JURISDICTIONS.some(([code]) => code === m.state);
+const fold = str => String(str || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+// "WA-7", "wa 7", "WA-AL" -> { state: "WA", district: 7 | 0 }
+function parseDistrictTerm(term) {
+  const m = /^([a-z]{2})[\s-]*(\d{1,2}|al)$/i.exec(term.trim());
+  if (!m || !STATE_NAMES[m[1].toUpperCase()]) return null;
+  return { state: m[1].toUpperCase(), district: /al/i.test(m[2]) ? 0 : Number(m[2]) };
+}
+
+function filterMembers(members) {
+  const f = memberFilters;
+  const term = fold(f.text.trim());
+  const district = parseDistrictTerm(f.text);
+  return members.filter(m => {
+    if (f.state && m.state !== f.state) return false;
+    if (f.party && m.party !== f.party) return false;
+    // "House" = voting representatives; "Delegates" = DC, PR and territories.
+    if (f.chamber === "Senate" && m.chamber !== "Senate") return false;
+    if (f.chamber === "House" && (m.chamber !== "House" || isDelegate(m))) return false;
+    if (f.chamber === "Delegates" && !isDelegate(m)) return false;
+    if (!term) return true;
+    if (district) return m.chamber === "House" && m.state === district.state && (Number(m.district) || 0) === district.district;
+    return fold(m.name).includes(term) || fold(STATE_NAMES[m.state]) === term || fold(m.state) === term;
+  });
+}
+
+function sortForView(members) {
+  if (memberFilters.state) return [...members].sort(compareMembers);
+  return [...members].sort((a, b) =>
+    (a.state || "").localeCompare(b.state || "") || compareMembers(a, b));
+}
+
+function membersSummary(shownCount, list) {
+  const senators = list.filter(m => m.chamber === "Senate").length;
+  const delegates = list.filter(m => m.chamber === "House" && isDelegate(m)).length;
+  const reps = list.length - senators - delegates;
+  const byParty = {};
+  for (const m of list) if (m.party) byParty[m.party] = (byParty[m.party] || 0) + 1;
+  const parts = [
+    senators && `${senators} senator${senators === 1 ? "" : "s"}`,
+    reps && `${reps} representative${reps === 1 ? "" : "s"}`,
+    delegates && `${delegates} delegate${delegates === 1 ? "" : "s"}`,
+  ].filter(Boolean).join(", ");
+  const parties = Object.entries(byParty).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${p} ${n}`).join(" · ");
+  return `Showing ${shownCount} of ${list.length} member${list.length === 1 ? "" : "s"}${parts ? ` — ${parts}` : ""}${parties ? ` · ${parties}` : ""}`;
+}
+
+function memberCard(m) {
+  return `
+    <button type="button" data-open="member" data-id="${escapeHtml(m.id)}" aria-label="View profile of ${escapeHtml(m.name || "member")}"
+      class="member-card text-left bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+      ${memberPhoto(m)}
+      <div class="min-w-0">
+        ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
+        <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
+        <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}${memberFilters.state ? "" : ` · ${escapeHtml(m.state || "")}`}</p>
+        <p class="text-xs text-blue-600 mt-1">View profile →</p>
+      </div>
+    </button>`;
+}
+
+function renderMemberList(members) {
+  const summary = document.getElementById("members-summary");
+  const more = document.getElementById("members-more");
+  const list = sortForView(filterMembers(members));
+  const shown = list.slice(0, membersShown);
+
+  summary.textContent = list.length ? membersSummary(shown.length, list) : "";
+  if (!list.length) {
+    const scoped = memberFilters.state && memberFilters.text.trim();
     membersContainer.innerHTML = `
       <div class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-4"></div>
-        <p class="text-gray-500">Loading members for ${escapeHtml(stateName)}...</p>
-      </div>
-    `;
+        <p class="text-gray-500">No current members match these filters.</p>
+        ${scoped ? `<button type="button" data-member-action="all-states" class="mt-3 text-sm font-semibold text-blue-600 hover:underline">Search all states instead</button>` : ""}
+      </div>`;
+    more.innerHTML = "";
+    return;
+  }
+  membersContainer.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${shown.map(memberCard).join("")}</div>`;
+  more.innerHTML = list.length > shown.length
+    ? `<button type="button" data-member-action="more" class="px-4 py-2 text-sm font-semibold rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm">Show ${Math.min(MEMBERS_PAGE, list.length - shown.length)} more</button>`
+    : `<p class="text-xs text-gray-400">Source: Congress.gov</p>`;
+}
 
-    const q = query(collection(db, "members"), where("state", "==", stateCode), where("current", "==", true), limit(100));
-    const snapshot = await getDocs(q);
-    if (request !== membersRequest) return; // a newer state was selected meanwhile
-
-    if (snapshot.empty) {
-      membersContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No current members found for ${escapeHtml(stateName)}.</p>`;
-      return;
-    }
-
-    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(compareMembers);
-    members.forEach(m => memberById.set(m.id, m));
-    membersContainer.innerHTML = `
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        ${members.map(m => `
-          <button type="button" data-open="member" data-id="${escapeHtml(m.id)}" aria-label="View profile of ${escapeHtml(m.name || "member")}"
-            class="member-card text-left bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
-            ${memberPhoto(m)}
-            <div class="min-w-0">
-              ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
-              <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}</p>
-              <p class="text-xs text-blue-600 mt-1">View profile →</p>
-            </div>
-          </button>
-        `).join("")}
-      </div>
-      <p class="text-xs text-gray-400 mt-4">${members.length} current member${members.length === 1 ? "" : "s"} · Source: Congress.gov</p>
-    `;
+async function showDirectory() {
+  try {
+    const { members } = await loadDirectory();
+    renderMemberList(members);
   } catch (err) {
-    if (request !== membersRequest) return;
+    console.warn("Directory unavailable, falling back to per-state query:", err.message);
+    await showStateFallback();
+  }
+}
+
+// Fallback: query `members` for the selected state only (party/chamber/name
+// filters still apply to that state's results).
+async function showStateFallback() {
+  const request = ++directoryFallbackRequest;
+  const summary = document.getElementById("members-summary");
+  if (!memberFilters.state) {
+    membersContainer.innerHTML = `<p class="text-center text-gray-500 py-12">Nationwide search isn't available right now. Pick a state to browse its members.</p>`;
+    summary.textContent = "";
+    document.getElementById("members-more").innerHTML = "";
+    return;
+  }
+  try {
+    const snapshot = await getDocs(query(collection(db, "members"),
+      where("state", "==", memberFilters.state), where("current", "==", true), limit(100)));
+    if (request !== directoryFallbackRequest) return;
+    const members = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    members.forEach(m => memberById.set(m.id, m));
+    renderMemberList(members);
+  } catch (err) {
+    if (request !== directoryFallbackRequest) return;
     console.error("Error fetching members:", err);
     membersContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load members: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function setChipGroup(groupId, attr, value) {
+  document.querySelectorAll(`#${groupId} [data-${attr}]`).forEach(b => {
+    const active = b.dataset[attr] === value;
+    b.setAttribute("aria-pressed", String(active));
+    b.className = `filter-chip px-3 py-1.5 text-xs font-semibold rounded-lg transition ${active ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
+  });
+}
+
+function setMemberFilters(changes) {
+  Object.assign(memberFilters, changes);
+  membersShown = MEMBERS_PAGE;
+  if (stateSelect) stateSelect.value = memberFilters.state;
+  const search = document.getElementById("member-search");
+  if (search && search.value !== memberFilters.text) search.value = memberFilters.text;
+  setChipGroup("party-filters", "party", memberFilters.party);
+  setChipGroup("chamber-filters", "chamber", memberFilters.chamber);
+  showDirectory();
+}
+
+function setupMemberFilters() {
+  setChipGroup("party-filters", "party", memberFilters.party);
+  setChipGroup("chamber-filters", "chamber", memberFilters.chamber);
+  stateSelect?.addEventListener("change", e => setMemberFilters({ state: e.target.value }));
+  let debounce;
+  document.getElementById("member-search")?.addEventListener("input", e => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => setMemberFilters({ text: e.target.value }), 150);
+  });
+  document.getElementById("party-filters")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-party]");
+    if (b) setMemberFilters({ party: b.dataset.party });
+  });
+  document.getElementById("chamber-filters")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-chamber]");
+    if (b) setMemberFilters({ chamber: b.dataset.chamber });
+  });
+  document.getElementById("view-members").addEventListener("click", e => {
+    const action = e.target.closest("[data-member-action]")?.dataset.memberAction;
+    if (action === "more") { membersShown += MEMBERS_PAGE; showDirectory(); }
+    if (action === "all-states") setMemberFilters({ state: "" });
+  });
+}
+
+// --- Headline counts (all computed from stored data) --------------------------
+
+async function loadHeadlineStats() {
+  const el = document.getElementById("headline-stats");
+  if (!el) return;
+  const [dir, bills, votes] = await Promise.allSettled([
+    loadDirectory(),
+    getCountFromServer(collection(db, "bills")),
+    getCountFromServer(collection(db, "votes")),
+  ]);
+
+  const split = list => {
+    const c = {};
+    for (const m of list) c[PARTY_ABBR[m.party] || m.party || "?"] = (c[PARTY_ABBR[m.party] || m.party || "?"] || 0) + 1;
+    return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${n} ${p}`).join(" · ");
+  };
+  const card = (value, label, detail, action) => `
+    <${action ? `button type="button" data-headline="${action}"` : "div"}
+      class="text-left bg-gray-50 border border-gray-200 rounded-xl px-4 py-3${action ? " hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" : ""}">
+      <p class="text-2xl font-bold text-gray-900">${escapeHtml(String(value))}</p>
+      <p class="text-xs font-semibold uppercase text-gray-500">${escapeHtml(label)}</p>
+      ${detail ? `<p class="text-xs text-gray-500 mt-0.5">${escapeHtml(detail)}</p>` : ""}
+    </${action ? "button" : "div"}>`;
+
+  const cards = [];
+  if (dir.status === "fulfilled") {
+    const all = dir.value.members;
+    const senate = all.filter(m => m.chamber === "Senate");
+    const house = all.filter(m => m.chamber === "House" && !isDelegate(m));
+    const delegates = all.filter(m => m.chamber === "House" && isDelegate(m));
+    cards.push(card(senate.length, "Senators", split(senate), "Senate"));
+    cards.push(card(house.length, "Representatives", `${house.length < 435 ? `${435 - house.length} of 435 seats vacant · ` : ""}${split(house)}`, "House"));
+    cards.push(card(delegates.length, "Non-voting delegates", "DC, PR and territories", "Delegates"));
+  }
+  if (bills.status === "fulfilled") cards.push(card(bills.value.data().count, "Bills tracked", "Synced from Congress.gov"));
+  if (votes.status === "fulfilled") cards.push(card(votes.value.data().count, "Roll-call votes", "House votes synced"));
+  el.innerHTML = cards.join("");
+  if (!el.dataset.wired) {
+    el.dataset.wired = "1";
+    el.addEventListener("click", e => {
+      const action = e.target.closest("[data-headline]")?.dataset.headline;
+      if (!action) return;
+      switchTab("members");
+      setMemberFilters({ state: "", chamber: action, party: "", text: "" });
+    });
   }
 }
 

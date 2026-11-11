@@ -119,6 +119,7 @@ async function syncCurrentMembers() {
 
   const ops = [];
   const currentIds = new Set();
+  const directory = [];
   const unknownStates = new Set();
 
   for (const m of members) {
@@ -130,13 +131,23 @@ async function syncCurrentMembers() {
     const latestChamber = terms.at(-1)?.chamber;
 
     currentIds.add(m.bioguideId);
+    const chamber = CHAMBERS[latestChamber] || latestChamber || null;
+    directory.push({
+      id: m.bioguideId,
+      name: m.name || null,
+      state: state || null,
+      party: m.partyName || null,
+      chamber,
+      district: m.district ?? null,
+      imageUrl: m.depiction?.imageUrl || null,
+    });
     ops.push([db.collection("members").doc(m.bioguideId), {
       bioguideId: m.bioguideId,
       name: m.name || null,
       state: state || null,
       state_name: m.state || null,
       party: m.partyName || null,
-      chamber: CHAMBERS[latestChamber] || latestChamber || null,
+      chamber,
       district: m.district ?? null,
       imageUrl: m.depiction?.imageUrl || null,
       current: true,
@@ -158,6 +169,14 @@ async function syncCurrentMembers() {
     for (const [ref, data] of ops.slice(i, i + 450)) batch.set(ref, data, { merge: true });
     await batch.commit();
   }
+
+  // One compact doc with every current member (~100 KB), so the directory page can
+  // search and filter nationwide with a single read instead of ~540.
+  await db.collection("directory").doc("members").set({
+    members: directory.sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+    count: directory.length,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 
   if (unknownStates.size) console.warn(`Unmapped state names: ${[...unknownStates].join(', ')}`);
   console.log(`Synced ${currentIds.size} current members; marked ${retired} as no longer serving.`);
