@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, limit, orderBy } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyB53n86BTG9co1S8Ek0Acvx4onbzvXQD8Y",
@@ -30,6 +30,7 @@ const viewVotes = document.getElementById("view-votes");
 const viewMembers = document.getElementById("view-members");
 
 let allBills = [];
+let votesLoaded = false;
 let activeCategory = "all";
 
 async function init() {
@@ -68,7 +69,7 @@ function switchTab(tabName) {
   } else if (tabName === "votes") {
     navVotes.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
     viewVotes.classList.remove("hidden");
-    renderVotesFromBills(allBills);
+    if (!votesLoaded) fetchVotes();
   } else if (tabName === "members") {
     navMembers.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
     viewMembers.classList.remove("hidden");
@@ -157,28 +158,140 @@ function renderBills(bills) {
   `;
 }
 
-function renderVotesFromBills(bills) {
-  // Even if specific vote fields are missing, display bill actions/titles as roll-call entries
-  if (!bills || bills.length === 0) {
-    votesContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No vote or action records found.</p>`;
+// --- Roll-call votes (schema written by netlify/functions/ingest-votes.js) ---
+
+async function fetchVotes() {
+  try {
+    const q = query(collection(db, "votes"), orderBy("date", "desc"), limit(25));
+    const snapshot = await getDocs(q);
+    votesLoaded = true;
+    renderVotes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  } catch (err) {
+    console.error("Error fetching votes:", err);
+    votesContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load votes: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+const BILL_TYPE_SLUGS = {
+  hr: "house-bill", s: "senate-bill", hres: "house-resolution", sres: "senate-resolution",
+  hjres: "house-joint-resolution", sjres: "senate-joint-resolution",
+  hconres: "house-concurrent-resolution", sconres: "senate-concurrent-resolution",
+};
+
+function ordinal(n) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  return `${n}${{ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`;
+}
+
+// Link a vote to its bill: our own bill card data when we have it,
+// otherwise straight to Congress.gov.
+function voteBillInfo(vote) {
+  if (!vote.bill_id) return null;
+  const bill = allBills.find(b => b.id === vote.bill_id);
+  const m = /^([a-z]+)(\d+)-(\d+)$/.exec(vote.bill_id);
+  const fallbackUrl = m && BILL_TYPE_SLUGS[m[1]]
+    ? `https://www.congress.gov/bill/${ordinal(Number(m[3]))}-congress/${BILL_TYPE_SLUGS[m[1]]}/${m[2]}`
+    : null;
+  return {
+    label: bill ? billLabel(bill) : (vote.legislation || vote.bill_id),
+    title: bill?.title || null,
+    url: bill?.congress_gov_url || fallbackUrl,
+  };
+}
+
+const POSITION_GROUPS = { yea: "yea", aye: "yea", nay: "nay", no: "nay", present: "present", "not voting": "not_voting" };
+const PARTY_NAMES = { R: "Republican", D: "Democratic", I: "Independent" };
+
+function partyBreakdown(individualVotes = []) {
+  const byParty = {};
+  for (const v of individualVotes) {
+    const party = v.party || "?";
+    const group = POSITION_GROUPS[(v.position || "").toLowerCase()] || "other";
+    byParty[party] ??= { yea: 0, nay: 0, present: 0, not_voting: 0, other: 0 };
+    byParty[party][group]++;
+  }
+  // Largest caucus first
+  return Object.entries(byParty).sort((a, b) =>
+    Object.values(b[1]).reduce((x, y) => x + y, 0) - Object.values(a[1]).reduce((x, y) => x + y, 0));
+}
+
+function formatVoteDate(iso) {
+  if (!iso) return "Date not available";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function resultBadgeClass(result) {
+  const r = (result || "").toLowerCase();
+  if (/(passed|agreed|adopted)/.test(r)) return "bg-green-100 text-green-800";
+  if (/(failed|rejected|not agreed)/.test(r)) return "bg-red-100 text-red-800";
+  return "bg-gray-100 text-gray-700";
+}
+
+function renderVotes(votes) {
+  if (votes.length === 0) {
+    votesContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No roll-call votes have been synced yet.</p>`;
     return;
   }
 
   votesContainer.innerHTML = `
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      ${bills.map(bill => `
-        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span class="bg-purple-50 text-purple-600 font-semibold px-2 py-0.5 rounded uppercase">Action / Vote</span>
-              <span>${escapeHtml(billLabel(bill))}</span>
+    <div class="space-y-6">
+      ${votes.map(vote => {
+        const t = vote.tallies || {};
+        const bill = voteBillInfo(vote);
+        const parties = partyBreakdown(vote.individual_votes);
+        const tally = (label, value, cls) => `
+          <div class="${cls} p-3 rounded-lg border text-center">
+            <p class="text-xs font-semibold uppercase">${label}</p>
+            <p class="text-xl font-bold">${Number.isFinite(value) ? value : "—"}</p>
+          </div>`;
+        return `
+        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-gray-100">
+            <div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 uppercase">
+                ${escapeHtml(vote.chamber || "House")} Roll Call #${escapeHtml(String(vote.roll_call_number ?? "?"))}${vote.session ? ` · Session ${escapeHtml(String(vote.session))}` : ""}
+              </span>
+              <h3 class="font-bold text-gray-900 text-lg mt-2">${escapeHtml(vote.question || "Question not available")}</h3>
+              ${bill ? `
+                <p class="text-sm text-gray-600 mt-1">
+                  ${bill.url
+                    ? `<a href="${escapeHtml(bill.url)}" target="_blank" rel="noopener" class="font-semibold text-blue-600 hover:underline">${escapeHtml(bill.label)}</a>`
+                    : `<span class="font-semibold">${escapeHtml(bill.label)}</span>`}
+                  ${bill.title ? ` — ${escapeHtml(bill.title)}` : ""}
+                </p>` : `<p class="text-sm text-gray-400 mt-1">No bill associated with this vote</p>`}
+              ${vote.vote_type ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(vote.vote_type)}</p>` : ""}
             </div>
-            <h3 class="font-bold text-gray-900 text-lg mb-2">${escapeHtml(bill.title || 'Legislative Item')}</h3>
-            <p class="text-gray-600 text-sm mb-3"><strong>Latest Action:</strong> ${escapeHtml(bill.latestAction?.text || bill.actionText || 'No action text recorded.')}</p>
-            ${bill.latestAction?.actionDate ? `<p class="text-xs text-gray-400">Date: ${escapeHtml(bill.latestAction.actionDate)}</p>` : ''}
+            <div class="sm:text-right shrink-0">
+              <span class="inline-block px-3 py-1 text-xs font-bold rounded ${resultBadgeClass(vote.result)}">${escapeHtml(vote.result || "Result pending")}</span>
+              <p class="text-xs text-gray-400 mt-1">${escapeHtml(formatVoteDate(vote.date))}</p>
+            </div>
           </div>
-        </div>
-      `).join('')}
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+            ${tally("Yea", t.yea, "bg-green-50 border-green-100 text-green-700")}
+            ${tally("Nay", t.nay, "bg-red-50 border-red-100 text-red-700")}
+            ${tally("Present", t.present, "bg-gray-50 border-gray-200 text-gray-700")}
+            ${tally("Not voting", t.not_voting, "bg-gray-50 border-gray-200 text-gray-700")}
+          </div>
+          ${parties.length ? `
+            <table class="w-full text-sm text-left">
+              <thead class="text-xs text-gray-500 uppercase">
+                <tr><th class="py-1 font-semibold">Party</th><th class="py-1 font-semibold text-right">Yea</th><th class="py-1 font-semibold text-right">Nay</th><th class="py-1 font-semibold text-right">Present</th><th class="py-1 font-semibold text-right">Not voting</th></tr>
+              </thead>
+              <tbody class="text-gray-700">
+                ${parties.map(([party, c]) => `
+                  <tr class="border-t border-gray-100">
+                    <td class="py-1">${escapeHtml(PARTY_NAMES[party] || party)}</td>
+                    <td class="py-1 text-right">${c.yea}</td><td class="py-1 text-right">${c.nay}</td>
+                    <td class="py-1 text-right">${c.present}</td><td class="py-1 text-right">${c.not_voting}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>` : `<p class="text-xs text-gray-400">Member-level votes not available.</p>`}
+          ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="inline-block mt-3 text-xs text-blue-600 hover:underline">Official record (House Clerk) →</a>` : ""}
+        </div>`;
+      }).join("")}
     </div>
   `;
 }

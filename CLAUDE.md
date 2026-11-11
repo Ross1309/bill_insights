@@ -65,12 +65,17 @@ ai_summary { bullet_points[], source: "crs_summary"|"title_only", model, generat
 synced_at
 ```
 
-**`votes`** — doc id `{congress}-house-vote-{rollCall}`, written by `ingest-votes.js`
+**`votes`** — doc id `{congress}-{session}-house-vote-{rollCall}` (roll-call numbers restart
+each session), written by `ingest-votes.js`
 ```
-vote_id, bill_id (matches bills doc id, or null), chamber, congress, roll_call_number,
-date, question, result, tallies { yea, nay, present, not_voting, ... },
-individual_votes [{ bioguideId, name, state, party, position }], updatedAt
+vote_id, bill_id (bills doc id format, or null), legislation ("HR 9612" or null), chamber,
+congress, session, roll_call_number, date (UTC ISO), question, vote_type, result,
+tallies { yea, nay, present, not_voting } (Aye/No counted as yea/nay),
+individual_votes [{ bioguideId, name, state, party ("R"/"D"/"I"), position }],
+source_url (House Clerk XML), updatedAt
 ```
+Congress.gov's `house-vote` list ignores `sort` and is unordered, so the ingest pages
+through the whole congress and takes the newest by `startDate`.
 
 **`members`** — doc id = bioguideId
 ```
@@ -84,23 +89,21 @@ area, sourced summary bullets, latest action, Congress.gov link; search matches
 title / policy area / bill number ("HR 10914", "hr10914", "10914"); category filter
 buttons work.
 
+Votes tab reads the `votes` collection (orderBy `date` desc): question, result, tallies,
+party breakdown, bill link (own bill data or Congress.gov), House Clerk source link.
+Backfill has been run (verified 2026-11-10: no fake fields, all summaries sourced).
+
 Pending / known issues:
-- **Backfill not yet run.** Existing bill docs (~9) still have rotated fake categories,
-  some speculative title-only summaries, and some "Impact details pending analysis."
-  placeholders. Run `node scripts/backfill-bills.js --write --summaries` once.
-- Uncommitted work in the tree (app.js changes, new lib/scripts, CLAUDE.md,
-  .gitignore). Review the diff before committing.
-- `node_modules/` (~5k files) is tracked in git. Should be `git rm -r --cached
-  node_modules` + added to `.gitignore`.
+- Legacy vote docs with ids `119-house-vote-{315..319}` (pre-session ids) duplicate the
+  new `119-2-house-vote-*` docs and should be deleted.
 - `sync-votes.js` must stay under Netlify's function timeout: detail fetches run in
   parallel and AI summaries are capped at 3 per run.
+- Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
+  recently updated). Consider syncing bills referenced by votes.
 
 ## Next steps (in priority order)
 
-1. **Votes tab → `votes` collection.** `renderVotesFromBills` currently just re-lists
-   bills with their latest action. Query `votes` (orderBy `date` desc), show
-   question, result, tallies, date; link to the bill via `bill_id`; party breakdown
-   from `individual_votes`.
+1. ~~Votes tab → `votes` collection.~~ Done; per-member positions belong in the detail modal (#4).
 2. **Members for all states.** `ingest-votes.js` only syncs WA, so CA/OR/NY/TX in the
    dropdown are empty. Loop all states (or the dropdown's list), filter to current
    members (Congress.gov `currentMember=true`), and expand the dropdown to 50 states.
