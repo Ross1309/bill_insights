@@ -60,8 +60,8 @@ function setupTabs() {
   });
 }
 
-const TAB_BASE = "nav-tab py-3.5 text-sm sm:text-base font-semibold whitespace-nowrap border-b-2 focus:outline-none focus-visible:text-brand-900";
-const TAB_ACTIVE = `${TAB_BASE} text-brand-900 border-gold-500`;
+const TAB_BASE = "nav-tab py-3.5 text-sm sm:text-base font-semibold whitespace-nowrap border-b-2 focus:outline-none focus-visible:text-gray-900";
+const TAB_ACTIVE = `${TAB_BASE} text-gray-900 border-pink`;
 const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-800`;
 
 function switchTab(tabName) {
@@ -103,7 +103,7 @@ async function loadBills({ reset = false } = {}) {
     billsError = null;
     billsContainer.innerHTML = `
       <div class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand-600 border-t-transparent mb-4"></div>
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
         <p class="text-gray-500">Loading bills...</p>
       </div>`;
     billsMore.innerHTML = "";
@@ -153,7 +153,7 @@ function renderLoadMore() {
   }
   billsMore.innerHTML = `
     <button id="bills-load-more" ${billsLoading ? "disabled" : ""}
-      class="px-4 py-2 text-sm font-semibold rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 shadow-sm">
+      class="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 shadow-sm">
       ${billsLoading ? "Loading…" : "Load more bills"}
     </button>`;
   document.getElementById("bills-load-more").addEventListener("click", () => loadBills());
@@ -198,21 +198,21 @@ function renderBills(bills, term = "") {
   billsContainer.innerHTML = scopeNote + `
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       ${bills.map(bill => `
-        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+        <div class="bg-surface border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span class="bg-brand-50 text-brand-700 font-semibold ring-1 ring-brand-100 px-2 py-0.5 rounded uppercase">${escapeHtml(billLabel(bill))}</span>
+              <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded uppercase">${escapeHtml(billLabel(bill))}</span>
               <span>${escapeHtml(String(bill.congress || ''))}${bill.congress ? 'th Congress' : ''}</span>
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
-            <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-brand-900 hover:underline">${escapeHtml(bill.title || 'Untitled Bill')}</button></h3>
+            <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(bill.title || 'Untitled Bill')}</button></h3>
             ${renderSummary(bill)}
           </div>
           <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
             ${bill.latestAction?.text ? `<p><strong class="text-gray-700">Latest action${bill.latestAction.actionDate ? ` (${escapeHtml(bill.latestAction.actionDate)})` : ''}:</strong> ${escapeHtml(bill.latestAction.text)}</p>` : ''}
             <div class="flex flex-wrap gap-4 pt-1">
-              <button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="font-semibold text-brand-700 hover:underline">Details, actions &amp; votes →</button>
-              ${bill.congress_gov_url ? `<a href="${escapeHtml(bill.congress_gov_url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">Congress.gov →</a>` : ''}
+              <button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="font-semibold text-accent hover:underline">Details, actions &amp; votes →</button>
+              ${bill.congress_gov_url ? `<a href="${escapeHtml(bill.congress_gov_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">Congress.gov →</a>` : ''}
             </div>
           </div>
         </div>
@@ -223,28 +223,130 @@ function renderBills(bills, term = "") {
 
 // --- Roll-call votes (schema written by netlify/functions/ingest-votes.js) ---
 
-// Most recent synced roll-call votes, shared by the Votes tab and member profiles.
-const RECENT_VOTES_LIMIT = 50;
-let recentVotesPromise = null;
+// --- Votes: newest first, cursor pagination (like bills) ---------------------
+// Filtering by chamber while ordering by date needs the (chamber ASC, date DESC)
+// index in firestore.indexes.json. If it's missing, fall back to paging all votes and
+// filtering by chamber in the browser.
 
-function getRecentVotes() {
-  recentVotesPromise ??= getDocs(query(collection(db, "votes"), orderBy("date", "desc"), limit(RECENT_VOTES_LIMIT)))
-    .then(snapshot => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
-    .catch(err => { recentVotesPromise = null; throw err; });
-  return recentVotesPromise;
+const VOTES_PAGE_SIZE = 10;
+const FALLBACK_PAGE_SIZE = 30;
+const votesMore = document.getElementById("votes-more");
+const voteCache = new Map(); // every vote seen this session, by id
+let voteChamber = "";
+let voteIndexMissing = false;
+const votesState = { items: [], cursor: null, exhausted: false, loading: false, generation: 0 };
+
+function rememberVotes(list) {
+  for (const v of list) voteCache.set(v.id, v);
 }
 
-let voteChamber = "";
-
-async function fetchVotes() {
+async function queryVotes({ chamber = "", cursor = null, size }) {
+  const useIndex = chamber && !voteIndexMissing;
+  const constraints = [];
+  if (useIndex) constraints.push(where("chamber", "==", chamber));
+  constraints.push(orderBy("date", "desc"));
+  if (cursor) constraints.push(startAfter(cursor));
+  constraints.push(limit(useIndex || !chamber ? size : FALLBACK_PAGE_SIZE));
   try {
-    const votes = await getRecentVotes();
-    votesLoaded = true;
-    renderVotes(voteChamber ? votes.filter(v => v.chamber === voteChamber) : votes);
+    const snap = await getDocs(query(collection(db, "votes"), ...constraints));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    rememberVotes(docs);
+    return {
+      votes: chamber && !useIndex ? docs.filter(v => v.chamber === chamber) : docs,
+      cursor: snap.docs.at(-1) || cursor,
+      done: snap.docs.length < (useIndex || !chamber ? size : FALLBACK_PAGE_SIZE),
+    };
   } catch (err) {
+    if (err.code === "failed-precondition" && useIndex) {
+      console.warn("Votes chamber index missing; filtering by chamber in the browser.", err.message);
+      voteIndexMissing = true;
+      return queryVotes({ chamber, cursor, size });
+    }
+    throw err;
+  }
+}
+
+// Latest synced votes for one chamber (or both), for member voting records.
+const RECENT_VOTES_LIMIT = 50;
+const recentVotesByChamber = new Map();
+
+function getRecentVotes(chamber = "") {
+  if (!recentVotesByChamber.has(chamber)) {
+    recentVotesByChamber.set(chamber, (async () => {
+      const out = [];
+      let cursor = null;
+      while (out.length < RECENT_VOTES_LIMIT) {
+        const page = await queryVotes({ chamber, cursor, size: RECENT_VOTES_LIMIT });
+        out.push(...page.votes);
+        cursor = page.cursor;
+        if (page.done) break;
+      }
+      return out.slice(0, RECENT_VOTES_LIMIT);
+    })().catch(err => { recentVotesByChamber.delete(chamber); throw err; }));
+  }
+  return recentVotesByChamber.get(chamber);
+}
+
+async function loadVotes({ reset = false } = {}) {
+  const st = votesState;
+  if (reset) {
+    st.generation++;
+    Object.assign(st, { items: [], cursor: null, exhausted: false, loading: false });
+    votesContainer.innerHTML = `
+      <div class="text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+        <p class="text-gray-500">Loading vote records...</p>
+      </div>`;
+    votesMore.innerHTML = "";
+  }
+  if (st.loading || st.exhausted) return;
+
+  const generation = st.generation;
+  st.loading = true;
+  renderVotesMore();
+  try {
+    const page = [];
+    while (page.length < VOTES_PAGE_SIZE && !st.exhausted) {
+      const res = await queryVotes({ chamber: voteChamber, cursor: st.cursor, size: VOTES_PAGE_SIZE });
+      if (generation !== st.generation) return;
+      page.push(...res.votes);
+      st.cursor = res.cursor;
+      st.exhausted = res.done;
+    }
+    st.items.push(...page);
+    st.loading = false;
+    votesLoaded = true;
+    renderVotes(st.items);
+    renderVotesMore();
+  } catch (err) {
+    if (generation !== st.generation) return;
+    st.loading = false;
     console.error("Error fetching votes:", err);
     votesContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load votes: ${escapeHtml(err.message)}</p>`;
+    votesMore.innerHTML = "";
   }
+}
+
+function fetchVotes() {
+  return loadVotes({ reset: true });
+}
+
+function renderVotesMore() {
+  const st = votesState;
+  if (st.exhausted && !st.loading) {
+    votesMore.innerHTML = st.items.length
+      ? `<p class="text-xs text-gray-400">All ${st.items.length} synced ${voteChamber ? `${voteChamber} ` : ""}votes loaded.</p>`
+      : "";
+    return;
+  }
+  const oldest = st.items.at(-1)?.date;
+  votesMore.innerHTML = `
+    <button type="button" id="votes-load-more" ${st.loading ? "disabled" : ""}
+      class="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 shadow-sm">
+      ${st.loading ? "Loading…" : "Load older votes"}
+    </button>
+    ${oldest && !st.loading ? `<p class="text-xs text-gray-400 mt-2">Showing ${st.items.length} votes back to ${escapeHtml(new Date(oldest).toLocaleDateString(undefined, { dateStyle: "medium" }))}</p>` : ""}`;
+  document.getElementById("votes-load-more")?.addEventListener("click", () => loadVotes());
 }
 
 const BILL_TYPE_SLUGS = {
@@ -316,8 +418,8 @@ function voteTalliesHtml(vote) {
     </div>`;
   return `
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
-      ${tally("Yea", t.yea, "bg-green-50 border-green-100 text-green-700")}
-      ${tally("Nay", t.nay, "bg-red-50 border-red-100 text-red-700")}
+      ${tally("Yea", t.yea, "bg-green-50 border-green-200 text-green-700")}
+      ${tally("Nay", t.nay, "bg-red-50 border-red-200 text-red-700")}
       ${tally("Present", t.present, "bg-gray-50 border-gray-200 text-gray-700")}
       ${tally("Not voting", t.not_voting, "bg-gray-50 border-gray-200 text-gray-700")}
     </div>
@@ -329,7 +431,7 @@ function voteTalliesHtml(vote) {
         <tbody class="text-gray-700">
           ${parties.map(([party, c]) => `
             <tr class="border-t border-gray-100">
-              <td class="py-1">${escapeHtml(PARTY_NAMES[party] || party)}</td>
+              <td class="py-1">${partyChip(PARTY_NAMES[party] || party)}</td>
               <td class="py-1 text-right">${c.yea}</td><td class="py-1 text-right">${c.nay}</td>
               <td class="py-1 text-right">${c.present}</td><td class="py-1 text-right">${c.not_voting}</td>
             </tr>`).join("")}
@@ -352,7 +454,7 @@ function voteBillLine(vote) {
   }
   return `
     <p class="text-sm text-gray-600 mt-1">
-      <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="font-semibold text-brand-700 hover:underline">${escapeHtml(bill.label)}</button>
+      <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="font-semibold text-accent hover:underline">${escapeHtml(bill.label)}</button>
       ${bill.title || vote.document_title ? ` — ${escapeHtml(bill.title || vote.document_title)}` : ""}
     </p>`;
 }
@@ -378,13 +480,23 @@ function renderVotes(votes) {
     return;
   }
 
-  votesContainer.innerHTML = `
+  // Group under month headings so it's clear how far back the list goes.
+  const monthOf = v => (v.date ? new Date(v.date).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "Date not available");
+  const groups = [];
+  for (const v of votes) {
+    const label = monthOf(v);
+    if (groups.at(-1)?.label !== label) groups.push({ label, votes: [] });
+    groups.at(-1).votes.push(v);
+  }
+
+  votesContainer.innerHTML = groups.map(g => `
+    <h3 class="text-xs font-bold uppercase tracking-wide text-gray-500 mt-8 mb-3 first:mt-0">${escapeHtml(g.label)}</h3>
     <div class="space-y-6">
-      ${votes.map(vote => `
-        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+      ${g.votes.map(vote => `
+        <div class="bg-surface border border-gray-200 rounded-xl p-6 shadow-sm">
           <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-gray-100">
             <div>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-gold-50 text-gold-800 ring-1 ring-gold-200 uppercase">${voteHeadingBadge(vote)}</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-accent/10 text-accent ring-1 ring-accent/30 uppercase">${voteHeadingBadge(vote)}</span>
               <h3 class="font-serif font-bold text-gray-900 text-xl mt-2">${escapeHtml(vote.question || "Question not available")}</h3>
               ${voteBillLine(vote)}
               ${vote.vote_type ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(vote.vote_type)}</p>` : ""}
@@ -396,12 +508,11 @@ function renderVotes(votes) {
           </div>
           ${voteTalliesHtml(vote)}
           <div class="flex flex-wrap items-center gap-4 mt-3 text-xs">
-            ${vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-brand-700 hover:underline">How each member voted →</button>` : ""}
-            ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">${escapeHtml(sourceLabel(vote))} →</a>` : ""}
+            ${vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-accent hover:underline">How each member voted →</button>` : ""}
+            ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(sourceLabel(vote))} →</a>` : ""}
           </div>
         </div>`).join("")}
-    </div>
-  `;
+    </div>`).join("");
 }
 
 // --- Members (schema written by netlify/functions/ingest-votes.js) ---
@@ -421,9 +532,18 @@ function populateStateSelect() {
   `;
 }
 
+// Outlined pastel chips: deliberately a different shape from the filled Yea/Nay
+// tiles and badges, so party never reads as a vote position.
+const PARTY_TEXT = { D: "text-party-d", R: "text-party-r", I: "text-party-i" };
+
+function partyChip(name) {
+  return `<span class="inline-block text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[name] || "bg-gray-100 text-gray-800"}">${escapeHtml(name)}</span>`;
+}
+
 const PARTY_BADGES = {
-  Democratic: "bg-blue-100 text-blue-800",
-  Republican: "bg-red-100 text-red-800",
+  Democratic: "ring-1 ring-inset ring-party-d/70 text-party-d",
+  Republican: "ring-1 ring-inset ring-party-r/70 text-party-r",
+  Independent: "ring-1 ring-inset ring-party-i/60 text-party-i",
 };
 
 // Senators first, then representatives by district.
@@ -529,13 +649,13 @@ function membersSummary(shownCount, list) {
 function memberCard(m) {
   return `
     <button type="button" data-open="member" data-id="${escapeHtml(m.id)}" aria-label="View profile of ${escapeHtml(m.name || "member")}"
-      class="member-card text-left bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 transition">
+      class="member-card text-left bg-surface border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent transition">
       ${memberPhoto(m)}
       <div class="min-w-0">
         ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
         <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
         <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}${memberFilters.state ? "" : ` · ${escapeHtml(m.state || "")}`}</p>
-        <p class="text-xs text-brand-700 mt-1">View profile →</p>
+        <p class="text-xs text-accent mt-1">View profile →</p>
       </div>
     </button>`;
 }
@@ -552,14 +672,14 @@ function renderMemberList(members) {
     membersContainer.innerHTML = `
       <div class="text-center py-12">
         <p class="text-gray-500">No current members match these filters.</p>
-        ${scoped ? `<button type="button" data-member-action="all-states" class="mt-3 text-sm font-semibold text-brand-700 hover:underline">Search all states instead</button>` : ""}
+        ${scoped ? `<button type="button" data-member-action="all-states" class="mt-3 text-sm font-semibold text-accent hover:underline">Search all states instead</button>` : ""}
       </div>`;
     more.innerHTML = "";
     return;
   }
   membersContainer.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${shown.map(memberCard).join("")}</div>`;
   more.innerHTML = list.length > shown.length
-    ? `<button type="button" data-member-action="more" class="px-4 py-2 text-sm font-semibold rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm">Show ${Math.min(MEMBERS_PAGE, list.length - shown.length)} more</button>`
+    ? `<button type="button" data-member-action="more" class="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm">Show ${Math.min(MEMBERS_PAGE, list.length - shown.length)} more</button>`
     : `<p class="text-xs text-gray-400">Source: Congress.gov</p>`;
 }
 
@@ -602,7 +722,7 @@ function setChipGroup(groupId, attr, value) {
   document.querySelectorAll(`#${groupId} [data-${attr}]`).forEach(b => {
     const active = b.dataset[attr] === value;
     b.setAttribute("aria-pressed", String(active));
-    b.className = `filter-chip px-3 py-1.5 text-xs font-semibold rounded-full transition ${active ? "bg-brand-800 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
+    b.className = `filter-chip px-3 py-1.5 text-xs font-semibold rounded-full transition ${active ? "bg-cta text-ink" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
   });
 }
 
@@ -659,10 +779,10 @@ async function loadHeadlineStats() {
   };
   const card = (value, label, detail, action) => `
     <${action ? `button type="button" data-headline="${action}"` : "div"}
-      class="flex flex-col items-start justify-start text-left bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3${action ? " hover:bg-white/10 hover:border-gold-400/60 focus:outline-none focus:ring-2 focus:ring-gold-400 transition" : ""}">
+      class="flex flex-col items-start justify-start text-left bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3${action ? " hover:bg-white/10 hover:border-pink/60 focus:outline-none focus:ring-2 focus:ring-pink transition" : ""}">
       <p class="font-serif text-xl sm:text-3xl font-bold text-white tabular-nums">${escapeHtml(String(value))}</p>
-      <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gold-300 leading-tight">${escapeHtml(label)}</p>
-      ${detail ? `<p class="hidden sm:block text-xs text-brand-200 mt-1">${escapeHtml(detail)}</p>` : ""}
+      <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-pink leading-tight">${escapeHtml(label)}</p>
+      ${detail ? `<p class="hidden sm:block text-xs text-gray-600 mt-1">${escapeHtml(detail)}</p>` : ""}
     </${action ? "button" : "div"}>`;
 
   const cards = [];
@@ -739,8 +859,10 @@ async function getBill(id) {
 }
 
 async function getVote(id) {
-  const recent = await getRecentVotes().catch(() => []);
-  return recent.find(v => v.id === id) || getFirestoreDoc("votes", id);
+  if (voteCache.has(id)) return voteCache.get(id);
+  const v = await getFirestoreDoc("votes", id);
+  if (v) voteCache.set(id, v);
+  return v;
 }
 
 async function getVotesForBill(billId) {
@@ -759,7 +881,7 @@ function recordedVoteId(rv) {
 // --- shared bits
 
 function spinner(text) {
-  return `<div class="text-center py-10"><div class="inline-block animate-spin rounded-full h-6 w-6 border-4 border-brand-600 border-t-transparent mb-3"></div><p class="text-sm text-gray-500">${escapeHtml(text)}</p></div>`;
+  return `<div class="text-center py-10"><div class="inline-block animate-spin rounded-full h-6 w-6 border-4 border-accent border-t-transparent mb-3"></div><p class="text-sm text-gray-500">${escapeHtml(text)}</p></div>`;
 }
 
 function errorBlock(message, lead = "Couldn't load this from Congress.gov right now.") {
@@ -767,7 +889,7 @@ function errorBlock(message, lead = "Couldn't load this from Congress.gov right 
     <div class="text-center py-8">
       <p class="text-sm text-red-600">${escapeHtml(lead)}</p>
       <p class="text-xs text-gray-400 mt-1">${escapeHtml(message)}</p>
-      <button type="button" data-retry class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-800 text-white hover:bg-brand-900">Retry</button>
+      <button type="button" data-retry class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cta text-ink hover:bg-cta-light">Retry</button>
     </div>`;
 }
 
@@ -778,12 +900,12 @@ function factList(facts) {
 
 function memberLink(id, label) {
   return id
-    ? `<button type="button" data-open="member" data-id="${escapeHtml(id)}" class="text-brand-700 hover:underline text-left">${escapeHtml(label)}</button>`
+    ? `<button type="button" data-open="member" data-id="${escapeHtml(id)}" class="text-accent hover:underline text-left">${escapeHtml(label)}</button>`
     : escapeHtml(label);
 }
 
 function externalLink(url, label) {
-  return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">${escapeHtml(label)} →</a>` : "";
+  return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(label)} →</a>` : "";
 }
 
 // --- member
@@ -845,7 +967,7 @@ function shareBars(rows, total) {
           <span class="text-gray-700">${escapeHtml(label)}</span>
           <span class="text-gray-900 font-semibold tabular-nums whitespace-nowrap">${money(value)} <span class="text-gray-500 font-normal">${escapeHtml(pctText)}</span></span>
         </div>
-        <div class="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true"><div class="h-2 rounded-full bg-brand-800" style="width:${pct.toFixed(1)}%"></div></div>
+        <div class="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true"><div class="h-2 rounded-full bg-accent" style="width:${pct.toFixed(1)}%"></div></div>
       </div>`;
   }).join("");
 }
@@ -936,7 +1058,7 @@ const memberModal = {
   load(e) {
     loadInto(e, "member", getMember(e.id));
     loadInto(e, "profile", fetchFunction("member-profile", e.id));
-    loadInto(e, "votes", getRecentVotes());
+    loadInto(e, "votes", getMember(e.id).then(m => getRecentVotes(m?.chamber || "")));
     if (e.financeRequested) loadInto(e, "finance", fetchFunction("member-finance", e.id)); // Retry
   },
   header(e) {
@@ -993,8 +1115,8 @@ const memberModal = {
       return `
         <p class="text-xs text-gray-500 mb-3">Based on the ${votes.length} most recent ${where}roll-call votes synced from the official record.</p>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          ${stat("Yea", c.yea, "bg-green-50 border-green-100 text-green-700")}
-          ${stat("Nay", c.nay, "bg-red-50 border-red-100 text-red-700")}
+          ${stat("Yea", c.yea, "bg-green-50 border-green-200 text-green-700")}
+          ${stat("Nay", c.nay, "bg-red-50 border-red-200 text-red-700")}
           ${stat("Present", c.present, "bg-gray-50 border-gray-200 text-gray-700")}
           ${stat("Not voting", c.not_voting, "bg-yellow-50 border-yellow-100 text-yellow-800")}
         </div>
@@ -1005,10 +1127,10 @@ const memberModal = {
             return `
             <li class="py-3 flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="text-sm font-semibold text-gray-900 hover:text-brand-900 hover:underline text-left">${escapeHtml(vote.question || "Question not available")}</button>
+                <button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(vote.question || "Question not available")}</button>
                 <p class="text-xs text-gray-500 mt-0.5">
                   Roll call #${escapeHtml(String(vote.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(vote.date))}
-                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="text-brand-700 hover:underline">${escapeHtml(bill.label)}</button>` : vote.legislation ? ` · ${escapeHtml(vote.legislation)}` : ""}
+                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="text-accent hover:underline">${escapeHtml(bill.label)}</button>` : vote.legislation ? ` · ${escapeHtml(vote.legislation)}` : ""}
                   · ${escapeHtml(vote.result || "Result pending")}
                 </p>
                 ${partyMajority && group !== partyMajority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
@@ -1031,8 +1153,8 @@ const memberModal = {
             <li class="py-3">
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 ${item.kind === "bill" && item.bill_id
-                  ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-brand-700 hover:underline">${escapeHtml(item.label)}</button>`
-                  : item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="font-semibold text-brand-700 hover:underline">${escapeHtml(item.label)}</a>`
+                  ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-accent hover:underline">${escapeHtml(item.label)}</button>`
+                  : item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="font-semibold text-accent hover:underline">${escapeHtml(item.label)}</a>`
                   : `<span class="font-semibold">${escapeHtml(item.label)}</span>`}
                 ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(item.introducedDate)}</span>` : ""}
                 ${item.policyArea ? `<span class="text-gray-500">· ${escapeHtml(item.policyArea)}</span>` : ""}
@@ -1063,7 +1185,7 @@ const billModal = {
     return `
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2 text-xs">
-          <span class="bg-brand-50 text-brand-700 font-semibold ring-1 ring-brand-100 px-2 py-0.5 rounded uppercase">${escapeHtml(label)}</span>
+          <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded uppercase">${escapeHtml(label)}</span>
           ${congress ? `<span class="text-gray-500">${escapeHtml(ordinal(Number(congress)))} Congress</span>` : ""}
           ${policy ? `<span class="text-gray-500">· ${escapeHtml(policy)}</span>` : ""}
         </div>
@@ -1097,8 +1219,8 @@ const billModal = {
           <h3 class="text-sm font-bold text-gray-900">Official summary <span class="font-normal text-gray-500">(Congressional Research Service${d.crsSummary.version ? `, ${escapeHtml(d.crsSummary.version)}` : ""})</span></h3>
           <details class="mt-2 group">
             <summary class="text-sm text-gray-700 cursor-pointer list-none">
-              <span class="group-open:hidden">${escapeHtml(d.crsSummary.text.slice(0, 280))}${d.crsSummary.text.length > 280 ? "… <span class=\"text-brand-700\">Read more</span>" : ""}</span>
-              <span class="hidden group-open:inline text-brand-700">Show less</span>
+              <span class="group-open:hidden">${escapeHtml(d.crsSummary.text.slice(0, 280))}${d.crsSummary.text.length > 280 ? "… <span class=\"text-accent\">Read more</span>" : ""}</span>
+              <span class="hidden group-open:inline text-accent">Show less</span>
             </summary>
             <p class="text-sm text-gray-700 mt-2 whitespace-pre-line">${escapeHtml(d.crsSummary.text)}</p>
           </details>
@@ -1122,13 +1244,13 @@ const billModal = {
         <ol class="relative border-l border-gray-200 ml-2">
           ${d.actions.map(a => `
             <li class="ml-4 pb-4">
-              <span class="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-brand-200 border border-white"></span>
+              <span class="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-accent/60 border border-surface"></span>
               <p class="text-xs text-gray-500">${escapeHtml(a.actionDate || "")}${a.source ? ` · ${escapeHtml(a.source)}` : ""}</p>
               <p class="text-sm text-gray-800">${escapeHtml(a.text)}</p>
               ${a.recordedVotes.map(rv => {
                 const id = recordedVoteId(rv);
                 return `<span class="inline-flex flex-wrap gap-x-3 mr-3">
-                  ${id ? `<button type="button" data-open="vote" data-id="${escapeHtml(id)}" class="text-xs font-semibold text-brand-700 hover:underline">${escapeHtml(rv.chamber || "")} roll call #${escapeHtml(String(rv.rollNumber))}: how members voted →</button>` : ""}
+                  ${id ? `<button type="button" data-open="vote" data-id="${escapeHtml(id)}" class="text-xs font-semibold text-accent hover:underline">${escapeHtml(rv.chamber || "")} roll call #${escapeHtml(String(rv.rollNumber))}: how members voted →</button>` : ""}
                   ${rv.url ? `<a href="${escapeHtml(rv.url)}" target="_blank" rel="noopener" class="text-xs text-gray-500 hover:underline">official record</a>` : ""}
                 </span>`;
               }).join("")}
@@ -1146,7 +1268,7 @@ const billModal = {
           ${e.data.votes.map(v => `
             <li class="py-3 flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-brand-900 hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
+                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
                 <p class="text-xs text-gray-500 mt-0.5">Roll call #${escapeHtml(String(v.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(v.date))} · Yea ${v.tallies?.yea ?? "—"}, Nay ${v.tallies?.nay ?? "—"}</p>
               </div>
               <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
@@ -1183,7 +1305,7 @@ function voteMemberListHtml(e) {
         ${groups[g].sort((a, b) => (a.name || "").localeCompare(b.name || "")).map(v => `
           <li class="py-1 text-sm flex items-center justify-between gap-2 border-b border-gray-50">
             ${memberLink(v.bioguideId, v.name || v.bioguideId || "Unknown")}
-            <span class="text-xs text-gray-500 shrink-0">${escapeHtml(v.party || "?")}-${escapeHtml(v.state || "?")}</span>
+            <span class="text-xs shrink-0 ${PARTY_TEXT[v.party] || "text-gray-500"}">${escapeHtml(v.party || "?")}-${escapeHtml(v.state || "?")}</span>
           </li>`).join("")}
       </ul>
     </section>`).join("");
@@ -1200,7 +1322,7 @@ const voteModal = {
     }
     return `
       <div class="min-w-0 flex-1">
-        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-gold-50 text-gold-800 ring-1 ring-gold-200 uppercase">${voteHeadingBadge(v)}</span>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-accent/10 text-accent ring-1 ring-accent/30 uppercase">${voteHeadingBadge(v)}</span>
         <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(v.question || "Question not available")}</h2>
         <p class="text-sm text-gray-500 mt-0.5">
           <span class="inline-block px-2 py-0.5 text-xs font-bold rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
@@ -1228,8 +1350,8 @@ const voteModal = {
       return `
         <div class="flex flex-wrap gap-2">
           <input type="search" data-vote-filter="text" value="${escapeHtml(e.filter.text || "")}" placeholder="Filter by name or state (e.g. WA)"
-            class="flex-1 min-w-[12rem] px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
-          <select data-vote-filter="party" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+            class="flex-1 min-w-[12rem] px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+          <select data-vote-filter="party" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-surface">
             <option value="">All parties</option>
             ${parties.map(p => `<option value="${escapeHtml(p)}"${e.filter.party === p ? " selected" : ""}>${escapeHtml(PARTY_NAMES[p] || p)}</option>`).join("")}
           </select>
@@ -1290,18 +1412,18 @@ function renderModal() {
   const [, , renderTab] = def.tabs.find(([key]) => key === e.tab);
 
   modalRoot.innerHTML = `
-    <div class="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-gray-900/50 p-0 sm:p-6" data-backdrop>
+    <div class="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 p-0 sm:p-6" data-backdrop>
       <div role="dialog" aria-modal="true" aria-labelledby="modal-title"
-        class="bg-white w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-xl flex flex-col">
+        class="bg-surface w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-xl flex flex-col">
         <div class="shrink-0 flex items-start gap-4 p-5 border-b border-gray-200">
-          ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500">←</button>` : ""}
+          ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">←</button>` : ""}
           ${def.header(e)}
-          <button type="button" data-close aria-label="Close" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500">✕</button>
+          <button type="button" data-close aria-label="Close" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">✕</button>
         </div>
         <div role="tablist" class="shrink-0 flex gap-4 px-5 border-b border-gray-200 overflow-x-auto">
           ${def.tabs.map(([key, label]) => `
             <button type="button" role="tab" data-tab="${key}" aria-selected="${key === e.tab}"
-              class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-brand-900 border-gold-500" : "text-gray-500 border-transparent hover:text-gray-700"}">${label}</button>`).join("")}
+              class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-gray-900 border-pink" : "text-gray-500 border-transparent hover:text-gray-700"}">${label}</button>`).join("")}
         </div>
         <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" class="p-5 overflow-y-auto flex-1">${renderTab(e)}</div>
       </div>
@@ -1373,8 +1495,8 @@ function setupBillFilters() {
       activeCategory = btn.dataset.category;
       document.querySelectorAll("#category-filters .filter-btn").forEach(b => {
         const active = b === btn;
-        b.classList.toggle("bg-brand-800", active);
-        b.classList.toggle("text-white", active);
+        b.classList.toggle("bg-cta", active);
+        b.classList.toggle("text-ink", active);
         b.classList.toggle("bg-gray-200", !active);
         b.classList.toggle("text-gray-700", !active);
         b.classList.toggle("hover:bg-gray-300", !active);
@@ -1442,7 +1564,11 @@ function applyBillFilters() {
   if (term && numberLookupTerm.toLowerCase() === term) {
     for (const bill of numberMatches) if (matches(bill)) byId.set(bill.id, bill);
   }
-  const filtered = [...byId.values()].sort((a, b) => (b.update_date || "").localeCompare(a.update_date || ""));
+  // Exact bill-number hits ("HR 1" -> HR 1, not HR 10970) first, then newest.
+  const parsed = term ? parseBillNumberTerm(term) : null;
+  const exact = b => parsed && String(Number(b.number)) === parsed.number && (!parsed.type || b.type === parsed.type);
+  const filtered = [...byId.values()].sort((a, b) =>
+    (exact(b) ? 1 : 0) - (exact(a) ? 1 : 0) || (b.update_date || "").localeCompare(a.update_date || ""));
 
   renderBills(filtered, term);
   renderLoadMore();

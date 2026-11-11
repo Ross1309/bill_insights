@@ -5,14 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Congress Watcher</title>
   <meta name="description" content="Non-partisan tracking of what the US Congress is doing: bills in plain language, House roll-call votes, members and campaign finance, from official sources." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1d36'/%3E%3Cpath d='M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z' fill='%23d4a537'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23232323'/%3E%3Cpath d='M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z' fill='%23b39cd0'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Brand: navy ink + muted gold on warm neutrals. Party red/blue stay reserved for
-    // party badges, so the brand itself reads as non-partisan.
+    // Dark theme. Palette: background #2C2C2C, text #E4E4E4, accent cyan #A8DADC
+    // (links, data, focus), accent pink #FFC1CC (decorative only: tab underline, labels),
+    // lavender #B39CD0 (buttons / active chips, with dark text).
+    // Grays are inverted (50 = page, 900 = brightest text) so existing classes read right.
+    // Status scales are dark-tinted (50/100 = dark tinted fill, 500-800 = pastel text).
+    // Pastel green = Yea/passed, pastel coral = Nay/rejected; parties use outlined chips.
     tailwind.config = {
       theme: {
         extend: {
@@ -21,10 +25,18 @@
             serif: ['"Source Serif 4"', 'ui-serif', 'Georgia', 'serif'],
           },
           colors: {
-            // Warm neutral (Tailwind "stone") in place of the default cool gray.
-            gray: { 50: '#fafaf9', 100: '#f5f5f4', 200: '#e7e5e4', 300: '#d6d3d1', 400: '#a8a29e', 500: '#78716c', 600: '#57534e', 700: '#44403c', 800: '#292524', 900: '#1c1917' },
-            brand: { 50: '#eef2f8', 100: '#d9e1ee', 200: '#b3c3dd', 300: '#8aa2c8', 400: '#5f7eae', 500: '#3f5f93', 600: '#2c4a7c', 700: '#1f3a66', 800: '#172c4f', 900: '#0f1d36', 950: '#0a1426' },
-            gold: { 50: '#fbf6e9', 100: '#f5e9c6', 200: '#ecd590', 300: '#e1bd5a', 400: '#d4a537', 500: '#b88a22', 600: '#946c1a', 700: '#6f5014', 800: '#4f3a10' },
+            gray: { 50: '#2c2c2c', 100: '#333333', 200: '#444444', 300: '#555555', 400: '#a0a0a0', 500: '#b0b0b0', 600: '#c4c4c4', 700: '#d4d4d4', 800: '#e4e4e4', 900: '#f3f3f3' },
+            surface: { DEFAULT: '#363636', deep: '#232323' },
+            ink: '#2c2c2c',
+            accent: { DEFAULT: '#a8dadc', light: '#cdebec' },
+            pink: { DEFAULT: '#ffc1cc' },
+            cta: { DEFAULT: '#b39cd0', light: '#c8b6df' },
+            // Yea / passed: pastel lime-green. Nay / rejected / errors: pastel coral-red.
+            green: { 50: '#26331c', 100: '#30451f', 200: '#456230', 700: '#b5e48c', 800: '#c9eda8' },
+            red: { 50: '#3a2a22', 100: '#523226', 200: '#6e4130', 500: '#f4a07a', 600: '#f6ad8d', 700: '#f4a07a', 800: '#f8b89c' },
+            yellow: { 50: '#373220', 100: '#4a4126', 800: '#f0db8c' },
+            // Party chips are outlined (ring + text), never filled, so they don't read as Yea/Nay.
+            party: { r: '#f59a9a', d: '#a3b4f7', i: '#c4c4c4' },
           },
         },
       },
@@ -37,24 +49,24 @@
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-800 font-sans antialiased flex flex-col">
 
-  <header class="bg-brand-950 text-white">
+  <header class="bg-surface-deep text-white">
     <div class="max-w-7xl mx-auto px-4 pt-8 pb-6 sm:px-6 lg:px-8">
       <div class="flex items-center gap-3">
         <svg class="w-9 h-9 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
-          <rect width="32" height="32" rx="7" fill="#172c4f" />
-          <path d="M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z" fill="#d4a537" />
+          <rect width="32" height="32" rx="7" fill="#3a3a3a" />
+          <path d="M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z" fill="#b39cd0" />
         </svg>
         <h1 class="font-serif text-3xl sm:text-4xl font-bold tracking-tight">Congress Watcher</h1>
       </div>
-      <p class="text-brand-200 mt-3 max-w-2xl text-sm sm:text-base">
-        What Congress is actually doing: bills in plain language, recorded House votes, and every
+      <p class="text-gray-600 mt-3 max-w-2xl text-sm sm:text-base">
+        What Congress is actually doing: bills in plain language, recorded House and Senate votes, and every
         member, straight from official sources. Non-partisan, with every AI summary labeled.
       </p>
       <div id="headline-stats" class="grid grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 mt-6" aria-live="polite"></div>
     </div>
   </header>
 
-  <nav class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
+  <nav class="sticky top-0 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar" role="tablist">
       <button id="nav-bills" role="tab" class="nav-tab">Bills &amp; Summaries</button>
       <button id="nav-votes" role="tab" class="nav-tab">Roll-Call Votes</button>
@@ -77,11 +89,11 @@
             type="search"
             id="search-input"
             placeholder="Search by title, bill number, or policy area..."
-            class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm"
+            class="w-full px-4 py-2 bg-surface border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
           />
         </div>
         <div id="category-filters" class="flex flex-wrap gap-2" role="group" aria-label="Category">
-          <button data-category="all" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-brand-800 text-white transition">All</button>
+          <button data-category="all" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-cta text-ink transition">All</button>
           <button data-category="Economy" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Economy</button>
           <button data-category="Healthcare" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Healthcare</button>
           <button data-category="Foreign Affairs" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Foreign Affairs</button>
@@ -89,7 +101,7 @@
       </div>
       <div id="bills-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand-600 border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading bills...</p>
         </div>
       </div>
@@ -109,10 +121,11 @@
       </div>
       <div id="votes-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand-600 border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading vote records...</p>
         </div>
       </div>
+      <div id="votes-more" class="text-center mt-6"></div>
     </section>
 
     <!-- VIEW 3: LEGISLATORS -->
@@ -125,9 +138,9 @@
         <div class="flex flex-col md:flex-row gap-3">
           <label for="member-search" class="sr-only">Search members</label>
           <input type="search" id="member-search" placeholder="Search by name, state, or district (e.g. WA-7)"
-            class="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            class="flex-1 px-4 py-2 bg-surface border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-accent" />
           <label for="state-select" class="sr-only">State</label>
-          <select id="state-select" class="px-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="state-select" class="px-3 py-2 border border-gray-300 rounded-lg bg-surface shadow-sm focus:outline-none focus:ring-2 focus:ring-accent">
           </select>
         </div>
         <div class="flex flex-wrap gap-x-6 gap-y-2 items-center">
@@ -148,7 +161,7 @@
       </div>
       <div id="members-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand-600 border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading members...</p>
         </div>
       </div>
@@ -157,7 +170,7 @@
 
   </main>
 
-  <footer class="bg-brand-950 text-brand-200 mt-12">
+  <footer class="bg-surface-deep text-gray-600 mt-12">
     <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 grid gap-6 sm:grid-cols-2 text-sm">
       <div>
         <p class="font-serif text-lg font-bold text-white">Congress Watcher</p>
@@ -169,11 +182,11 @@
       <div>
         <p class="font-semibold text-white">Data sources</p>
         <ul class="mt-2 space-y-1">
-          <li><a class="underline decoration-brand-500 hover:text-white" href="https://api.congress.gov/" target="_blank" rel="noopener">Congress.gov API</a>: bills, actions, CRS summaries, members</li>
-          <li><a class="underline decoration-brand-500 hover:text-white" href="https://clerk.house.gov/Votes" target="_blank" rel="noopener">Office of the Clerk, U.S. House</a>: House roll-call votes</li>
-          <li><a class="underline decoration-brand-500 hover:text-white" href="https://www.senate.gov/legislative/votes_new.htm" target="_blank" rel="noopener">U.S. Senate (senate.gov)</a>: Senate roll-call votes</li>
-          <li><a class="underline decoration-brand-500 hover:text-white" href="https://api.open.fec.gov/developers/" target="_blank" rel="noopener">FEC (OpenFEC)</a>: campaign finance filings</li>
-          <li><a class="underline decoration-brand-500 hover:text-white" href="https://github.com/unitedstates/congress-legislators" target="_blank" rel="noopener">congress-legislators</a>: member ↔ FEC and Senate id mapping</li>
+          <li><a class="underline decoration-accent/50 hover:text-white" href="https://api.congress.gov/" target="_blank" rel="noopener">Congress.gov API</a>: bills, actions, CRS summaries, members</li>
+          <li><a class="underline decoration-accent/50 hover:text-white" href="https://clerk.house.gov/Votes" target="_blank" rel="noopener">Office of the Clerk, U.S. House</a>: House roll-call votes</li>
+          <li><a class="underline decoration-accent/50 hover:text-white" href="https://www.senate.gov/legislative/votes_new.htm" target="_blank" rel="noopener">U.S. Senate (senate.gov)</a>: Senate roll-call votes</li>
+          <li><a class="underline decoration-accent/50 hover:text-white" href="https://api.open.fec.gov/developers/" target="_blank" rel="noopener">FEC (OpenFEC)</a>: campaign finance filings</li>
+          <li><a class="underline decoration-accent/50 hover:text-white" href="https://github.com/unitedstates/congress-legislators" target="_blank" rel="noopener">congress-legislators</a>: member ↔ FEC and Senate id mapping</li>
         </ul>
       </div>
     </div>

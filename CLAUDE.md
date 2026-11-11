@@ -34,6 +34,9 @@ netlify/functions/sync-bills.js    Syncs recent bills + AI summaries (was sync-v
 netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House
                                    and 5 latest Senate roll-call votes
 netlify/lib/senate-votes.js        senate.gov LIS XML -> `votes` docs (menu, vote parse, ET->UTC)
+netlify/lib/house-votes.js         Congress.gov House votes -> `votes` docs (list + build doc)
+scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
+scripts/import-bills.js            Backfill the N most recently updated bills (resumable)
 netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
@@ -58,6 +61,8 @@ node run-ingest.js                                  # all current members + Hous
 curl localhost:8888/.netlify/functions/sync-bills   # bill sync (10 bills, ≤3 summaries/run)
 node scripts/backfill-bills.js                      # dry run
 node scripts/backfill-bills.js --write [--summaries]
+node scripts/import-votes.js [--write] [--chamber house|senate] [--congress 118] [--limit N]
+node scripts/import-bills.js [--write] [--limit 2000]
 ```
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
@@ -143,18 +148,35 @@ Pending / known issues:
 
 ## Visual design (frontend)
 
-- Theme lives in the inline `tailwind.config` in `index.html`: `brand` (navy ink, 50–950),
-  `gold` (accent, 50–800), and `gray` remapped to warm stone. Fonts: Inter (sans/body) and
-  Source Serif 4 (`font-serif`: page/section headings, card and modal titles, stat numbers)
-  from Google Fonts.
-- Rules: interactive accents use `brand-*` (links `text-brand-700`, active chips
-  `bg-brand-800`, focus `ring-brand-500`); the active tab underline and vote badges use
-  `gold-*`. **Party red/blue (`bg-blue-100 text-blue-800`, `bg-red-100 text-red-800`) are
-  reserved for party badges.** Don't use them for UI chrome, so the brand stays
-  non-partisan.
-- Layout: dark `brand-950` header with headline stat cards (3 columns on phones, detail
-  lines hidden below `sm`), sticky tab bar (`switchTab` sets classes + `aria-selected`
-  and scrolls back to the bar if you're below it), sources footer.
+Dark theme (user-chosen palette, 2026-11-10): background `#2C2C2C`, text `#E4E4E4`, accent
+cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
+
+- Theme lives in the inline `tailwind.config` in `index.html`. Fonts: Inter (body) and
+  Source Serif 4 (`font-serif`: headings, card/modal titles, stat numbers).
+- **Grays are inverted** so existing classes read correctly on dark: `gray-50` = page
+  background, `gray-100/200/300` = fills and borders, `gray-400…900` = text from faint to
+  brightest. `bg-surface` (`#363636`) = cards, inputs, modal; `bg-surface-deep`
+  (`#232323`) = header and footer. Don't use `bg-white`; the modal backdrop is `bg-black/60`.
+- Roles: `text-accent` = links, `bg-accent` = data bars, `ring-accent` = focus; vote and bill
+  badges = `bg-accent/10 text-accent`. **`pink` is decorative only** (active tab
+  underline, headline-card labels). Pink sits next to party red, so it must never mark
+  data. Lavender `bg-cta` buttons and active chips always use **`text-ink`**, because
+  white on lavender is only 2.45:1.
+- **Vote colors (filled):** pastel lime-green `#b5e48c` = Yea / passed / agreed / confirmed;
+  pastel coral-red `#f4a07a` = Nay / rejected / errors. Tiles use dark tinted fills
+  (`bg-green-50 border-green-200 text-green-700`, red likewise); badges `*-100` fill +
+  `*-800` text. All pairs ≥ 6.6:1.
+- **Party colors (outlined, never filled):** `party-r` `#f59a9a`, `party-d` `#a3b4f7`,
+  `party-i` `#c4c4c4` (gray: a pastel purple sat too close to Democratic periwinkle). Use
+  `PARTY_BADGES` / `partyChip()` (ring + text) for chips and `PARTY_TEXT` for small "D-WA"
+  labels. The outline-vs-fill difference is what keeps "Republican" from reading as "Nay"
+  (same red family) and "Democratic" from reading as "Yea", so don't fill party chips
+  and don't use party colors for anything else.
+- Pastels were picked by OKLab distance from the accents they sit next to (Yea vs cyan
+  11.7, Nay vs pink 11.4, Yea vs Nay 18.4); every color also has a text label.
+- Layout: header with headline stat cards (3 columns on phones, detail lines hidden below
+  `sm`), sticky tab bar (`switchTab` sets classes + `aria-selected` and scrolls back to the
+  bar if you're below it), sources footer.
 
 ## Legislators tab + headline counts (frontend)
 
@@ -215,6 +237,18 @@ Pending / known issues:
   `array-contains` + `orderBy('date')` (needs a composite index).
 - Not done: Tab-key focus trap inside the modal; deep links (e.g. `#bill/hr9612-119`).
 
+## Votes paging (frontend)
+
+- `loadVotes` mirrors bills: `orderBy('date','desc')`, 10 per page, `startAfter` cursor,
+  "Load older votes", month headings, "Showing N votes back to <date>".
+- Chamber chips query `where('chamber','==')` + `orderBy('date')`, which needs the
+  (chamber ASC, date DESC) index in `firestore.indexes.json`. If it's missing
+  (`failed-precondition`), `queryVotes` switches to paging all votes 30 at a time and
+  filtering by chamber in the browser, so the chips still work (pages are just uneven).
+  The index was created in the Firebase console on 2026-11-10; the fallback is a safety net.
+- Member Voting Record uses `getRecentVotes(chamber)`: the member's own chamber's latest
+  50 votes. `voteCache` holds every vote seen; the vote modal checks it before Firestore.
+
 ## Bills paging (frontend)
 
 - `loadBills` queries `bills` with `orderBy('update_date','desc')`, 12 per page,
@@ -269,6 +303,18 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 8. ~~Rename `sync-votes.js` → `sync-bills.js`~~ Done 2026-11-10 (no schedules or callers in
    the repo; any external cron hitting `/.netlify/functions/sync-votes` must be updated).
    Senate roll-call votes added at the same time (see `votes` schema).
+
+### History backfill (2026-11-10)
+- `import-votes.js --write` loaded every 119th-Congress roll call (House 681, Senate 917),
+  Jan 3 2025 onward. It maps Senate LIS ids with current **and historical**
+  congress-legislators (13.5 MB, script only), then remaps stored Senate votes. That fixed
+  1,583 entries for senators who've since left (Graham, Mullin, Rubio, Vance). The nightly
+  `ingest-votes` uses only the current file, so a senator who leaves later can show
+  unlinked on new votes. Re-run `import-votes.js --write --chamber senate` to fix.
+- `import-bills.js --write` loaded the 2,000 most recently updated bills (metadata only).
+  Backfilled bills have no AI summary ("Summary pending") until something generates one;
+  `sync-bills` only summarizes new bills (≤3/run). Extend with `--limit` (19,863 bills in
+  the 119th; >20k Firestore writes/day can exceed the free tier).
 
 ### Proposed next
 - Deploy and verify on Netlify: env vars, every function, and `ingest-votes` runtime vs the
