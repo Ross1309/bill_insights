@@ -42,6 +42,7 @@ let activeCategory = "all";
 async function init() {
   populateStateSelect();
   setupTabs();
+  switchTab("bills");
   setupMemberFilters();
   setupBillFilters();
   setupModals();
@@ -58,23 +59,24 @@ function setupTabs() {
   });
 }
 
-function switchTab(tabName) {
-  [navBills, navVotes, navMembers].forEach(el => {
-    el.className = "nav-tab pb-3 font-semibold text-gray-500 hover:text-gray-700 focus:outline-none transition border-b-2 border-transparent";
-  });
-  [viewBills, viewVotes, viewMembers].forEach(el => el.classList.add("hidden"));
+const TAB_BASE = "nav-tab py-3.5 text-sm sm:text-base font-semibold whitespace-nowrap border-b-2 focus:outline-none focus-visible:text-brand-900";
+const TAB_ACTIVE = `${TAB_BASE} text-brand-900 border-gold-500`;
+const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-800`;
 
-  if (tabName === "bills") {
-    navBills.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
-    viewBills.classList.remove("hidden");
-  } else if (tabName === "votes") {
-    navVotes.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
-    viewVotes.classList.remove("hidden");
-    if (!votesLoaded) fetchVotes();
-  } else if (tabName === "members") {
-    navMembers.className = "nav-tab pb-3 font-semibold text-blue-600 border-b-2 border-blue-600 focus:outline-none transition";
-    viewMembers.classList.remove("hidden");
+function switchTab(tabName) {
+  const tabs = { bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers] };
+  for (const [name, [nav, view]] of Object.entries(tabs)) {
+    const active = name === tabName;
+    nav.className = active ? TAB_ACTIVE : TAB_IDLE;
+    nav.setAttribute("aria-selected", String(active));
+    view.classList.toggle("hidden", !active);
   }
+  if (tabName === "votes" && !votesLoaded) fetchVotes();
+  // If the sticky tab bar is pinned (scrolled past the header), start the new tab
+  // at its top instead of mid-way down.
+  // (The bar sits right under the header, so the header's height is where it pins.)
+  const barTop = document.querySelector("body > header")?.offsetHeight || 0;
+  if (window.scrollY > barTop) window.scrollTo({ top: barTop });
 }
 
 // --- Bills: server-side ordering + cursor pagination ---
@@ -100,7 +102,7 @@ async function loadBills({ reset = false } = {}) {
     billsError = null;
     billsContainer.innerHTML = `
       <div class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-4"></div>
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-brand-600 border-t-transparent mb-4"></div>
         <p class="text-gray-500">Loading bills...</p>
       </div>`;
     billsMore.innerHTML = "";
@@ -198,18 +200,18 @@ function renderBills(bills, term = "") {
         <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span class="bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded uppercase">${escapeHtml(billLabel(bill))}</span>
+              <span class="bg-brand-50 text-brand-700 font-semibold ring-1 ring-brand-100 px-2 py-0.5 rounded uppercase">${escapeHtml(billLabel(bill))}</span>
               <span>${escapeHtml(String(bill.congress || ''))}${bill.congress ? 'th Congress' : ''}</span>
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
-            <h3 class="font-bold text-gray-900 text-lg mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-blue-700 hover:underline">${escapeHtml(bill.title || 'Untitled Bill')}</button></h3>
+            <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-brand-900 hover:underline">${escapeHtml(bill.title || 'Untitled Bill')}</button></h3>
             ${renderSummary(bill)}
           </div>
           <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
             ${bill.latestAction?.text ? `<p><strong class="text-gray-700">Latest action${bill.latestAction.actionDate ? ` (${escapeHtml(bill.latestAction.actionDate)})` : ''}:</strong> ${escapeHtml(bill.latestAction.text)}</p>` : ''}
             <div class="flex flex-wrap gap-4 pt-1">
-              <button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="font-semibold text-blue-600 hover:underline">Details, actions &amp; votes →</button>
-              ${bill.congress_gov_url ? `<a href="${escapeHtml(bill.congress_gov_url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">Congress.gov →</a>` : ''}
+              <button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="font-semibold text-brand-700 hover:underline">Details, actions &amp; votes →</button>
+              ${bill.congress_gov_url ? `<a href="${escapeHtml(bill.congress_gov_url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">Congress.gov →</a>` : ''}
             </div>
           </div>
         </div>
@@ -337,7 +339,7 @@ function voteBillLine(vote) {
   if (!bill) return `<p class="text-sm text-gray-400 mt-1">No bill associated with this vote</p>`;
   return `
     <p class="text-sm text-gray-600 mt-1">
-      <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="font-semibold text-blue-600 hover:underline">${escapeHtml(bill.label)}</button>
+      <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="font-semibold text-brand-700 hover:underline">${escapeHtml(bill.label)}</button>
       ${bill.title ? ` — ${escapeHtml(bill.title)}` : ""}
     </p>`;
 }
@@ -358,8 +360,8 @@ function renderVotes(votes) {
         <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-gray-100">
             <div>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 uppercase">${voteHeadingBadge(vote)}</span>
-              <h3 class="font-bold text-gray-900 text-lg mt-2">${escapeHtml(vote.question || "Question not available")}</h3>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-gold-50 text-gold-800 ring-1 ring-gold-200 uppercase">${voteHeadingBadge(vote)}</span>
+              <h3 class="font-serif font-bold text-gray-900 text-xl mt-2">${escapeHtml(vote.question || "Question not available")}</h3>
               ${voteBillLine(vote)}
               ${vote.vote_type ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(vote.vote_type)}</p>` : ""}
             </div>
@@ -370,8 +372,8 @@ function renderVotes(votes) {
           </div>
           ${voteTalliesHtml(vote)}
           <div class="flex flex-wrap items-center gap-4 mt-3 text-xs">
-            ${vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-blue-600 hover:underline">How each member voted →</button>` : ""}
-            ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">Official record (House Clerk) →</a>` : ""}
+            ${vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-brand-700 hover:underline">How each member voted →</button>` : ""}
+            ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">Official record (House Clerk) →</a>` : ""}
           </div>
         </div>`).join("")}
     </div>
@@ -503,13 +505,13 @@ function membersSummary(shownCount, list) {
 function memberCard(m) {
   return `
     <button type="button" data-open="member" data-id="${escapeHtml(m.id)}" aria-label="View profile of ${escapeHtml(m.name || "member")}"
-      class="member-card text-left bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+      class="member-card text-left bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 transition">
       ${memberPhoto(m)}
       <div class="min-w-0">
         ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
         <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
         <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}${memberFilters.state ? "" : ` · ${escapeHtml(m.state || "")}`}</p>
-        <p class="text-xs text-blue-600 mt-1">View profile →</p>
+        <p class="text-xs text-brand-700 mt-1">View profile →</p>
       </div>
     </button>`;
 }
@@ -526,7 +528,7 @@ function renderMemberList(members) {
     membersContainer.innerHTML = `
       <div class="text-center py-12">
         <p class="text-gray-500">No current members match these filters.</p>
-        ${scoped ? `<button type="button" data-member-action="all-states" class="mt-3 text-sm font-semibold text-blue-600 hover:underline">Search all states instead</button>` : ""}
+        ${scoped ? `<button type="button" data-member-action="all-states" class="mt-3 text-sm font-semibold text-brand-700 hover:underline">Search all states instead</button>` : ""}
       </div>`;
     more.innerHTML = "";
     return;
@@ -576,7 +578,7 @@ function setChipGroup(groupId, attr, value) {
   document.querySelectorAll(`#${groupId} [data-${attr}]`).forEach(b => {
     const active = b.dataset[attr] === value;
     b.setAttribute("aria-pressed", String(active));
-    b.className = `filter-chip px-3 py-1.5 text-xs font-semibold rounded-lg transition ${active ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
+    b.className = `filter-chip px-3 py-1.5 text-xs font-semibold rounded-full transition ${active ? "bg-brand-800 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
   });
 }
 
@@ -633,10 +635,10 @@ async function loadHeadlineStats() {
   };
   const card = (value, label, detail, action) => `
     <${action ? `button type="button" data-headline="${action}"` : "div"}
-      class="text-left bg-gray-50 border border-gray-200 rounded-xl px-4 py-3${action ? " hover:border-blue-300 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" : ""}">
-      <p class="text-2xl font-bold text-gray-900">${escapeHtml(String(value))}</p>
-      <p class="text-xs font-semibold uppercase text-gray-500">${escapeHtml(label)}</p>
-      ${detail ? `<p class="text-xs text-gray-500 mt-0.5">${escapeHtml(detail)}</p>` : ""}
+      class="flex flex-col items-start justify-start text-left bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3${action ? " hover:bg-white/10 hover:border-gold-400/60 focus:outline-none focus:ring-2 focus:ring-gold-400 transition" : ""}">
+      <p class="font-serif text-xl sm:text-3xl font-bold text-white tabular-nums">${escapeHtml(String(value))}</p>
+      <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gold-300 leading-tight">${escapeHtml(label)}</p>
+      ${detail ? `<p class="hidden sm:block text-xs text-brand-200 mt-1">${escapeHtml(detail)}</p>` : ""}
     </${action ? "button" : "div"}>`;
 
   const cards = [];
@@ -647,7 +649,7 @@ async function loadHeadlineStats() {
     const delegates = all.filter(m => m.chamber === "House" && isDelegate(m));
     cards.push(card(senate.length, "Senators", split(senate), "Senate"));
     cards.push(card(house.length, "Representatives", `${house.length < 435 ? `${435 - house.length} of 435 seats vacant · ` : ""}${split(house)}`, "House"));
-    cards.push(card(delegates.length, "Non-voting delegates", "DC, PR and territories", "Delegates"));
+    cards.push(card(delegates.length, "Delegates", "Non-voting: DC, PR and territories", "Delegates"));
   }
   if (bills.status === "fulfilled") cards.push(card(bills.value.data().count, "Bills tracked", "Synced from Congress.gov"));
   if (votes.status === "fulfilled") cards.push(card(votes.value.data().count, "Roll-call votes", "House votes synced"));
@@ -732,7 +734,7 @@ function houseVoteId(rv) {
 // --- shared bits
 
 function spinner(text) {
-  return `<div class="text-center py-10"><div class="inline-block animate-spin rounded-full h-6 w-6 border-4 border-blue-500 border-t-transparent mb-3"></div><p class="text-sm text-gray-500">${escapeHtml(text)}</p></div>`;
+  return `<div class="text-center py-10"><div class="inline-block animate-spin rounded-full h-6 w-6 border-4 border-brand-600 border-t-transparent mb-3"></div><p class="text-sm text-gray-500">${escapeHtml(text)}</p></div>`;
 }
 
 function errorBlock(message, lead = "Couldn't load this from Congress.gov right now.") {
@@ -740,7 +742,7 @@ function errorBlock(message, lead = "Couldn't load this from Congress.gov right 
     <div class="text-center py-8">
       <p class="text-sm text-red-600">${escapeHtml(lead)}</p>
       <p class="text-xs text-gray-400 mt-1">${escapeHtml(message)}</p>
-      <button type="button" data-retry class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700">Retry</button>
+      <button type="button" data-retry class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-800 text-white hover:bg-brand-900">Retry</button>
     </div>`;
 }
 
@@ -751,12 +753,12 @@ function factList(facts) {
 
 function memberLink(id, label) {
   return id
-    ? `<button type="button" data-open="member" data-id="${escapeHtml(id)}" class="text-blue-600 hover:underline text-left">${escapeHtml(label)}</button>`
+    ? `<button type="button" data-open="member" data-id="${escapeHtml(id)}" class="text-brand-700 hover:underline text-left">${escapeHtml(label)}</button>`
     : escapeHtml(label);
 }
 
 function externalLink(url, label) {
-  return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${escapeHtml(label)} →</a>` : "";
+  return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="text-brand-700 hover:underline">${escapeHtml(label)} →</a>` : "";
 }
 
 // --- member
@@ -818,7 +820,7 @@ function shareBars(rows, total) {
           <span class="text-gray-700">${escapeHtml(label)}</span>
           <span class="text-gray-900 font-semibold tabular-nums whitespace-nowrap">${money(value)} <span class="text-gray-500 font-normal">${escapeHtml(pctText)}</span></span>
         </div>
-        <div class="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true"><div class="h-2 rounded-full bg-blue-600" style="width:${pct.toFixed(1)}%"></div></div>
+        <div class="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true"><div class="h-2 rounded-full bg-brand-800" style="width:${pct.toFixed(1)}%"></div></div>
       </div>`;
   }).join("");
 }
@@ -920,7 +922,7 @@ const memberModal = {
       ${memberPhoto(shown)}
       <div class="min-w-0 flex-1">
         ${shown.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[shown.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(shown.party)}</span>` : ""}
-        <h2 id="modal-title" class="text-xl font-bold text-gray-900 mt-1">${escapeHtml(name)}</h2>
+        <h2 id="modal-title" class="font-serif text-2xl font-bold text-gray-900 mt-1">${escapeHtml(name)}</h2>
         ${m ? `<p class="text-sm text-gray-500">${escapeHtml(memberRole(m))} · ${escapeHtml(STATE_NAMES[m.state] || m.state || "")}</p>` : ""}
       </div>`;
   },
@@ -978,10 +980,10 @@ const memberModal = {
             return `
             <li class="py-3 flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="text-sm font-semibold text-gray-900 hover:text-blue-700 hover:underline text-left">${escapeHtml(vote.question || "Question not available")}</button>
+                <button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="text-sm font-semibold text-gray-900 hover:text-brand-900 hover:underline text-left">${escapeHtml(vote.question || "Question not available")}</button>
                 <p class="text-xs text-gray-500 mt-0.5">
                   Roll call #${escapeHtml(String(vote.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(vote.date))}
-                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="text-blue-600 hover:underline">${escapeHtml(bill.label)}</button>` : ""}
+                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(vote.bill_id)}" class="text-brand-700 hover:underline">${escapeHtml(bill.label)}</button>` : ""}
                   · ${escapeHtml(vote.result || "Result pending")}
                 </p>
                 ${partyMajority && group !== partyMajority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
@@ -1004,8 +1006,8 @@ const memberModal = {
             <li class="py-3">
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 ${item.kind === "bill" && item.bill_id
-                  ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-blue-600 hover:underline">${escapeHtml(item.label)}</button>`
-                  : item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="font-semibold text-blue-600 hover:underline">${escapeHtml(item.label)}</a>`
+                  ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-brand-700 hover:underline">${escapeHtml(item.label)}</button>`
+                  : item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="font-semibold text-brand-700 hover:underline">${escapeHtml(item.label)}</a>`
                   : `<span class="font-semibold">${escapeHtml(item.label)}</span>`}
                 ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(item.introducedDate)}</span>` : ""}
                 ${item.policyArea ? `<span class="text-gray-500">· ${escapeHtml(item.policyArea)}</span>` : ""}
@@ -1036,11 +1038,11 @@ const billModal = {
     return `
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2 text-xs">
-          <span class="bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded uppercase">${escapeHtml(label)}</span>
+          <span class="bg-brand-50 text-brand-700 font-semibold ring-1 ring-brand-100 px-2 py-0.5 rounded uppercase">${escapeHtml(label)}</span>
           ${congress ? `<span class="text-gray-500">${escapeHtml(ordinal(Number(congress)))} Congress</span>` : ""}
           ${policy ? `<span class="text-gray-500">· ${escapeHtml(policy)}</span>` : ""}
         </div>
-        <h2 id="modal-title" class="text-lg font-bold text-gray-900 mt-1">${escapeHtml(title || label)}</h2>
+        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(title || label)}</h2>
       </div>`;
   },
   tabs: [
@@ -1070,8 +1072,8 @@ const billModal = {
           <h3 class="text-sm font-bold text-gray-900">Official summary <span class="font-normal text-gray-500">(Congressional Research Service${d.crsSummary.version ? `, ${escapeHtml(d.crsSummary.version)}` : ""})</span></h3>
           <details class="mt-2 group">
             <summary class="text-sm text-gray-700 cursor-pointer list-none">
-              <span class="group-open:hidden">${escapeHtml(d.crsSummary.text.slice(0, 280))}${d.crsSummary.text.length > 280 ? "… <span class=\"text-blue-600\">Read more</span>" : ""}</span>
-              <span class="hidden group-open:inline text-blue-600">Show less</span>
+              <span class="group-open:hidden">${escapeHtml(d.crsSummary.text.slice(0, 280))}${d.crsSummary.text.length > 280 ? "… <span class=\"text-brand-700\">Read more</span>" : ""}</span>
+              <span class="hidden group-open:inline text-brand-700">Show less</span>
             </summary>
             <p class="text-sm text-gray-700 mt-2 whitespace-pre-line">${escapeHtml(d.crsSummary.text)}</p>
           </details>
@@ -1095,14 +1097,14 @@ const billModal = {
         <ol class="relative border-l border-gray-200 ml-2">
           ${d.actions.map(a => `
             <li class="ml-4 pb-4">
-              <span class="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-blue-200 border border-white"></span>
+              <span class="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-brand-200 border border-white"></span>
               <p class="text-xs text-gray-500">${escapeHtml(a.actionDate || "")}${a.source ? ` · ${escapeHtml(a.source)}` : ""}</p>
               <p class="text-sm text-gray-800">${escapeHtml(a.text)}</p>
               ${a.recordedVotes.map(rv => {
                 const id = houseVoteId(rv);
                 return id
-                  ? `<button type="button" data-open="vote" data-id="${escapeHtml(id)}" class="text-xs font-semibold text-blue-600 hover:underline mr-3">Roll call #${escapeHtml(String(rv.rollNumber))}: how members voted →</button>`
-                  : rv.url ? `<a href="${escapeHtml(rv.url)}" target="_blank" rel="noopener" class="text-xs text-blue-600 hover:underline mr-3">${escapeHtml(rv.chamber || "")} roll call #${escapeHtml(String(rv.rollNumber ?? "?"))} →</a>` : "";
+                  ? `<button type="button" data-open="vote" data-id="${escapeHtml(id)}" class="text-xs font-semibold text-brand-700 hover:underline mr-3">Roll call #${escapeHtml(String(rv.rollNumber))}: how members voted →</button>`
+                  : rv.url ? `<a href="${escapeHtml(rv.url)}" target="_blank" rel="noopener" class="text-xs text-brand-700 hover:underline mr-3">${escapeHtml(rv.chamber || "")} roll call #${escapeHtml(String(rv.rollNumber ?? "?"))} →</a>` : "";
               }).join("")}
             </li>`).join("")}
         </ol>`;
@@ -1118,7 +1120,7 @@ const billModal = {
           ${e.data.votes.map(v => `
             <li class="py-3 flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-blue-700 hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
+                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-brand-900 hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
                 <p class="text-xs text-gray-500 mt-0.5">Roll call #${escapeHtml(String(v.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(v.date))} · Yea ${v.tallies?.yea ?? "—"}, Nay ${v.tallies?.nay ?? "—"}</p>
               </div>
               <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
@@ -1168,12 +1170,12 @@ const voteModal = {
   header(e) {
     const v = e.data.vote;
     if (!v) {
-      return `<div class="min-w-0 flex-1"><h2 id="modal-title" class="text-lg font-bold text-gray-900">${e.data.vote === null ? "Vote not synced" : "Loading vote…"}</h2></div>`;
+      return `<div class="min-w-0 flex-1"><h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900">${e.data.vote === null ? "Vote not synced" : "Loading vote…"}</h2></div>`;
     }
     return `
       <div class="min-w-0 flex-1">
-        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 uppercase">${voteHeadingBadge(v)}</span>
-        <h2 id="modal-title" class="text-lg font-bold text-gray-900 mt-1">${escapeHtml(v.question || "Question not available")}</h2>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-gold-50 text-gold-800 ring-1 ring-gold-200 uppercase">${voteHeadingBadge(v)}</span>
+        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(v.question || "Question not available")}</h2>
         <p class="text-sm text-gray-500 mt-0.5">
           <span class="inline-block px-2 py-0.5 text-xs font-bold rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
           ${escapeHtml(formatVoteDate(v.date))}
@@ -1200,7 +1202,7 @@ const voteModal = {
       return `
         <div class="flex flex-wrap gap-2">
           <input type="search" data-vote-filter="text" value="${escapeHtml(e.filter.text || "")}" placeholder="Filter by name or state (e.g. WA)"
-            class="flex-1 min-w-[12rem] px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            class="flex-1 min-w-[12rem] px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
           <select data-vote-filter="party" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
             <option value="">All parties</option>
             ${parties.map(p => `<option value="${escapeHtml(p)}"${e.filter.party === p ? " selected" : ""}>${escapeHtml(PARTY_NAMES[p] || p)}</option>`).join("")}
@@ -1266,14 +1268,14 @@ function renderModal() {
       <div role="dialog" aria-modal="true" aria-labelledby="modal-title"
         class="bg-white w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-xl flex flex-col">
         <div class="shrink-0 flex items-start gap-4 p-5 border-b border-gray-200">
-          ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">←</button>` : ""}
+          ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500">←</button>` : ""}
           ${def.header(e)}
-          <button type="button" data-close aria-label="Close" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">✕</button>
+          <button type="button" data-close aria-label="Close" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500">✕</button>
         </div>
         <div role="tablist" class="shrink-0 flex gap-4 px-5 border-b border-gray-200 overflow-x-auto">
           ${def.tabs.map(([key, label]) => `
             <button type="button" role="tab" data-tab="${key}" aria-selected="${key === e.tab}"
-              class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-blue-600 border-blue-600" : "text-gray-500 border-transparent hover:text-gray-700"}">${label}</button>`).join("")}
+              class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-brand-900 border-gold-500" : "text-gray-500 border-transparent hover:text-gray-700"}">${label}</button>`).join("")}
         </div>
         <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" class="p-5 overflow-y-auto flex-1">${renderTab(e)}</div>
       </div>
@@ -1345,7 +1347,7 @@ function setupBillFilters() {
       activeCategory = btn.dataset.category;
       document.querySelectorAll("#category-filters .filter-btn").forEach(b => {
         const active = b === btn;
-        b.classList.toggle("bg-blue-600", active);
+        b.classList.toggle("bg-brand-800", active);
         b.classList.toggle("text-white", active);
         b.classList.toggle("bg-gray-200", !active);
         b.classList.toggle("text-gray-700", !active);

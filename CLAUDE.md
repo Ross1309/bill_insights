@@ -128,6 +128,21 @@ Pending / known issues:
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
 
+## Visual design (frontend)
+
+- Theme lives in the inline `tailwind.config` in `index.html`: `brand` (navy ink, 50–950),
+  `gold` (accent, 50–800), and `gray` remapped to warm stone. Fonts: Inter (sans/body) and
+  Source Serif 4 (`font-serif`: page/section headings, card and modal titles, stat numbers)
+  from Google Fonts.
+- Rules: interactive accents use `brand-*` (links `text-brand-700`, active chips
+  `bg-brand-800`, focus `ring-brand-500`); the active tab underline and vote badges use
+  `gold-*`. **Party red/blue (`bg-blue-100 text-blue-800`, `bg-red-100 text-red-800`) are
+  reserved for party badges.** Don't use them for UI chrome, so the brand stays
+  non-partisan.
+- Layout: dark `brand-950` header with headline stat cards (3 columns on phones, detail
+  lines hidden below `sm`), sticky tab bar (`switchTab` sets classes + `aria-selected`
+  and scrolls back to the bar if you're below it), sources footer.
+
 ## Legislators tab + headline counts (frontend)
 
 - Filters: search (accent-insensitive name, state name/code, or district like "WA-7" /
@@ -137,8 +152,6 @@ Pending / known issues:
 - Headline cards under the page title: senators and representatives with party split and
   House vacancies (out of 435), delegates, bills tracked and votes synced (via
   `getCountFromServer`). Member cards are clickable and set the directory filters.
-- On phones the five headline cards take most of the first screen; revisit in the visual
-  refresh.
 
 ## Campaign finance (member modal → Campaign Finance tab)
 
@@ -239,5 +252,5 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 4. ~~Detail modals~~ Done for members, bills and votes (see Detail modals above).
 5. ~~Directory filters and headline counts~~ Done (see Legislators tab above).
 6. ~~Money & donors via OpenFEC~~ Done as the member Campaign Finance tab.
-7. Visual refresh.
+7. ~~Visual refresh~~ Done (see Visual design above).
 8. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).
