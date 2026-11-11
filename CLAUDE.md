@@ -53,8 +53,10 @@ scripts/import-topic-bills.js      Store + enrich every law and voted-on bill (r
 mockups/                           Design mockups (static, not deployed; `mockups` launch config)
 firestore.indexes.json             Composite indexes the UI's queries need
 netlify/functions/sync-bills.js    Syncs recent bills + AI summaries (was sync-votes.js)
-netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + 5 latest House
-                                   and 5 latest Senate roll-call votes
+netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + every House and
+                                   Senate roll-call vote not yet stored (≤40/chamber/run)
+netlify/lib/congress.js            currentCongress() (Jan 3 rollover), ordinal(), MIN_VOTES_TO_DISPLAY
+tests/rules.test.js                Unit tests for rule functions (`npm test`; gates Netlify builds)
 netlify/lib/senate-votes.js        senate.gov LIS XML -> `votes` docs (menu, vote parse, ET->UTC)
 netlify/lib/house-votes.js         Congress.gov House votes -> `votes` docs (list + build doc)
 netlify/lib/vote-stats.js          party_breakdown, alignment/category/outcome rules, computeOverview
@@ -63,11 +65,11 @@ scripts/build-stats.js             Rebuild stats/overview [--backfill party_brea
 scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
 scripts/import-bills.js            Backfill the N most recently updated bills (resumable)
 scripts/summarize-bills.js         CRS-based AI summaries for stored bills (resumable)
-netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
+netlify/functions/member-profile.js  GET /api/member-profile?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
                                    donation-size buckets, itemized by state (api.data.gov key)
-netlify/functions/bill-detail.js   GET ?id={bill_id}: sponsor, cosponsor count, latest CRS
+netlify/functions/bill-detail.js   GET /api/bill-detail?id={bill_id}: sponsor, cosponsor count, latest CRS
                                    summary, action history (works for bills not in `bills`)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
                                    policy-area -> category map, summary generation
@@ -189,22 +191,48 @@ The Legislators tab and headline counts read this one doc (1 read instead of ~54
 search/filter client-side. If it's missing or unreadable, the tab falls back to the
 per-state `members` query and says nationwide search is unavailable.
 
-## Current state (as of 2026-11-10)
+## Current state (as of 2026-11-11)
 
-Working: all three tabs render live Firestore data; bill cards show bill number, policy
-area, sourced summary bullets, latest action, Congress.gov link; search matches
-title / policy area / bill number ("HR 10914", "hr10914", "10914"); category filter
-buttons work.
+Live at https://congress-watcher.netlify.app: Overview, Issues, Bills, Votes, Legislators
+tabs, detail modals, campaign finance. Data is complete for the 119th Congress (votes
+1,600/1,600, laws 140/140 as of 2026-11-11) and kept current by the two scheduled syncs.
 
-Votes tab reads the `votes` collection (orderBy `date` desc): question, result, tallies,
-party breakdown, bill link (own bill data or Congress.gov), House Clerk source link.
-Backfill has been run (verified 2026-11-10: no fake fields, all summaries sourced).
+### Project review fixes (2026-11-11)
+A full review found four must-fix problems; all fixed:
+1. **Vote ingest dropped votes.** It took the 5 newest per chamber; 76 chamber-days had
+   more (up to 24), so 22% of votes would have been missed. Now: every vote not yet
+   stored (compared against stored ids), newest first, ≤40/chamber/run, in parallel.
+2. **Congress rollover (Jan 3, 2027).** `currentCongress()` derives it from the date;
+   nothing hard-codes 119. Stats keep describing the previous Congress until the new
+   one has `MIN_VOTES_TO_DISPLAY` (25) votes, and label which Congress they cover.
+3. **Stale bill stages.** `sync-bills` now re-enriches every *tracked* bill updated since
+   `sync_state/bills.last_refresh`, plus any bill on the official laws list not stored as
+   a law (≤60/run), then rebuilds stats. Full run ~12 s.
+4. **Public function abuse.** Durable `Netlify-CDN-Cache-Control` on member-profile,
+   bill-detail, member-finance (404s cached 1h); rate limit 60/min per visitor on
+   member-profile and bill-detail (plan allows 2 rules). Rate-limited functions must
+   have an explicit path, so they live at `/api/member-profile` and `/api/bill-detail`
+   (`FUNCTION_PATHS` in app.js); the old `/.netlify/functions/` paths 404.
+Plus: `npm test` (tests/rules.test.js, node:test) runs in the Netlify build command, so a
+broken rule fails the deploy.
 
-Pending / known issues:
-- `sync-bills.js` must stay under Netlify's function timeout: detail fetches run in
-  parallel and AI summaries are capped at 3 per run.
-- Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
-  recently updated). Consider syncing bills referenced by votes.
+`sync_state` is server-only (no read rule in firestore.rules, so browsers are denied).
+
+### Review: remaining recommendations (not done yet)
+- Per-member votes doc: a member's Voting Record downloads 50 full vote docs (~1.5 MB);
+  a compact precomputed doc fixes that and enables Phase 2 (participation, party trend).
+- Run health doc + visible "data as of"; alert on failed scheduled runs.
+- Timeouts/retries in the other fetch helpers (bills.js has a 15 s timeout); dedupe the
+  copied getJson/json/ordinal helpers into one lib; drop `node-fetch`, the old
+  FABRICATED_FIELDS cleanup and `scripts/backfill-bills.js`; upgrade firebase-admin
+  (`npm audit`: 8 moderate, all in unused Google Cloud storage deps).
+- Frontend: split the 1,700-line app.js into modules; Tailwind build step (CDN warns in
+  production); URL routing for shareable links; modal focus trap.
+- Product: find-your-representative by address (Census geocoder); shareable links;
+  "what Congress did this week" digest; focused/broad split for every topic (Healthcare
+  shows only 11 measures because health provisions ride in budget bills); reframe the
+  "bills tracked" headline; a "How we count" methodology page; "report an error".
+- Docs: real README; trim this file (it's part changelog).
 
 ## Issues tab (frontend)
 
@@ -451,6 +479,7 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 - Docs-only commits can skip a credit-costing deploy with `[skip netlify]` in the message.
 
 ### Proposed next
+(See "Review: remaining recommendations" above for the prioritized list.)
 - Issue tracker follow-ups: more topics (Immigration, Defense?) = add to topics.js +
   chip in index.html; "moving now" section; bills that never reached the floor would need
   the complete (~20k bill) enrichment.
