@@ -7,10 +7,6 @@ import { topicTags } from './topics.js';
 
 const API = 'https://api.congress.gov/v3';
 
-// Fields earlier versions of the bill sync (then sync-votes.js) wrote with placeholder values.
-// They must be removed from every bill doc.
-export const FABRICATED_FIELDS = ['outcome', 'vote_counts', 'date_voted'];
-
 // Congress.gov policy areas -> the app's filter buckets.
 // Anything not listed is "Other"; bills CRS hasn't tagged yet are "Uncategorized".
 const CATEGORY_MAP = {

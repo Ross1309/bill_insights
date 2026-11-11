@@ -8,7 +8,6 @@
 import { getDb, admin } from '../lib/firebase.js';
 import { json } from '../lib/http.js';
 import {
-  FABRICATED_FIELDS,
   billMetadata,
   fetchBillDetail,
   fetchRecentBills,
@@ -137,7 +136,6 @@ export default async () => {
       const meta = billMetadata(details[i], billsList[i]);
       const existing = snaps[i].exists ? snaps[i].data() : {};
       const update = { ...meta, ...enrichments[i], synced_at: FieldValue.serverTimestamp() };
-      for (const field of FABRICATED_FIELDS) update[field] = FieldValue.delete();
 
       // Same re-check rule as the backlog: a bill with no CRS summary is asked again
       // at most every 3 days.

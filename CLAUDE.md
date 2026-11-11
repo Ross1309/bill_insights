@@ -74,7 +74,6 @@ netlify/functions/bill-detail.js   GET /api/bill-detail?id={bill_id}: sponsor, c
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
                                    policy-area -> category map, summary generation
 netlify/lib/firebase.js            firebase-admin init (raw or base64 service account)
-scripts/backfill-bills.js          One-off cleanup/refresh of existing bill docs
 run-ingest.js                      Runs ingest-votes handler locally
 ```
 
@@ -87,8 +86,6 @@ as a function; esbuild bundles it via imports.
 netlify dev                                         # app + functions on :8888
 node run-ingest.js                                  # all current members + House votes
 curl localhost:8888/.netlify/functions/sync-bills   # bill sync (10 bills, ≤3 summaries/run)
-node scripts/backfill-bills.js                      # dry run
-node scripts/backfill-bills.js --write [--summaries]
 node scripts/import-votes.js [--write] [--chamber house|senate] [--congress 118] [--limit N]
 node scripts/import-bills.js [--write] [--limit 2000]
 node scripts/summarize-bills.js [--write] [--limit N] [--recheck-days 3]
