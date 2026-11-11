@@ -34,6 +34,8 @@ netlify/functions/sync-votes.js    Syncs recent BILLS (name is historical) + AI 
 netlify/functions/ingest-votes.js  Syncs all current members + 5 latest House roll-call votes
 netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
+netlify/functions/bill-detail.js   GET ?id={bill_id}: sponsor, cosponsor count, latest CRS
+                                   summary, action history (works for bills not in `bills`)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
                                    policy-area -> category map, summary generation
 netlify/lib/firebase.js            firebase-admin init (raw or base64 service account)
@@ -104,24 +106,36 @@ party breakdown, bill link (own bill data or Congress.gov), House Clerk source l
 Backfill has been run (verified 2026-11-10: no fake fields, all summaries sourced).
 
 Pending / known issues:
+- Title-only AI summaries can still speculate despite the prompt (e.g. HRES 1650: "It is
+  likely to affect…"). Tighten the prompt or skip AI summaries until a CRS summary exists.
 - `sync-votes.js` must stay under Netlify's function timeout: detail fetches run in
   parallel and AI summaries are capped at 3 per run.
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
 
-## Member profile modal (frontend)
+## Detail modals (frontend)
 
-- Clicking a member card opens a modal with Overview / Voting Record / Legislation tabs.
-- Overview + Legislation come from `member-profile` (cached 1h by `Cache-Control`). If it
-  fails, the modal still shows Firestore member data plus a Retry button.
-- Voting Record is computed client-side: the latest 50 `votes` (shared with the Votes tab
-  via `getRecentVotes`) filtered to the member's `individual_votes` entry. Counts
-  Yea/Nay/Present/Not voting, and "voted with party majority" = matches the majority of
-  their party's Yea/Nay votes on that roll call (ties and Independents excluded).
-  Senators get "Senate votes aren't tracked yet".
+- One modal shell with a stack (Back button): anything with `data-open="member|bill|vote"
+  data-id="…"` opens one, from the page or inside another modal. Escape / backdrop / ✕
+  close all and return focus. Kinds are defined in `MODAL_KINDS` (load, header, tabs).
+- **Member** (id = bioguideId): Overview / Voting Record / Legislation. Member doc from
+  `memberById` or Firestore; details + sponsored items from `member-profile`.
+- **Bill** (id = bill_id): Summary (sponsor → member modal, cosponsors, AI summary with
+  source label, official CRS summary, latest action) / Actions (timeline; recorded House
+  votes link to the vote modal by `{congress}-{session}-house-vote-{roll}`) / Votes
+  (synced `votes` where `bill_id ==`). Works for bills not in `bills` via `bill-detail`.
+- **Vote** (id = vote doc id): Results (tallies, party table, bill link, Clerk record) /
+  How members voted (grouped by position; filter by name, a bare state code like "WA",
+  or party; names open member modals). Unsynced roll calls say so.
+- Functions are cached per id in the page and for 1h via `Cache-Control`. If they fail,
+  modals still show Firestore data plus a Retry button.
+- Voting Record = latest 50 `votes` (shared `getRecentVotes`) filtered to the member;
+  "voted with party majority" = matches most of their party's Yea/Nay on that roll call
+  (ties and Independents excluded). Senators: "Senate votes aren't tracked yet".
 - Scaling note: once many votes accumulate, filtering the latest 50 client-side will
   miss older votes. Then add a `voter_ids` array to vote docs and query
   `array-contains` + `orderBy('date')` (needs a composite index).
+- Not done: Tab-key focus trap inside the modal; deep links (e.g. `#bill/hr9612-119`).
 
 ## Bills paging (frontend)
 
@@ -170,8 +184,7 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 1. ~~Votes tab → `votes` collection.~~ Done.
 2. ~~Members for all states.~~ Done (all states + delegates, current only, real photos).
 3. ~~Server-side ordering + pagination~~ Done (see Bills paging above).
-4. **Detail modals.** ~~Member profile~~ done (see above). Next: bill and vote modals
-   (full summary, actions, how each member voted, linking to member profiles).
+4. ~~Detail modals~~ Done for members, bills and votes (see Detail modals above).
 5. Directory filters (name search, party, chamber) and headline counts.
 6. Money & donors tab via OpenFEC.
 7. Visual refresh.
