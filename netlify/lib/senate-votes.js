@@ -8,6 +8,9 @@
 
 import { partyBreakdown } from './vote-stats.js';
 import { currentCongress } from './congress.js';
+import { getText as fetchText } from './http.js';
+
+const getText = url => fetchText(url, { headers: HEADERS });
 
 const LIS = 'https://www.senate.gov/legislative/LIS';
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; CongressWatcher/1.0)' };
@@ -30,12 +33,6 @@ function tag(xml, name) {
 
 function blocks(xml, name) {
   return [...xml.matchAll(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, 'g'))].map(m => m[1]);
-}
-
-async function getText(url) {
-  const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) throw new Error(`senate.gov ${res.status} for ${url}`);
-  return res.text();
 }
 
 // Offset of a time zone from UTC at a given instant, in minutes (e.g. -300 for EST).

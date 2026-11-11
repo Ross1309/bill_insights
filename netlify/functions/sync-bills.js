@@ -6,6 +6,7 @@
 // a few of those are re-checked each run so summaries appear once CRS publishes.
 
 import { getDb, admin } from '../lib/firebase.js';
+import { json } from '../lib/http.js';
 import {
   FABRICATED_FIELDS,
   billMetadata,
@@ -83,13 +84,6 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds) {
   if (todo.length <= batch.length) await stateRef.set({ last_refresh: runStart }, { merge: true });
   console.log(`refresh: ${updatedIds.length} bills updated since ${since}; refreshed ${batch.length}`);
   return batch.length;
-}
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
 }
 
 export default async () => {

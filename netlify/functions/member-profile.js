@@ -5,35 +5,14 @@
 // only fields taken from the source; anything missing is null.
 
 import { congressGovUrl, makeBillId, stripHtml } from '../lib/bills.js';
+import { getJson, json } from '../lib/http.js';
+import { ordinal } from '../lib/congress.js';
 
 const API = 'https://api.congress.gov/v3';
 const SPONSORED_LIMIT = 10;
 const CHAMBERS = { 'House of Representatives': 'House', Senate: 'Senate' };
 
-function json(body, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...extraHeaders },
-  });
-}
-
-async function getJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = new Error(`Congress API ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
-}
-
 const AMENDMENT_TYPES = { samdt: ['S.Amdt.', 'senate-amendment'], hamdt: ['H.Amdt.', 'house-amendment'], suamdt: ['S.UP.Amdt.', 'senate-amendment'] };
-
-function ordinal(n) {
-  const v = n % 100;
-  if (v >= 11 && v <= 13) return `${n}th`;
-  return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'}`;
-}
 
 function shapeSponsored(item) {
   // Amendments come back without type/number; their kind is only in the API url

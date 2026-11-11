@@ -10,15 +10,9 @@
 // `netlify dev` with neither set it falls back to the public, heavily limited DEMO_KEY.
 
 import { getDb } from '../lib/firebase.js';
+import { fetchWithRetry, json } from '../lib/http.js';
 
 const FEC = 'https://api.open.fec.gov/v1';
-
-function json(body, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...extraHeaders },
-  });
-}
 
 function fecKey() {
   if (process.env.FEC_API_KEY) return process.env.FEC_API_KEY;
@@ -37,13 +31,7 @@ async function fec(path, key) {
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
 
   const url = `${FEC}${path}${path.includes('?') ? '&' : '?'}api_key=${key}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = new Error(res.status === 429 ? 'FEC rate limit reached' : `FEC API ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  const data = await res.json();
+  const data = await (await fetchWithRetry(url, { timeoutMs: 10000, retries: 1 })).json();
   if (cache.size > 500) cache.clear();
   cache.set(path, { at: Date.now(), data });
   return data;

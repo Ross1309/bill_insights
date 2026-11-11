@@ -1,6 +1,10 @@
 // Shared helpers for pulling bill data from the Congress.gov API and
 // shaping it into the Firestore `bills` document schema.
 
+import { getJson, fetchWithRetry } from './http.js';
+import { ordinal } from './congress.js';
+import { topicTags } from './topics.js';
+
 const API = 'https://api.congress.gov/v3';
 
 // Fields earlier versions of the bill sync (then sync-votes.js) wrote with placeholder values.
@@ -37,12 +41,6 @@ const TYPE_SLUGS = {
   SCONRES: 'senate-concurrent-resolution',
 };
 
-function ordinal(n) {
-  const v = n % 100;
-  if (v >= 11 && v <= 13) return `${n}th`;
-  return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'}`;
-}
-
 export function congressGovUrl(congress, type, number) {
   const slug = TYPE_SLUGS[type];
   if (!slug || !congress || !number) return null;
@@ -58,16 +56,6 @@ export function parseBillId(billId) {
 
 export function makeBillId(type, number, congress) {
   return `${String(type).toLowerCase()}${number}-${congress}`;
-}
-
-// 15 s per request so one hung call can't use up a scheduled function's 30 s.
-async function getJson(url) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) {
-    const safeUrl = url.replace(/api_key=[^&]+/, 'api_key=***');
-    throw new Error(`Congress API ${res.status} for ${safeUrl}`);
-  }
-  return res.json();
 }
 
 // Ids ("hr1234-119") of every bill updated since an ISO time, newest first.
@@ -156,8 +144,6 @@ export function billMetadata(detail = {}, fallback = {}) {
   };
 }
 
-// Plain-language summary from the official CRS summary when one exists,
-// otherwise from the title only (and labeled as such). Returns null on failure.
 // Plain-language summary of the official CRS summary. Policy: no CRS summary ->
 // no AI summary (title-only summaries speculated), so `crsSummary` is required.
 export async function generateSummary({ title, crsSummary }, openaiKey) {
@@ -175,18 +161,21 @@ export async function generateSummary({ title, crsSummary }, openaiKey) {
     context,
   ].join('\n');
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
+  let res;
+  try {
+    res = await fetchWithRetry('https://api.openai.com/v1/chat/completions', {
+      timeoutMs: 30000,
+      retries: 1,
+      method: 'POST',
     headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
     }),
-  });
-
-  if (!res.ok) {
-    console.error(`OpenAI request failed (${res.status}) for "${title}"`);
+    });
+  } catch (err) {
+    console.error(`OpenAI request failed (${err.status || err.message}) for "${title}"`);
     return null;
   }
 
@@ -241,8 +230,6 @@ export async function summaryUpdate(bill, existingSummary, { congressKey, openai
 }
 
 // --- Issue-tracker enrichment: CRS subjects, legislative stage, sponsor, topics ---
-
-import { topicTags } from './topics.js';
 
 // Stages in order. Concurrent/simple resolutions stop at passed_both / passed_one.
 export const STAGES = ['introduced', 'committee', 'passed_one', 'passed_both', 'to_president', 'law'];

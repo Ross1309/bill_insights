@@ -1,5 +1,5 @@
-import fetch from 'node-fetch';
 import { getDb, admin } from '../lib/firebase.js';
+import { getJson } from '../lib/http.js';
 import { STATE_CODES } from '../../public/states.js';
 import { listSenateVotes, fetchSenateVote, senateVoteId } from '../lib/senate-votes.js';
 import { listHouseVotes, buildHouseVoteDoc, houseVoteId } from '../lib/house-votes.js';
@@ -25,12 +25,6 @@ async function pool(items, concurrency, fn) {
       await fn(items[i]);
     }
   }));
-}
-
-async function getJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Congress API ${res.status} for ${url.replace(/api_key=[^&]+/, 'api_key=***')}`);
-  return res.json();
 }
 
 export async function handler(event, context) {
@@ -155,9 +149,7 @@ const LEGISLATORS_URL = 'https://unitedstates.github.io/congress-legislators/leg
 
 async function fetchLegislators() {
   try {
-    const res = await fetch(LEGISLATORS_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return await getJson(LEGISLATORS_URL, { timeoutMs: 20000 });
   } catch (err) {
     console.warn(`congress-legislators unavailable (${err.message}); fec_ids left unchanged, Senate votes unmapped.`);
     return null;

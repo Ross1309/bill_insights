@@ -6,26 +6,10 @@
 // anything missing is null.
 
 import { billMetadata, congressGovUrl, parseBillId, stripHtml } from '../lib/bills.js';
+import { getJson, json } from '../lib/http.js';
 
 const API = 'https://api.congress.gov/v3';
 const ACTIONS_LIMIT = 100;
-
-function json(body, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...extraHeaders },
-  });
-}
-
-async function getJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = new Error(`Congress API ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
-}
 
 function shapeActions(list) {
   const seen = new Set();

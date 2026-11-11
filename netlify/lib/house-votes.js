@@ -3,16 +3,11 @@
 // (whole-congress backfill).
 
 import { partyBreakdown } from './vote-stats.js';
+import { getJson } from './http.js';
 
 const API = 'https://api.congress.gov/v3';
 const BILL_TYPES = new Set(['HR', 'S', 'HRES', 'SRES', 'HJRES', 'SJRES', 'HCONRES', 'SCONRES']);
 const TALLY_KEYS = { yea: 'yea', aye: 'yea', nay: 'nay', no: 'nay', present: 'present', 'not voting': 'not_voting' };
-
-async function getJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Congress API ${res.status} for ${url.replace(/api_key=[^&]+/, 'api_key=***')}`);
-  return res.json();
-}
 
 export function houseVoteId(congress, session, rollCall) {
   return `${congress}-${session}-house-vote-${rollCall}`;
