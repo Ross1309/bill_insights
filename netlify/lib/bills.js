@@ -60,13 +60,39 @@ export function makeBillId(type, number, congress) {
   return `${String(type).toLowerCase()}${number}-${congress}`;
 }
 
+// 15 s per request so one hung call can't use up a scheduled function's 30 s.
 async function getJson(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) {
     const safeUrl = url.replace(/api_key=[^&]+/, 'api_key=***');
     throw new Error(`Congress API ${res.status} for ${safeUrl}`);
   }
   return res.json();
+}
+
+// Ids ("hr1234-119") of every bill updated since an ISO time, newest first.
+export async function listBillIdsUpdatedSince(sinceIso, apiKey, max = 1000) {
+  const since = new Date(sinceIso).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const ids = [];
+  for (let offset = 0; offset < max; offset += 250) {
+    const data = await getJson(`${API}/bill?api_key=${apiKey}&format=json&limit=250&offset=${offset}&sort=updateDate+desc&fromDateTime=${since}`);
+    const items = data.bills || [];
+    ids.push(...items.filter(b => b.type && b.number && b.congress).map(b => makeBillId(b.type, b.number, b.congress)));
+    if (items.length < 250) break;
+  }
+  return ids.slice(0, max);
+}
+
+// Ids of every bill that became law in a Congress (official laws list).
+export async function listLawBillIds(congress, apiKey) {
+  const ids = [];
+  for (let offset = 0; ; offset += 250) {
+    const data = await getJson(`${API}/law/${congress}?api_key=${apiKey}&format=json&limit=250&offset=${offset}`);
+    const items = data.bills || [];
+    ids.push(...items.map(b => makeBillId(b.type, b.number, b.congress)));
+    if (items.length < 250) break;
+  }
+  return ids;
 }
 
 export async function fetchRecentBills(apiKey, limit = 10) {
