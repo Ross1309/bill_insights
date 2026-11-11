@@ -21,6 +21,7 @@ import {
 } from '../lib/bills.js';
 import { currentCongress } from '../lib/congress.js';
 import { writeOverviewStats } from '../lib/overview.js';
+import { recordRun } from '../lib/health.js';
 
 const BILLS_PER_RUN = 10;
 const MAX_SUMMARIES = 3; // keeps each run inside Netlify's function timeout
@@ -102,6 +103,7 @@ export default async () => {
       .filter(item => item.type && item.number && item.congress);
 
     if (billsList.length === 0) {
+      await recordRun(db, 'sync_bills', { failedSteps: ['bill list'] });
       return json({ success: false, message: 'Congress API returned 0 bills.' });
     }
 
@@ -183,14 +185,17 @@ export default async () => {
 
     // Rebuild Overview + Issues stats so today's stage changes show up today.
     let statsNote = '';
+    const failedSteps = [];
     if (refreshed) {
       try {
         const stats = await writeOverviewStats(db, admin, { congress: currentCongress().congress });
         statsNote = ` Stats rebuilt (${stats.congress}th).`;
       } catch (err) {
         console.error('Stats rebuild failed:', err);
+        failedSteps.push('stats');
       }
     }
+    await recordRun(db, 'sync_bills', { failedSteps, counts: { bills: updated, refreshed, summarized } });
 
     return json({
       success: true,
@@ -199,6 +204,7 @@ export default async () => {
     });
   } catch (err) {
     console.error('Fatal sync error:', err);
+    try { await recordRun(getDb(), 'sync_bills', { failedSteps: ['run'] }); } catch { /* no Firestore */ }
     return json({ error: err.message }, 500);
   }
 };

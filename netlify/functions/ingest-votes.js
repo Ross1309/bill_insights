@@ -8,6 +8,7 @@ import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
 import { currentCongress } from '../lib/congress.js';
 import { applyNewMemberVotes } from '../lib/member-votes.js';
 import { loadVoteIndex } from '../lib/vote-index.js';
+import { recordRun } from '../lib/health.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -43,13 +44,14 @@ export async function handler(event, context) {
     // failing doesn't block the other.
     const indexed = new Set((await loadVoteIndex(db, CONGRESS_NUM) || []).map(v => v.id));
     const results = await Promise.allSettled([syncHouseVotes(indexed), syncSenateVotes(legislators, indexed)]);
-    const failures = results.filter(r => r.status === "rejected").map(r => r.reason?.message || String(r.reason));
+    const failures = results.map((r, i) => r.status === "rejected" ? `${["house votes", "senate votes"][i]}: ${r.reason?.message || r.reason}` : null).filter(Boolean);
     failures.forEach(msg => console.error("Vote sync failed:", msg));
 
     // 4. Per-member voting records: count every vote not yet applied (incl. any a
     //    failed earlier run left behind).
+    let applied = { votes: 0, members: 0 };
     try {
-      const applied = await applyNewMemberVotes(db, admin, CONGRESS_NUM);
+      applied = await applyNewMemberVotes(db, admin, CONGRESS_NUM);
       if (applied.votes) console.log(`Member records: applied ${applied.votes} votes to ${applied.members} members`);
     } catch (err) {
       failures.push(`member votes: ${err.message}`);
@@ -75,6 +77,7 @@ export async function handler(event, context) {
       console.error("Stats rebuild failed:", err);
     }
 
+    await recordRun(db, "ingest_votes", { failedSteps: failures.map(m => m.split(":")[0]), counts: { new_votes: applied.votes } });
     return {
       statusCode: results.every(r => r.status === "rejected") ? 500 : 200,
       body: JSON.stringify({
@@ -85,6 +88,7 @@ export async function handler(event, context) {
 
   } catch (error) {
     console.error("Ingestion failed:", error);
+    await recordRun(db, "ingest_votes", { failedSteps: ["run"] });
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),

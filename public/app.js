@@ -115,6 +115,33 @@ async function loadOverview() {
     container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load the overview: ${escapeHtml(err.message)}</p>`;
   }
 }
+// --- Data freshness: stats/health, written by both nightly syncs ---------------
+const STALE_AFTER_MS = 36 * 3600 * 1000; // syncs run daily; allow one missed-by-hours run
+
+async function loadHealth() {
+  try {
+    const snap = await getDoc(doc(db, "stats", "health"));
+    if (!snap.exists()) return;
+    const h = snap.data();
+    const fmt = iso => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const votesAt = h.ingest_votes?.last_success;
+    const billsAt = h.sync_bills?.last_success;
+    const parts = [votesAt && `votes and members ${fmt(votesAt)}`, billsAt && `bills ${fmt(billsAt)}`].filter(Boolean);
+    if (parts.length) document.getElementById("data-asof").textContent = `Data last updated: ${parts.join("; ")}.`;
+
+    const stale = [["Votes and members", votesAt], ["Bills", billsAt]]
+      .filter(([, at]) => !at || Date.now() - Date.parse(at) > STALE_AFTER_MS);
+    if (stale.length) {
+      const el = document.getElementById("data-stale");
+      el.textContent = `${stale.map(([label, at]) => `${label}: ${at ? `last updated ${fmt(at)}` : "not updated recently"}`).join(". ")}. `
+        + "Our nightly update didn't complete, so the newest activity may be missing.";
+      el.classList.remove("hidden");
+    }
+  } catch (err) {
+    console.warn("Data freshness unavailable:", err.message);
+  }
+}
+
 let activeCategory = "all";
 
 async function init() {
@@ -127,6 +154,7 @@ async function init() {
   setupModals();
   setupIssues();
   loadHeadlineStats();
+  loadHealth();
   await loadBills({ reset: true });
 }
 
