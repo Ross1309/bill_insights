@@ -12,7 +12,7 @@
 import 'dotenv/config';
 import { getDb, admin } from '../netlify/lib/firebase.js';
 import { fetchEnrichedBill, parseBillId } from '../netlify/lib/bills.js';
-import { currentCongressSession } from '../netlify/lib/senate-votes.js';
+import { currentCongress } from '../netlify/lib/congress.js';
 
 const WRITE = process.argv.includes('--write');
 const FORCE = process.argv.includes('--force');
@@ -39,7 +39,7 @@ async function listLaws(congress) {
 
 async function main() {
   const db = getDb();
-  const { congress } = currentCongressSession();
+  const { congress } = currentCongress();
   const lawIds = await listLaws(congress);
   const votedIds = (await db.collection('votes').select('bill_id').get()).docs.map(d => d.data().bill_id).filter(Boolean);
   const ids = [...new Set([...lawIds, ...votedIds])].filter(id => parseBillId(id));

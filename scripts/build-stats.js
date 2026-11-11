@@ -9,13 +9,13 @@ import 'dotenv/config';
 import { getDb, admin } from '../netlify/lib/firebase.js';
 import { partyBreakdown } from '../netlify/lib/vote-stats.js';
 import { writeOverviewStats } from '../netlify/lib/overview.js';
-import { currentCongressSession } from '../netlify/lib/senate-votes.js';
+import { currentCongress } from '../netlify/lib/congress.js';
 
 const BACKFILL = process.argv.includes('--backfill');
 
 async function main() {
   const db = getDb();
-  const { congress } = currentCongressSession();
+  const { congress } = currentCongress();
 
   if (BACKFILL) {
     const snap = await db.collection('votes').get();
@@ -32,7 +32,7 @@ async function main() {
   }
 
   const result = await writeOverviewStats(db, admin, { congress });
-  console.log(`stats/overview rebuilt for the ${congress}th Congress: ${JSON.stringify(result)}`);
+  console.log(`stats rebuilt (current: ${congress}th; displayed: ${result.congress}th): ${JSON.stringify(result)}`);
   if (result.missing) console.warn(`${result.missing} votes lack party_breakdown; run with --backfill.`);
 }
 

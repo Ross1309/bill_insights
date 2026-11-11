@@ -31,6 +31,7 @@ const CATEGORY_LABELS = {
   other: "Other",
 };
 
+const ordinalOf = n => { const v = n % 100; return v >= 11 && v <= 13 ? `${n}th` : `${n}${{ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`; };
 const esc = s => String(s ?? "")
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
@@ -316,7 +317,7 @@ export function renderOverview(container, stats, { onState } = {}) {
       ${alignmentChart(stats)}
       ${outcomesChart(stats)}
       ${delegationsChart(stats)}
-      <p class="text-xs text-gray-400">${stats.congress ? `${stats.congress}th Congress · ` : ""}${(stats.totals?.House || 0) + (stats.totals?.Senate || 0)} roll-call votes${updated ? ` · updated ${esc(updated.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))}` : ""}</p>
+      <p class="text-xs text-gray-400">${stats.congress ? `${ordinalOf(stats.congress)} Congress · ` : ""}${(stats.totals?.House || 0) + (stats.totals?.Senate || 0)} roll-call votes${updated ? ` · updated ${esc(updated.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))}` : ""}</p>
     </div>`;
   wireTooltip(container);
   container.querySelectorAll("[data-state]").forEach(b =>

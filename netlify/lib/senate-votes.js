@@ -7,6 +7,7 @@
 // lis -> bioguideId map (from the congress-legislators dataset).
 
 import { partyBreakdown } from './vote-stats.js';
+import { currentCongress } from './congress.js';
 
 const LIS = 'https://www.senate.gov/legislative/LIS';
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; CongressWatcher/1.0)' };
@@ -60,10 +61,7 @@ export function parseSenateDate(text) {
   return new Date(asUtc - offset * 60000).toISOString();
 }
 
-export function currentCongressSession(now = new Date()) {
-  const year = now.getUTCFullYear();
-  return { congress: Math.floor((year - 1789) / 2) + 1, session: year % 2 === 1 ? 1 : 2 };
-}
+export { currentCongress as currentCongressSession } from './congress.js';
 
 async function fetchMenu(congress, session) {
   const xml = await getText(`${LIS}/roll_call_lists/vote_menu_${congress}_${session}.xml`);
@@ -155,7 +153,7 @@ export async function fetchSenateVote(entry, lisToBioguide) {
 
 // The n most recent Senate roll-call votes as `votes` docs (newest first).
 export async function fetchLatestSenateVotes(n, lisToBioguide) {
-  const { congress, session } = currentCongressSession();
+  const { congress, session } = currentCongress();
   const entries = await listSenateVotes(congress, session === 2 ? [2, 1] : [1]);
   const out = [];
   for (const entry of entries.slice(0, n)) out.push(await fetchSenateVote(entry, lisToBioguide));

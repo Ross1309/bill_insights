@@ -5,10 +5,12 @@ import { fetchLatestSenateVotes } from '../lib/senate-votes.js';
 import { listHouseVotes, buildHouseVoteDoc } from '../lib/house-votes.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
+import { currentCongress } from '../lib/congress.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
-const CONGRESS_NUM = 119;
+// Current Congress from the date (rolls over on January 3 of odd years).
+const CONGRESS_NUM = currentCongress().congress;
 const API = 'https://api.congress.gov/v3';
 const VOTES_PER_RUN = 5;
 
@@ -47,7 +49,7 @@ export async function handler(event, context) {
     // 5. Rebuild the Overview tab's precomputed stats (small fields only).
     try {
       const stats = await writeOverviewStats(db, admin, { congress: CONGRESS_NUM });
-      console.log(`stats/overview rebuilt from ${stats.votes} votes`);
+      console.log(`stats rebuilt for the ${stats.congress}th Congress from ${stats.votes} votes`);
     } catch (err) {
       failures.push(`stats: ${err.message}`);
       console.error("Stats rebuild failed:", err);

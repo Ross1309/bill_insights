@@ -7,6 +7,7 @@
 
 import { TOPICS } from './topics.js';
 import { partyAlignment } from './vote-stats.js';
+import { ordinal } from './congress.js';
 
 const LABELS = { HR: 'H.R.', S: 'S.', HRES: 'H.Res.', SRES: 'S.Res.', HJRES: 'H.J.Res.', SJRES: 'S.J.Res.', HCONRES: 'H.Con.Res.', SCONRES: 'S.Con.Res.' };
 const PASSAGE_Q = /passage|pass the bill|suspend the rules and (pass|agree|concur)|agreeing to the resolution|^on the (joint |concurrent )?resolution|concur in/i;
@@ -62,7 +63,7 @@ function stageCounts(measures) {
 }
 
 // bills: enriched bill docs ({ id, ...data }); votesByBill: Map bill_id -> votes (sorted by date)
-export function computeTopicStats(slug, bills, votesByBill, overallAlignment) {
+export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { congress } = {}) {
   const t = TOPICS[slug];
   const reached = b => b.stage === 'law' || (votesByBill.get(b.id) || []).length > 0;
   const measures = bills.filter(b => (b.topics || []).includes(slug) && reached(b));
@@ -109,7 +110,7 @@ export function computeTopicStats(slug, bills, votesByBill, overallAlignment) {
   return {
     slug,
     label: t.label,
-    intro: t.intro,
+    intro: t.intro.replace('{congress}', congress ? ordinal(congress) : 'current'),
     policy_areas: t.policyAreas,
     explainers: t.explainers,
     counts: { ...stageCounts(measures), votes: topicVotes.length },

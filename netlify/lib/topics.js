@@ -6,21 +6,21 @@
 export const TOPICS = {
   economy: {
     label: 'Economy',
-    intro: 'What the 119th Congress has done on taxes, spending, the financial system, trade and jobs: what became law, what is moving, and how members voted.',
+    intro: 'What the {congress} Congress has done on taxes, spending, the financial system, trade and jobs: what became law, what is moving, and how members voted.',
     policyAreas: ['Economics and Public Finance', 'Finance and Financial Sector', 'Taxation', 'Commerce', 'Labor and Employment'],
     watchlists: {},
     explainers: ['no-vote', 'resolutions'],
   },
   healthcare: {
     label: 'Healthcare',
-    intro: 'What the 119th Congress has done on health care, Medicare, Medicaid, public health and medical research: what became law, what is moving, and how members voted.',
+    intro: 'What the {congress} Congress has done on health care, Medicare, Medicaid, public health and medical research: what became law, what is moving, and how members voted.',
     policyAreas: ['Health'],
     watchlists: {},
     explainers: ['no-vote', 'resolutions'],
   },
   'foreign-affairs': {
     label: 'Foreign Affairs',
-    intro: 'What the 119th Congress has done on foreign policy, trade and international aid: what became law, what is moving, and how members voted.',
+    intro: 'What the {congress} Congress has done on foreign policy, trade and international aid: what became law, what is moving, and how members voted.',
     policyAreas: ['International Affairs', 'Foreign Trade and International Finance'],
     watchlists: {
       iran: {

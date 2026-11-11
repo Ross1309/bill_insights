@@ -7,16 +7,22 @@
 import { computeOverview } from './vote-stats.js';
 import { computeTopicStats } from './topic-stats.js';
 import { TOPICS } from './topics.js';
+import { MIN_VOTES_TO_DISPLAY } from './congress.js';
 
 const VOTE_FIELDS = ['chamber', 'date', 'question', 'result', 'party_breakdown', 'tallies', 'bill_id', 'roll_call_number', 'session'];
 const BILL_FIELDS = ['type', 'number', 'congress', 'title', 'stage', 'passed_house', 'passed_senate', 'failed_house', 'failed_senate',
   'law_number', 'sponsor', 'cosponsors_count', 'subject_count', 'topics', 'topic_focus', 'ai_summary', 'crs_summary_available', 'latestAction'];
 
+// `congress` is the current Congress. Until it has MIN_VOTES_TO_DISPLAY votes (early
+// January of odd years), the stats describe the previous Congress instead, and say so.
 export async function writeOverviewStats(db, admin, { congress } = {}) {
-  let query = db.collection('votes');
-  if (congress) query = query.where('congress', '==', congress);
-  const snap = await query.select(...VOTE_FIELDS).get();
-  const votes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const load = async c => (await db.collection('votes').where('congress', '==', c).select(...VOTE_FIELDS).get())
+    .docs.map(d => ({ id: d.id, ...d.data() }));
+  let votes = await load(congress);
+  if (votes.length < MIN_VOTES_TO_DISPLAY) {
+    const previous = await load(congress - 1);
+    if (previous.length > votes.length) { votes = previous; congress -= 1; }
+  }
   const missing = votes.filter(v => !v.party_breakdown).length;
 
   const dir = await db.collection('directory').doc('members').get();
@@ -29,7 +35,7 @@ export async function writeOverviewStats(db, admin, { congress } = {}) {
   // Issue tracker: bills tagged with any topic or watchlist slug.
   const slugs = Object.entries(TOPICS).flatMap(([slug, t]) => [slug, ...Object.keys(t.watchlists)]);
   const billSnap = await db.collection('bills').where('topics', 'array-contains-any', slugs.slice(0, 30)).select(...BILL_FIELDS).get();
-  const bills = billSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const bills = billSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => Number(b.congress) === congress);
 
   const votesByBill = new Map();
   for (const v of [...votes].sort((a, b) => (a.date || '').localeCompare(b.date || ''))) {
@@ -40,10 +46,10 @@ export async function writeOverviewStats(db, admin, { congress } = {}) {
 
   const topics = {};
   for (const slug of Object.keys(TOPICS)) {
-    const stats = computeTopicStats(slug, bills, votesByBill, overview.alignment_totals);
+    const stats = computeTopicStats(slug, bills, votesByBill, overview.alignment_totals, { congress });
     await db.collection('stats').doc(`topic-${slug}`).set({ ...stats, congress: congress ?? null, generated_at: now });
     topics[slug] = stats.counts.measures;
   }
 
-  return { votes: votes.length, missing, weeks: overview.weekly.length, months: overview.monthly.length, topicBills: bills.length, topics };
+  return { congress, votes: votes.length, missing, weeks: overview.weekly.length, months: overview.monthly.length, topicBills: bills.length, topics };
 }
