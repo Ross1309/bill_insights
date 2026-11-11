@@ -1,137 +1,98 @@
-import admin from 'firebase-admin';
+// Syncs the most recently updated bills from Congress.gov into Firestore.
+// (Name kept for compatibility with existing scheduling/URLs; it syncs bills.)
+//
+// For each bill it stores real metadata (type, number, policy area, latest action)
+// and, for up to MAX_SUMMARIES bills per run, a plain-language AI summary based on
+// the official CRS summary when one exists.
 
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+import { getDb, admin } from '../lib/firebase.js';
+import {
+  FABRICATED_FIELDS,
+  billMetadata,
+  fetchBillDetail,
+  fetchLatestCrsSummary,
+  fetchRecentBills,
+  generateSummary,
+  makeBillId,
+  needsSummary,
+} from '../lib/bills.js';
+
+const BILLS_PER_RUN = 10;
+const MAX_SUMMARIES = 3; // keeps each run inside Netlify's function timeout
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
-const db = admin.firestore();
-
-export default async (req, context) => {
+export default async () => {
   const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
   if (!CONGRESS_API_KEY || !OPENAI_API_KEY) {
-    return new Response(JSON.stringify({ error: "Missing API keys in environment variables." }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return json({ error: 'Missing API keys in environment variables.' }, 500);
   }
 
   try {
-    console.log("Fetching recent bills from Congress.gov API...");
+    const db = getDb();
+    const { FieldValue } = admin.firestore;
 
-    // 1. Query the main bills endpoint directly (specifying format=json)
-    const congressRes = await fetch(
-      `https://api.congress.gov/v3/bill?api_key=${CONGRESS_API_KEY}&format=json&limit=10&sort=updateDate+desc`
-    );
-    
-    if (!congressRes.ok) {
-      throw new Error(`Congress API error status: ${congressRes.status}`);
-    }
-
-    const billData = await congressRes.json();
-    const billsList = billData.bills || [];
+    const billsList = (await fetchRecentBills(CONGRESS_API_KEY, BILLS_PER_RUN))
+      .filter(item => item.type && item.number && item.congress);
 
     if (billsList.length === 0) {
-      return new Response(JSON.stringify({ success: false, message: "Congress API returned 0 bills." }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      return json({ success: false, message: 'Congress API returned 0 bills.' });
     }
 
-    let processedCount = 0;
-    const categories = ['Economy', 'Healthcare', 'Foreign Affairs'];
-
-    for (const item of billsList) {
-      const congress = item.congress || 118;
-      const billType = (item.type || 'hr').toLowerCase();
-      const billNumber = item.number;
-
-      if (!billNumber) continue;
-
-      const billId = `${billType}${billNumber}-${congress}`;
-      const billRef = db.collection('bills').doc(billId);
-      const billSnap = await billRef.get();
-
-      if (billSnap.exists) {
-        console.log(`Bill ${billId} already exists in Firestore. Skipping.`);
-        continue;
-      }
-
-      const billTitle = item.title || `Congressional Bill ${billType.toUpperCase()} ${billNumber}`;
-      
-      // Simple rotating/fallback category assignment if policy area isn't explicitly tagged
-      const category = categories[processedCount % categories.length];
-
-      console.log(`Generating OpenAI summary for: ${billTitle}`);
-
-      // 2. Fast AI Summary
-      const aiPrompt = `Summarize the key practical impacts of this U.S. congressional bill on everyday citizens in 3 concise bullet points:\nTitle: ${billTitle}`;
-
-      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: aiPrompt }],
-          temperature: 0.3
+    // Bill detail calls in parallel (policy area lives only on the detail endpoint).
+    const details = await Promise.all(
+      billsList.map(item =>
+        fetchBillDetail(item.congress, item.type, item.number, CONGRESS_API_KEY).catch(err => {
+          console.error(`Detail fetch failed for ${item.type} ${item.number}: ${err.message}`);
+          return {};
         })
-      });
+      )
+    );
 
-      let bulletPoints = ["Impact details pending analysis."];
-      if (openaiRes.ok) {
-        const aiData = await openaiRes.json();
-        const rawText = aiData.choices?.[0]?.message?.content || "";
-        bulletPoints = rawText
-          .split('\n')
-          .map(line => line.replace(/^[\s•*-]+/, '').trim())
-          .filter(line => line.length > 0)
-          .slice(0, 3);
-      } else {
-        console.error("OpenAI API call failed, falling back to default bullet points.");
+    let updated = 0;
+    let summarized = 0;
+
+    for (let i = 0; i < billsList.length; i++) {
+      const item = billsList[i];
+      const meta = billMetadata(details[i], item);
+      const billRef = db.collection('bills').doc(makeBillId(item.type, item.number, item.congress));
+      const snap = await billRef.get();
+      const existingSummary = snap.exists ? snap.data().ai_summary : null;
+
+      const update = { ...meta, synced_at: FieldValue.serverTimestamp() };
+      for (const field of FABRICATED_FIELDS) update[field] = FieldValue.delete();
+
+      if (summarized < MAX_SUMMARIES && existingSummary?.source !== 'crs_summary') {
+        const crsSummary = await fetchLatestCrsSummary(meta.congress, meta.type, meta.number, CONGRESS_API_KEY)
+          .catch(() => null);
+
+        if (needsSummary(existingSummary, Boolean(crsSummary))) {
+          const summary = await generateSummary({ title: meta.title, crsSummary }, OPENAI_API_KEY);
+          if (summary) {
+            update.ai_summary = summary;
+            summarized++;
+          }
+        }
       }
 
-      // 3. Write directly to Firestore
-      await billRef.set({
-        bill_id: billId,
-        congress: congress,
-        bill_number: `${billType.toUpperCase()} ${billNumber}`,
-        title: billTitle,
-        category: category,
-        chamber: item.originChamber || 'House',
-        date_voted: item.updateDate || new Date().toISOString().split('T')[0],
-        outcome: 'Passed',
-        vote_counts: { yea: 218, nay: 205 },
-        ai_summary: {
-          bullet_points: bulletPoints,
-          generated_at: new Date().toISOString()
-        }
-      });
-
-      processedCount++;
-      if (processedCount >= 3) break; // Limit batch size to 3 records per trigger
+      await billRef.set(update, { merge: true });
+      updated++;
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: `Batch sync complete! Successfully inserted ${processedCount} new bills into Firestore.`,
-      bills_found_in_api: billsList.length
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
+    return json({
+      success: true,
+      message: `Synced ${updated} bills; generated ${summarized} new summaries.`,
+      bills_found_in_api: billsList.length,
     });
-
   } catch (err) {
-    console.error("Fatal sync error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error('Fatal sync error:', err);
+    return json({ error: err.message }, 500);
   }
 };
