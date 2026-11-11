@@ -1,0 +1,33 @@
+// Compact vote index (no Firestore): doc grouping, merge by id, and expansion.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { entriesByIndexDoc, indexDocId, indexVotes, mergeIndex } from '../netlify/lib/vote-index.js';
+
+const v = (id, date, chamber = 'House', session = 2) => ({
+  id, date, chamber, session, congress: 119, roll_call_number: 7, question: 'On Passage',
+  result: 'Passed', bill_id: null, tallies: { yea: 1, nay: 0 }, party_breakdown: { D: { yea: 1, nay: 0 } },
+  individual_votes: [{ bioguideId: 'A1' }],
+});
+
+test('entriesByIndexDoc: one doc per congress/session/chamber, compact entries', () => {
+  const groups = entriesByIndexDoc([v('a', '2026-01-02'), v('b', '2026-01-01', 'Senate'), v('c', '2025-05-01', 'House', 1)]);
+  assert.deepEqual([...groups.keys()].sort(), ['119-1-house', '119-2-house', '119-2-senate']);
+  const e = groups.get('119-2-house').entries[0];
+  assert.equal(e.roll, 7);
+  assert.equal(e.individual_votes, undefined); // the heavy field stays out
+  assert.equal(indexDocId(119, 2, 'Senate'), '119-2-senate');
+});
+
+test('mergeIndex: replaces by id and sorts oldest first', () => {
+  const merged = mergeIndex([{ id: 'b', date: '2026-01-02', result: 'old' }], [{ id: 'a', date: '2026-01-01' }, { id: 'b', date: '2026-01-02', result: 'new' }]);
+  assert.deepEqual(merged.map(e => e.id), ['a', 'b']);
+  assert.equal(merged[1].result, 'new');
+});
+
+test('indexVotes: restores the fields stats code reads', () => {
+  const [out] = indexVotes({ congress: 119, session: 2, chamber: 'Senate', entries: [{ id: 'x', roll: 12, date: '2026-01-01' }] });
+  assert.equal(out.chamber, 'Senate');
+  assert.equal(out.roll_call_number, 12);
+  assert.equal(out.congress, 119);
+});

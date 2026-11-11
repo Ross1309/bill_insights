@@ -7,6 +7,7 @@ import { writeOverviewStats } from '../lib/overview.js';
 import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
 import { currentCongress } from '../lib/congress.js';
 import { applyNewMemberVotes } from '../lib/member-votes.js';
+import { loadVoteIndex } from '../lib/vote-index.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -40,8 +41,8 @@ export async function handler(event, context) {
 
     // 2 + 3. Latest House and Senate roll-call votes. Independent, so one source
     // failing doesn't block the other.
-    const stored = new Set((await db.collection("votes").where("congress", "==", CONGRESS_NUM).select().get()).docs.map(d => d.id));
-    const results = await Promise.allSettled([syncHouseVotes(stored), syncSenateVotes(legislators, stored)]);
+    const indexed = new Set((await loadVoteIndex(db, CONGRESS_NUM) || []).map(v => v.id));
+    const results = await Promise.allSettled([syncHouseVotes(indexed), syncSenateVotes(legislators, indexed)]);
     const failures = results.filter(r => r.status === "rejected").map(r => r.reason?.message || String(r.reason));
     failures.forEach(msg => console.error("Vote sync failed:", msg));
 
@@ -92,9 +93,11 @@ export async function handler(event, context) {
 }
 
 // House: every roll call in the Congress.gov list that isn't stored yet.
-export async function syncHouseVotes(stored) {
+export async function syncHouseVotes(indexed) {
   const all = await listHouseVotes(CONGRESS_NUM, CONGRESS_API_KEY); // newest first
-  const missing = all.filter(v => !stored.has(houseVoteId(CONGRESS_NUM, v.sessionNumber, v.rollCallNumber)));
+  const id = v => houseVoteId(CONGRESS_NUM, v.sessionNumber, v.rollCallNumber);
+  const unstored = await unstoredIds(all.map(id), indexed);
+  const missing = all.filter(v => unstored.has(id(v)));
   const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
   if (missing.length > todo.length) console.warn(`House: ${missing.length} missing votes; ingesting ${todo.length}, the rest next run`);
   const billIds = [];
@@ -108,14 +111,15 @@ export async function syncHouseVotes(stored) {
 }
 
 // Senate: every roll call in the senate.gov vote menus that isn't stored yet.
-export async function syncSenateVotes(legislators, stored) {
+export async function syncSenateVotes(legislators, indexed) {
   const lisToBioguide = new Map((legislators || [])
     .filter(l => l.id?.lis && l.id?.bioguide)
     .map(l => [l.id.lis, l.id.bioguide]));
 
   const { session } = currentCongress();
   const entries = await listSenateVotes(CONGRESS_NUM, session === 2 ? [2, 1] : [1]); // newest first
-  const missing = entries.filter(e => !stored.has(senateVoteId(e)));
+  const unstored = await unstoredIds(entries.map(senateVoteId), indexed);
+  const missing = entries.filter(e => unstored.has(senateVoteId(e)));
   const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
   if (missing.length > todo.length) console.warn(`Senate: ${missing.length} missing votes; ingesting ${todo.length}, the rest next run`);
   const billIds = [];
@@ -127,6 +131,19 @@ export async function syncSenateVotes(legislators, stored) {
   });
   console.log(`Senate: ingested ${todo.length} new votes`);
   return billIds;
+}
+
+// Vote ids not stored yet. The vote index lists every applied vote, so only ids
+// missing from it are looked up (usually a handful; all of them if there's no index
+// yet). Votes stored but not yet applied are found by the lookup, so never re-fetched.
+async function unstoredIds(ids, indexed) {
+  const candidates = ids.filter(id => !indexed.has(id));
+  const out = new Set();
+  for (let i = 0; i < candidates.length; i += 300) {
+    const snaps = await db.getAll(...candidates.slice(i, i + 300).map(id => db.collection("votes").doc(id)), { fieldMask: ["vote_id"] });
+    snaps.forEach(s => { if (!s.exists) out.add(s.id); });
+  }
+  return out;
 }
 
 // Bills a new vote refers to: store + enrich them if they aren't yet (stage, subjects,
