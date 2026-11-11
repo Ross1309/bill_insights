@@ -28,8 +28,9 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
 
 ```
 public/index.html, public/app.js   UI (no build step)
+public/states.js                   State/delegate list, shared by UI dropdown and ingest
 netlify/functions/sync-votes.js    Syncs recent BILLS (name is historical) + AI summaries
-netlify/functions/ingest-votes.js  Syncs WA members + 5 latest House roll-call votes
+netlify/functions/ingest-votes.js  Syncs all current members + 5 latest House roll-call votes
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
                                    policy-area -> category map, summary generation
 netlify/lib/firebase.js            firebase-admin init (raw or base64 service account)
@@ -44,7 +45,7 @@ as a function; esbuild bundles it via imports.
 
 ```
 netlify dev                                         # app + functions on :8888
-node run-ingest.js                                  # members (WA) + House votes
+node run-ingest.js                                  # all current members + House votes
 curl localhost:8888/.netlify/functions/sync-votes   # bill sync (10 bills, ≤3 summaries/run)
 node scripts/backfill-bills.js                      # dry run
 node scripts/backfill-bills.js --write [--summaries]
@@ -77,10 +78,16 @@ source_url (House Clerk XML), updatedAt
 Congress.gov's `house-vote` list ignores `sort` and is unordered, so the ingest pages
 through the whole congress and takes the newest by `startDate`.
 
-**`members`** — doc id = bioguideId
+**`members`** — doc id = bioguideId, written by `ingest-votes.js`
 ```
-bioguideId, name ("Last, First"), state, party, chamber, district, imageUrl, updatedAt
+bioguideId, name ("Last, First"), state ("WA"), state_name ("Washington"),
+party ("Democratic" | "Republican" | "Independent"), chamber ("House" | "Senate"),
+district (number, null/0 for senators and at-large), imageUrl (Congress.gov depiction or null),
+current (bool), updatedAt
 ```
+Synced from `/member?currentMember=true` (3 pages, ~539 incl. 6 delegates). Members no
+longer in that list are set `current: false`, never deleted; the UI queries
+`state ==` + `current == true`.
 
 ## Current state (as of 2026-11-10)
 
@@ -104,10 +111,7 @@ Pending / known issues:
 ## Next steps (in priority order)
 
 1. ~~Votes tab → `votes` collection.~~ Done; per-member positions belong in the detail modal (#4).
-2. **Members for all states.** `ingest-votes.js` only syncs WA, so CA/OR/NY/TX in the
-   dropdown are empty. Loop all states (or the dropdown's list), filter to current
-   members (Congress.gov `currentMember=true`), and expand the dropdown to 50 states.
-   Also switch `ingest-votes.js` to `netlify/lib/firebase.js`.
+2. ~~Members for all states.~~ Done (all states + delegates, current only, real photos).
 3. **Server-side ordering + pagination** for bills (`orderBy('update_date','desc')`,
    `startAfter` cursors). Safe once the backfill has run — docs missing the field
    would drop out of an orderBy query.

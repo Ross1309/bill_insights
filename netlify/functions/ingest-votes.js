@@ -1,28 +1,8 @@
-import admin from 'firebase-admin';
 import fetch from 'node-fetch';
+import { getDb, admin } from '../lib/firebase.js';
+import { STATE_CODES } from '../../public/states.js';
 
-if (!admin.apps.length) {
-  let serviceAccount;
-  const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT;
-
-  if (typeof rawKey === 'string' && rawKey.trim().startsWith('{')) {
-    serviceAccount = JSON.parse(rawKey);
-  } else if (typeof rawKey === 'object') {
-    serviceAccount = rawKey;
-  } else {
-    serviceAccount = JSON.parse(Buffer.from(rawKey, 'base64').toString('utf8'));
-  }
-
-  if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-  }
-
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-}
-
-const db = admin.firestore();
+const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
 const CONGRESS_NUM = 119;
 const API = 'https://api.congress.gov/v3';
@@ -56,8 +36,8 @@ export async function handler(event, context) {
   try {
     console.log("Starting Congressional backend data ingestion...");
 
-    // 1. Sync Members by State (e.g., WA)
-    await syncMembersByState("WA");
+    // 1. Sync all current members of Congress
+    await syncCurrentMembers();
 
     // 2. Fetch the most recent House roll-call votes
     const latest = await fetchLatestHouseVotes(VOTES_PER_RUN);
@@ -124,29 +104,61 @@ export async function handler(event, context) {
   }
 }
 
-async function syncMembersByState(stateCode) {
-  const url = `https://api.congress.gov/v3/member/${stateCode}?api_key=${CONGRESS_API_KEY}`;
-  const res = await fetch(url);
-  const data = await res.json();
+const CHAMBERS = { 'House of Representatives': 'House', 'Senate': 'Senate' };
 
-  const members = data.members || [];
-  const batch = db.batch();
+// Writes every sitting member (all states, plus non-voting delegates) and marks
+// members already in Firestore who are no longer serving as `current: false`.
+async function syncCurrentMembers() {
+  const members = [];
+  for (let offset = 0; ; offset += 250) {
+    const page = await getJson(`${API}/member?api_key=${CONGRESS_API_KEY}&format=json&currentMember=true&limit=250&offset=${offset}`);
+    const items = page.members || [];
+    members.push(...items);
+    if (items.length < 250 || members.length >= (page.pagination?.count ?? 0)) break;
+  }
+
+  const ops = [];
+  const currentIds = new Set();
+  const unknownStates = new Set();
 
   for (const m of members) {
     if (!m.bioguideId) continue;
-    const ref = db.collection("members").doc(m.bioguideId);
-    batch.set(ref, {
+    const state = STATE_CODES[m.state];
+    if (!state) unknownStates.add(m.state);
+
+    const terms = [...(m.terms?.item || [])].sort((a, b) => (a.startYear || 0) - (b.startYear || 0));
+    const latestChamber = terms.at(-1)?.chamber;
+
+    currentIds.add(m.bioguideId);
+    ops.push([db.collection("members").doc(m.bioguideId), {
       bioguideId: m.bioguideId,
-      name: m.name,
-      state: stateCode,
-      party: m.partyName,
-      chamber: m.terms?.item?.[m.terms?.item?.length - 1]?.chamber || "Unknown",
-      district: m.district || null,
-      imageUrl: `https://www.congress.gov/img/member/${m.bioguideId.toLowerCase()}.jpg`,
+      name: m.name || null,
+      state: state || null,
+      state_name: m.state || null,
+      party: m.partyName || null,
+      chamber: CHAMBERS[latestChamber] || latestChamber || null,
+      district: m.district ?? null,
+      imageUrl: m.depiction?.imageUrl || null,
+      current: true,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    }]);
   }
 
-  await batch.commit();
-  console.log(`Synced members for state: ${stateCode}`);
+  // Anyone stored earlier who isn't in the current list has left office.
+  const existing = await db.collection("members").select().get();
+  let retired = 0;
+  for (const doc of existing.docs) {
+    if (currentIds.has(doc.id)) continue;
+    ops.push([doc.ref, { current: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() }]);
+    retired++;
+  }
+
+  for (let i = 0; i < ops.length; i += 450) {
+    const batch = db.batch();
+    for (const [ref, data] of ops.slice(i, i + 450)) batch.set(ref, data, { merge: true });
+    await batch.commit();
+  }
+
+  if (unknownStates.size) console.warn(`Unmapped state names: ${[...unknownStates].join(', ')}`);
+  console.log(`Synced ${currentIds.size} current members; marked ${retired} as no longer serving.`);
 }

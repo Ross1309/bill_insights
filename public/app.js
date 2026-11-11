@@ -1,6 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
 import { getFirestore, collection, getDocs, query, where, limit, orderBy } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
+import { STATES, DELEGATE_JURISDICTIONS } from "./states.js";
+
 const firebaseConfig = {
     apiKey: "AIzaSyB53n86BTG9co1S8Ek0Acvx4onbzvXQD8Y",
     authDomain: "congress-watcher-b0dd3.firebaseapp.com",
@@ -34,6 +36,7 @@ let votesLoaded = false;
 let activeCategory = "all";
 
 async function init() {
+  populateStateSelect();
   setupTabs();
   setupStateListener();
   setupBillFilters();
@@ -45,7 +48,7 @@ function setupTabs() {
   navVotes.addEventListener("click", () => switchTab("votes"));
   navMembers.addEventListener("click", () => {
     switchTab("members");
-    fetchMembers(stateSelect ? stateSelect.value : "WA");
+    fetchMembers(stateSelect ? stateSelect.value : DEFAULT_STATE);
   });
 }
 
@@ -296,37 +299,96 @@ function renderVotes(votes) {
   `;
 }
 
+// --- Members (schema written by netlify/functions/ingest-votes.js) ---
+
+const DEFAULT_STATE = "WA";
+const STATE_NAMES = Object.fromEntries([...STATES, ...DELEGATE_JURISDICTIONS]);
+let membersRequest = 0;
+
+function populateStateSelect() {
+  if (!stateSelect) return;
+  const options = list => list.map(([code, name]) =>
+    `<option value="${code}"${code === DEFAULT_STATE ? " selected" : ""}>${escapeHtml(name)} (${code})</option>`).join("");
+  stateSelect.innerHTML = `
+    <optgroup label="States">${options(STATES)}</optgroup>
+    <optgroup label="Non-voting delegates">${options(DELEGATE_JURISDICTIONS)}</optgroup>
+  `;
+}
+
+const PARTY_BADGES = {
+  Democratic: "bg-blue-100 text-blue-800",
+  Republican: "bg-red-100 text-red-800",
+};
+
+// Senators first, then representatives by district.
+function memberSortKey(m) {
+  return [m.chamber === "Senate" ? 0 : 1, Number(m.district) || 0, m.name || ""];
+}
+
+function compareMembers(a, b) {
+  const ka = memberSortKey(a), kb = memberSortKey(b);
+  return ka[0] - kb[0] || ka[1] - kb[1] || ka[2].localeCompare(kb[2]);
+}
+
+function memberRole(m) {
+  if (m.chamber === "Senate") return "Senator";
+  if (m.chamber === "House") {
+    if (DELEGATE_JURISDICTIONS.some(([code]) => code === m.state)) {
+      return m.state === "PR" ? "Resident Commissioner" : "Delegate";
+    }
+    // Congress.gov leaves district empty (or 0) for at-large seats.
+    return m.district ? `Representative, District ${m.district}` : "Representative, At-large";
+  }
+  return m.chamber || "Chamber not available";
+}
+
+function memberPhoto(m) {
+  if (!m.imageUrl) {
+    return `<div class="w-16 h-20 rounded-lg bg-gray-100 border flex items-center justify-center text-xs text-gray-400 shrink-0">No photo</div>`;
+  }
+  return `<img src="${escapeHtml(m.imageUrl)}" alt="${escapeHtml(m.name || "")}" loading="lazy"
+    class="w-16 h-20 object-cover rounded-lg bg-gray-100 border shrink-0"
+    onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'w-16 h-20 rounded-lg bg-gray-100 border shrink-0'}))" />`;
+}
+
 async function fetchMembers(stateCode) {
+  const request = ++membersRequest;
+  const stateName = STATE_NAMES[stateCode] || stateCode;
   try {
     membersContainer.innerHTML = `
       <div class="text-center py-12">
         <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-4"></div>
-        <p class="text-gray-500">Loading members for ${stateCode}...</p>
+        <p class="text-gray-500">Loading members for ${escapeHtml(stateName)}...</p>
       </div>
     `;
 
-    const membersRef = collection(db, "members");
-    // Query Firestore filtering by state field
-    const q = query(membersRef, where("state", "==", stateCode), limit(50));
+    const q = query(collection(db, "members"), where("state", "==", stateCode), where("current", "==", true), limit(100));
     const snapshot = await getDocs(q);
+    if (request !== membersRequest) return; // a newer state was selected meanwhile
 
     if (snapshot.empty) {
-      membersContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No members found for ${stateCode}.</p>`;
+      membersContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No current members found for ${escapeHtml(stateName)}.</p>`;
       return;
     }
 
-    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(compareMembers);
     membersContainer.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         ${members.map(m => `
-          <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 class="font-bold text-gray-900 text-lg">${escapeHtml(m.name || m.fullName || 'Member')}</h3>
-            <p class="text-sm text-gray-500">${escapeHtml(m.state || '')} — <span class="font-medium text-blue-600">${escapeHtml(m.party || '')}</span></p>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            ${memberPhoto(m)}
+            <div class="min-w-0">
+              ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
+              <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
+              <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}</p>
+            </div>
           </div>
-        `).join('')}
+        `).join("")}
       </div>
+      <p class="text-xs text-gray-400 mt-4">${members.length} current member${members.length === 1 ? "" : "s"} · Source: Congress.gov</p>
     `;
   } catch (err) {
+    if (request !== membersRequest) return;
     console.error("Error fetching members:", err);
     membersContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load members: ${escapeHtml(err.message)}</p>`;
   }
