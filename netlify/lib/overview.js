@@ -31,6 +31,10 @@ export async function writeOverviewStats(db, admin, { congress } = {}) {
   const members = dir.exists ? dir.data().members || [] : [];
 
   const overview = computeOverview(votes, members, { congress });
+  // Header card totals (all Congresses), so the page needn't run count queries per visit.
+  const [billCount, voteCount] = await Promise.all(['bills', 'votes'].map(c => db.collection(c).count().get().then(s => s.data().count)));
+  overview.headline.bills = billCount;
+  overview.headline.votes = voteCount;
   const now = admin.firestore.FieldValue.serverTimestamp();
   await db.collection('stats').doc('overview').set({ ...overview, votes_without_party_breakdown: missing, generated_at: now });
 

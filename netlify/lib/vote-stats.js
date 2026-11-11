@@ -87,6 +87,21 @@ function nextMonth(ym) {
 
 const CHAMBERS = ['House', 'Senate'];
 const DELEGATE_CODES = new Set(['DC', 'PR', 'GU', 'VI', 'AS', 'MP']);
+
+// Header cards: current members per seat type with party split (party names as in
+// `members`, e.g. { Republican: 53, Democratic: 45, Independent: 2 }).
+export function headlineCounts(members) {
+  const out = { senate: { count: 0, parties: {} }, house: { count: 0, parties: {} }, delegates: { count: 0, parties: {} } };
+  for (const m of members || []) {
+    const seat = m.chamber === 'Senate' ? out.senate
+      : m.chamber === 'House' ? (DELEGATE_CODES.has(m.state) ? out.delegates : out.house) : null;
+    if (!seat) continue;
+    seat.count++;
+    const p = m.party || 'Unknown';
+    seat.parties[p] = (seat.parties[p] || 0) + 1;
+  }
+  return out;
+}
 const PARTY_ABBR = { Democratic: 'D', Republican: 'R', Independent: 'I' };
 
 // Build the overview from lightweight vote fields + the member directory.
@@ -148,6 +163,7 @@ export function computeOverview(votes, members, { congress } = {}) {
 
   return {
     congress: congress ?? null,
+    headline: headlineCounts(members),
     first_vote_date: dated[0]?.date || null,
     last_vote_date: dated.at(-1)?.date || null,
     totals,

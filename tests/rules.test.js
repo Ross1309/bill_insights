@@ -109,3 +109,16 @@ test('explainQuestion: concur vs concurrent, cloture vs motion to proceed', () =
   assert.match(explainQuestion('On the Motion to Proceed'), /start debating/);
   assert.match(explainQuestion('On the Nomination'), /confirm/);
 });
+
+test('headlineCounts: seat types and party split', async () => {
+  const { headlineCounts } = await import('../netlify/lib/vote-stats.js');
+  const h = headlineCounts([
+    { chamber: 'Senate', party: 'Republican', state: 'TX' },
+    { chamber: 'Senate', party: 'Independent', state: 'VT' },
+    { chamber: 'House', party: 'Democratic', state: 'WA' },
+    { chamber: 'House', party: 'Democratic', state: 'DC' },
+  ]);
+  assert.deepEqual(h.senate, { count: 2, parties: { Republican: 1, Independent: 1 } });
+  assert.deepEqual(h.house, { count: 1, parties: { Democratic: 1 } });
+  assert.equal(h.delegates.count, 1);
+});

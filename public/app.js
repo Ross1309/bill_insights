@@ -94,10 +94,17 @@ function setupIssues() {
 }
 
 // --- Overview tab: one small precomputed doc (stats/overview) ------------------
+// Shared by the Overview tab and the header cards (one read per visit).
+let overviewDocPromise = null;
+function getOverviewDoc() {
+  overviewDocPromise ??= getDoc(doc(db, "stats", "overview")).catch(err => { overviewDocPromise = null; throw err; });
+  return overviewDocPromise;
+}
+
 async function loadOverview() {
   const container = document.getElementById("overview-container");
   try {
-    const snap = await getDoc(doc(db, "stats", "overview"));
+    const snap = await getOverviewDoc();
     if (!snap.exists()) {
       container.innerHTML = `<p class="text-center text-gray-500 py-12">The overview hasn't been built yet.</p>`;
       return;
@@ -155,7 +162,7 @@ async function init() {
   setupIssues();
   loadHeadlineStats();
   loadHealth();
-  await loadBills({ reset: true });
+  // Bills load when their tab is first opened (Overview is the default tab).
 }
 
 function setupTabs() {
@@ -182,6 +189,7 @@ function switchTab(tabName) {
     view.classList.toggle("hidden", !active);
   }
   if (tabName === "votes" && !votesLoaded) fetchVotes();
+  if (tabName === "bills" && !billsStarted) { billsStarted = true; loadBills({ reset: true }); }
   if (tabName === "overview" && !overviewLoaded) loadOverview();
   if (tabName === "issues" && !issueLoaded) loadIssue(currentIssue);
   // If the sticky tab bar is pinned (scrolled past the header), start the new tab
@@ -198,6 +206,7 @@ let billsCursor = null;     // last doc of the most recent page
 let billsExhausted = false;
 let billsLoading = false;
 let billsGeneration = 0;    // bumps on category change so stale pages are dropped
+let billsStarted = false;   // first page is requested when the Bills tab opens
 let billsError = null;      // message shown instead of bills until the next reset
 
 function rememberBills(bills) {
@@ -865,17 +874,30 @@ function setupMemberFilters() {
 async function loadHeadlineStats() {
   const el = document.getElementById("headline-stats");
   if (!el) return;
-  const [dir, bills, votes] = await Promise.allSettled([
-    loadDirectory(),
-    getCountFromServer(collection(db, "bills")),
-    getCountFromServer(collection(db, "votes")),
-  ]);
+  // Normally all from stats/overview `headline` (rebuilt nightly; already read for the
+  // Overview tab). Older stats docs without it: directory doc + count queries.
+  const h = await getOverviewDoc().then(s => s.data()?.headline).catch(() => null);
+  const [dir, bills, votes] = h
+    ? [{ status: "rejected" }, { status: "rejected" }, { status: "rejected" }]
+    : await Promise.allSettled([
+        loadDirectory(),
+        getCountFromServer(collection(db, "bills")),
+        getCountFromServer(collection(db, "votes")),
+      ]);
 
-  const split = list => {
-    const c = {};
-    for (const m of list) c[PARTY_ABBR[m.party] || m.party || "?"] = (c[PARTY_ABBR[m.party] || m.party || "?"] || 0) + 1;
-    return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${n} ${p}`).join(" · ");
-  };
+  const split = counts => Object.entries(counts || {}).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${n} ${PARTY_ABBR[p] || p}`).join(" · ");
+  const seat = list => ({ count: list.length, parties: list.reduce((c, m) => ({ ...c, [m.party || "?"]: (c[m.party || "?"] || 0) + 1 }), {}) });
+  let seats = h;
+  if (!h && dir.status === "fulfilled") {
+    const all = dir.value.members;
+    seats = {
+      senate: seat(all.filter(m => m.chamber === "Senate")),
+      house: seat(all.filter(m => m.chamber === "House" && !isDelegate(m))),
+      delegates: seat(all.filter(m => m.chamber === "House" && isDelegate(m))),
+    };
+  }
+  const billCount = h ? h.bills : bills.status === "fulfilled" ? bills.value.data().count : null;
+  const voteCount = h ? h.votes : votes.status === "fulfilled" ? votes.value.data().count : null;
   const card = (value, label, detail, action) => `
     <${action ? `button type="button" data-headline="${action}"` : "div"}
       class="flex flex-col items-start justify-start text-left bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3${action ? " hover:bg-white/10 hover:border-pink/60 focus:outline-none focus:ring-2 focus:ring-pink transition" : ""}">
@@ -885,17 +907,14 @@ async function loadHeadlineStats() {
     </${action ? "button" : "div"}>`;
 
   const cards = [];
-  if (dir.status === "fulfilled") {
-    const all = dir.value.members;
-    const senate = all.filter(m => m.chamber === "Senate");
-    const house = all.filter(m => m.chamber === "House" && !isDelegate(m));
-    const delegates = all.filter(m => m.chamber === "House" && isDelegate(m));
-    cards.push(card(senate.length, "Senators", split(senate), "Senate"));
-    cards.push(card(house.length, "Representatives", `${house.length < 435 ? `${435 - house.length} of 435 seats vacant · ` : ""}${split(house)}`, "House"));
-    cards.push(card(delegates.length, "Delegates", "Non-voting: DC, PR and territories", "Delegates"));
+  if (seats) {
+    const { senate, house, delegates } = seats;
+    cards.push(card(senate.count, "Senators", split(senate.parties), "Senate"));
+    cards.push(card(house.count, "Representatives", `${house.count < 435 ? `${435 - house.count} of 435 seats vacant · ` : ""}${split(house.parties)}`, "House"));
+    cards.push(card(delegates.count, "Delegates", "Non-voting: DC, PR and territories", "Delegates"));
   }
-  if (bills.status === "fulfilled") cards.push(card(bills.value.data().count, "Bills tracked", "Synced from Congress.gov"));
-  if (votes.status === "fulfilled") cards.push(card(votes.value.data().count, "Roll-call votes", "House + Senate, synced"));
+  if (billCount != null) cards.push(card(billCount, "Bills tracked", "Synced from Congress.gov"));
+  if (voteCount != null) cards.push(card(voteCount, "Roll-call votes", "House + Senate, synced"));
   el.innerHTML = cards.join("");
   if (!el.dataset.wired) {
     el.dataset.wired = "1";
