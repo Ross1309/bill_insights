@@ -3,8 +3,8 @@
 //   node scripts/backfill-bills.js            # dry run: shows what would change
 //   node scripts/backfill-bills.js --write    # apply metadata fixes
 //   node scripts/backfill-bills.js --write --summaries
-//                                            # also regenerate unlabeled/title-only
-//                                            # AI summaries (calls OpenAI)
+//                                            # also summarize from CRS where available
+//                                            # (calls OpenAI); no CRS -> no AI summary
 //
 // For every doc in `bills` it:
 //   - removes the placeholder fields (outcome, vote_counts, date_voted)
@@ -17,10 +17,8 @@ import {
   FABRICATED_FIELDS,
   billMetadata,
   fetchBillDetail,
-  fetchLatestCrsSummary,
-  generateSummary,
-  needsSummary,
   parseBillId,
+  summaryUpdate,
 } from '../netlify/lib/bills.js';
 
 const WRITE = process.argv.includes('--write');
@@ -59,13 +57,15 @@ async function main() {
 
       let summaryNote = '';
       if (SUMMARIES && data.ai_summary?.source !== 'crs_summary') {
-        const crs = await fetchLatestCrsSummary(ids.congress, ids.type, ids.number, CONGRESS_API_KEY).catch(() => null);
-        if (needsSummary(data.ai_summary, Boolean(crs))) {
-          summaryNote = ` | summary: ${crs ? 'from CRS' : 'title only'}`;
-          if (WRITE) {
-            const summary = await generateSummary({ title: meta.title, crsSummary: crs }, OPENAI_API_KEY);
-            if (summary) { update.ai_summary = summary; counts.summarized++; }
-          }
+        if (WRITE) {
+          const result = await summaryUpdate(meta, data.ai_summary, {
+            congressKey: CONGRESS_API_KEY, openaiKey: OPENAI_API_KEY, deleteField: () => FieldValue.delete(),
+          });
+          Object.assign(update, result.fields);
+          if (result.generated) counts.summarized++;
+          summaryNote = ` | summary: ${result.status}`;
+        } else {
+          summaryNote = ' | summary: would check CRS';
         }
       }
 

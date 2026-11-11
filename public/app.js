@@ -172,10 +172,19 @@ const SUMMARY_SOURCE_LABELS = {
   title_only: 'AI summary from the title only — no official summary yet',
 };
 
+// Why a bill has no plain-language summary. Summaries are only written from the
+// official CRS summary, never guessed from the title.
+function noSummaryText(bill) {
+  if (bill?.crs_summary_available === false) {
+    return "No official summary yet. The Congressional Research Service hasn't published one for this bill; a plain-language summary will appear once it does.";
+  }
+  return "Not summarized yet.";
+}
+
 function renderSummary(bill) {
   const points = bill.ai_summary?.bullet_points;
   if (!points || points.length === 0) {
-    return `<p class="text-gray-500 text-sm italic">Summary pending.</p>`;
+    return `<p class="text-gray-500 text-sm">${escapeHtml(noSummaryText(bill))}</p>`;
   }
   const label = SUMMARY_SOURCE_LABELS[bill.ai_summary.source] || 'AI-generated summary';
   return `
@@ -1213,7 +1222,7 @@ const billModal = {
           <ul class="list-disc pl-5 space-y-1 text-gray-700 text-sm mt-2">${b.ai_summary.bullet_points.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
           <p class="text-[11px] text-gray-400 mt-1">${escapeHtml(SUMMARY_SOURCE_LABELS[b.ai_summary.source] || "AI-generated summary")}</p>
         </section>`
-        : `<p class="text-xs text-gray-400 mt-5">No plain-language AI summary yet${b ? "" : " (this bill hasn't been synced)"}.</p>`;
+        : `<p class="text-xs text-gray-400 mt-5">${b ? escapeHtml(noSummaryText(b)) : "No plain-language summary: this bill hasn't been synced to Congress Watcher."}</p>`;
       const crs = d?.crsSummary ? `
         <section class="mt-5">
           <h3 class="text-sm font-bold text-gray-900">Official summary <span class="font-normal text-gray-500">(Congressional Research Service${d.crsSummary.version ? `, ${escapeHtml(d.crsSummary.version)}` : ""})</span></h3>

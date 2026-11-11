@@ -10,8 +10,14 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
   and show "pending"/"not available" in the UI. (Earlier versions wrote fake
   `outcome: 'Passed'` / `vote_counts: {yea: 218, nay: 205}` on every bill — that was
   removed; don't reintroduce anything like it.)
-- AI summaries must be neutral, stick to the source text, and carry their source
-  (`ai_summary.source`: `crs_summary` or `title_only`) so the UI can label them.
+- AI summaries must be neutral, stick to the source text, and carry their source.
+  **Policy (2026-11-10): summaries are generated only from the official CRS summary**
+  (`ai_summary.source: "crs_summary"`). No CRS summary -> no AI summary. The bill gets
+  `crs_summary_available: false` and the UI says CRS hasn't published one yet. Title-only
+  summaries speculated, so they were removed; don't reintroduce them. All of this goes
+  through `summaryUpdate()` in `netlify/lib/bills.js`.
+  Bills before the 93rd Congress (1973) are treated as having no CRS summary (none exist,
+  and Congress.gov's summaries endpoint 500s for them).
 - Never commit `.env` (Firebase service account + OpenAI key). It's in `.gitignore`.
 
 ## Stack
@@ -37,6 +43,7 @@ netlify/lib/senate-votes.js        senate.gov LIS XML -> `votes` docs (menu, vot
 netlify/lib/house-votes.js         Congress.gov House votes -> `votes` docs (list + build doc)
 scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
 scripts/import-bills.js            Backfill the N most recently updated bills (resumable)
+scripts/summarize-bills.js         CRS-based AI summaries for stored bills (resumable)
 netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
@@ -63,6 +70,7 @@ node scripts/backfill-bills.js                      # dry run
 node scripts/backfill-bills.js --write [--summaries]
 node scripts/import-votes.js [--write] [--chamber house|senate] [--congress 118] [--limit N]
 node scripts/import-bills.js [--write] [--limit 2000]
+node scripts/summarize-bills.js [--write] [--limit N] [--recheck-days 3]
 ```
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
@@ -79,7 +87,8 @@ title, chamber, policy_area (CRS name or null),
 category ("Economy" | "Healthcare" | "Foreign Affairs" | "Other" | "Uncategorized"),
 introduced_date, update_date, latestAction { actionDate, text },
 congress_gov_url,
-ai_summary { bullet_points[], source: "crs_summary"|"title_only", model, generated_at },
+ai_summary { bullet_points[], source: "crs_summary", model, generated_at } (or absent),
+crs_summary_available (bool, absent = never checked), crs_checked_at (ISO),
 synced_at
 ```
 
@@ -139,8 +148,6 @@ party breakdown, bill link (own bill data or Congress.gov), House Clerk source l
 Backfill has been run (verified 2026-11-10: no fake fields, all summaries sourced).
 
 Pending / known issues:
-- Title-only AI summaries can still speculate despite the prompt (e.g. HRES 1650: "It is
-  likely to affect…"). Tighten the prompt or skip AI summaries until a CRS summary exists.
 - `sync-bills.js` must stay under Netlify's function timeout: detail fetches run in
   parallel and AI summaries are capped at 3 per run.
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
@@ -312,13 +319,17 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
   `ingest-votes` uses only the current file, so a senator who leaves later can show
   unlinked on new votes. Re-run `import-votes.js --write --chamber senate` to fix.
 - `import-bills.js --write` loaded the 2,000 most recently updated bills (metadata only).
-  Backfilled bills have no AI summary ("Summary pending") until something generates one;
-  `sync-bills` only summarizes new bills (≤3/run). Extend with `--limit` (19,863 bills in
-  the 119th; >20k Firestore writes/day can exceed the free tier).
+  Extend with `--limit` (19,863 bills in the 119th; >20k Firestore writes/day can exceed
+  the free tier). Then run `scripts/summarize-bills.js --write`.
+- `summarize-bills.js --write` checked all 1,994 stored bills: 987 now have a CRS-based
+  AI summary (gpt-4o-mini, well under $1 total); 1,007 are marked
+  `crs_summary_available: false`. `sync-bills` re-checks up to 5 waiting bills per run
+  (oldest check first, at most every 3 days) within its 3-summary budget.
 
 ### Proposed next
 - Deploy and verify on Netlify: env vars, every function, and `ingest-votes` runtime vs the
   10s limit (split members / House / Senate into separate functions if needed).
 - Schedule the syncs (Netlify scheduled functions) for `sync-bills` and `ingest-votes`.
 - Voting Record scaling: `voter_ids` array + `array-contains` query (see Detail modals).
-- Title-only AI summaries still speculate (see Pending).
+- Waiting bills only get re-checked 5 per sync run; with ~1,000 waiting, run
+  `summarize-bills.js --write` occasionally (or schedule it) to catch new CRS summaries.

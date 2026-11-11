@@ -1,23 +1,24 @@
 // Syncs the most recently updated bills from Congress.gov into Firestore.
 //
 // For each bill it stores real metadata (type, number, policy area, latest action)
-// and, for up to MAX_SUMMARIES bills per run, a plain-language AI summary based on
-// the official CRS summary when one exists.
+// and, for up to MAX_SUMMARIES bills per run, a plain-language AI summary of the
+// official CRS summary. Bills without one are marked crs_summary_available: false;
+// a few of those are re-checked each run so summaries appear once CRS publishes.
 
 import { getDb, admin } from '../lib/firebase.js';
 import {
   FABRICATED_FIELDS,
   billMetadata,
   fetchBillDetail,
-  fetchLatestCrsSummary,
   fetchRecentBills,
-  generateSummary,
   makeBillId,
-  needsSummary,
+  summaryUpdate,
 } from '../lib/bills.js';
 
 const BILLS_PER_RUN = 10;
 const MAX_SUMMARIES = 3; // keeps each run inside Netlify's function timeout
+const RECHECK_PER_RUN = 5; // waiting bills re-checked for a new CRS summary
+const RECHECK_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -37,6 +38,7 @@ export default async () => {
   try {
     const db = getDb();
     const { FieldValue } = admin.firestore;
+    const keys = { congressKey: CONGRESS_API_KEY, openaiKey: OPENAI_API_KEY, deleteField: () => FieldValue.delete() };
 
     const billsList = (await fetchRecentBills(CONGRESS_API_KEY, BILLS_PER_RUN))
       .filter(item => item.type && item.number && item.congress);
@@ -68,26 +70,36 @@ export default async () => {
       const update = { ...meta, synced_at: FieldValue.serverTimestamp() };
       for (const field of FABRICATED_FIELDS) update[field] = FieldValue.delete();
 
-      if (summarized < MAX_SUMMARIES && existingSummary?.source !== 'crs_summary') {
-        const crsSummary = await fetchLatestCrsSummary(meta.congress, meta.type, meta.number, CONGRESS_API_KEY)
-          .catch(() => null);
-
-        if (needsSummary(existingSummary, Boolean(crsSummary))) {
-          const summary = await generateSummary({ title: meta.title, crsSummary }, OPENAI_API_KEY);
-          if (summary) {
-            update.ai_summary = summary;
-            summarized++;
-          }
-        }
+      if (summarized < MAX_SUMMARIES) {
+        const result = await summaryUpdate(meta, existingSummary, keys);
+        Object.assign(update, result.fields);
+        if (result.generated) summarized++;
       }
 
       await billRef.set(update, { merge: true });
       updated++;
     }
 
+    // Backlog: re-check a few bills still waiting for a CRS summary.
+    let rechecked = 0;
+    if (summarized < MAX_SUMMARIES) {
+      const recent = new Set(billsList.map(item => makeBillId(item.type, item.number, item.congress)));
+      const waiting = (await db.collection('bills').where('crs_summary_available', '==', false).limit(100).get()).docs
+        .filter(d => !recent.has(d.id) && Date.now() - Date.parse(d.data().crs_checked_at || 0) > RECHECK_AFTER_MS)
+        .sort((a, b) => (a.data().crs_checked_at || '').localeCompare(b.data().crs_checked_at || ''))
+        .slice(0, RECHECK_PER_RUN);
+      for (const d of waiting) {
+        if (summarized >= MAX_SUMMARIES) break;
+        const result = await summaryUpdate(d.data(), d.data().ai_summary, keys);
+        if (Object.keys(result.fields).length) await d.ref.set(result.fields, { merge: true });
+        if (result.generated) summarized++;
+        rechecked++;
+      }
+    }
+
     return json({
       success: true,
-      message: `Synced ${updated} bills; generated ${summarized} new summaries.`,
+      message: `Synced ${updated} bills; re-checked ${rechecked} waiting bills; generated ${summarized} new summaries.`,
       bills_found_in_api: billsList.length,
     });
   } catch (err) {

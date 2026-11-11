@@ -132,17 +132,17 @@ export function billMetadata(detail = {}, fallback = {}) {
 
 // Plain-language summary from the official CRS summary when one exists,
 // otherwise from the title only (and labeled as such). Returns null on failure.
+// Plain-language summary of the official CRS summary. Policy: no CRS summary ->
+// no AI summary (title-only summaries speculated), so `crsSummary` is required.
 export async function generateSummary({ title, crsSummary }, openaiKey) {
-  const source = crsSummary ? 'crs_summary' : 'title_only';
-  const context = crsSummary
-    ? `Official Congressional Research Service summary:\n${crsSummary.slice(0, 6000)}`
-    : 'No official summary is available yet; only the title is known.';
+  if (!crsSummary) return null;
+  const source = 'crs_summary';
+  const context = `Official Congressional Research Service summary:\n${crsSummary.slice(0, 6000)}`;
 
   const prompt = [
     'You write neutral, non-partisan, plain-language explanations of U.S. legislation.',
     'Using only the information below, give exactly 3 concise bullet points on what this bill would do and who it would affect.',
     'Do not speculate beyond the text, and do not describe the bill as good or bad.',
-    'If only the title is available, say only what the title indicates.',
     'Respond with one bullet per line in plain text, with no markdown formatting.',
     '',
     `Title: ${title}`,
@@ -181,13 +181,35 @@ export async function generateSummary({ title, crsSummary }, openaiKey) {
   };
 }
 
-// Decide whether a bill needs a (re)generated summary.
-//  - no summary yet                     -> generate
-//  - legacy summary (no `source` field) -> regenerate (was title-only, unlabeled)
-//  - title_only and a CRS summary now exists -> upgrade
-export function needsSummary(existing, crsSummaryAvailable) {
-  if (!existing?.bullet_points?.length) return true;
-  if (!existing.source) return true;
-  if (existing.source === 'title_only' && crsSummaryAvailable) return true;
-  return false;
+// Summary fields to write for one bill (CRS-only policy):
+//  - already has a CRS-based summary         -> nothing to do
+//  - CRS summary exists                      -> generate from it
+//  - no CRS summary yet                      -> mark crs_summary_available: false (and
+//                                               drop any old title-only/legacy summary)
+//  - CRS or OpenAI request failed            -> nothing written; retried next time
+// `deleteField` is admin.firestore.FieldValue.delete().
+export async function summaryUpdate(bill, existingSummary, { congressKey, openaiKey, deleteField }) {
+  if (existingSummary?.source === 'crs_summary') return { fields: {}, generated: false, status: 'has_summary' };
+
+  let crs;
+  try {
+    // CRS bill summaries start with the 93rd Congress (1973); older records (which
+    // Congress.gov sometimes re-touches) have none, and their endpoint can error.
+    crs = Number(bill.congress) < 93
+      ? null
+      : await fetchLatestCrsSummary(bill.congress, bill.type, bill.number, congressKey);
+  } catch (err) {
+    return { fields: {}, generated: false, status: 'error', error: err.message };
+  }
+  const checked = { crs_checked_at: new Date().toISOString() };
+
+  if (!crs) {
+    const fields = { ...checked, crs_summary_available: false };
+    if (existingSummary) fields.ai_summary = deleteField();
+    return { fields, generated: false, status: 'no_crs' };
+  }
+
+  const summary = await generateSummary({ title: bill.title, crsSummary: crs }, openaiKey);
+  if (!summary) return { fields: {}, generated: false, status: 'error', error: 'OpenAI request failed' };
+  return { fields: { ...checked, crs_summary_available: true, ai_summary: summary }, generated: true, status: 'generated' };
 }
