@@ -29,6 +29,7 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
 ```
 public/index.html, public/app.js   UI (no build step)
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
+firestore.indexes.json             Composite indexes the UI's queries need
 netlify/functions/sync-votes.js    Syncs recent BILLS (name is historical) + AI summaries
 netlify/functions/ingest-votes.js  Syncs all current members + 5 latest House roll-call votes
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
@@ -101,6 +102,9 @@ party breakdown, bill link (own bill data or Congress.gov), House Clerk source l
 Backfill has been run (verified 2026-11-10: no fake fields, all summaries sourced).
 
 Pending / known issues:
+- **Firestore index not created yet** (category ASC, update_date DESC on `bills`), so
+  category buttons show an error. Create it from the link in the browser console error or
+  with `firebase deploy --only firestore:indexes`.
 - Legacy vote docs with ids `119-house-vote-{315..319}` (pre-session ids) duplicate the
   new `119-2-house-vote-*` docs and should be deleted.
 - `sync-votes.js` must stay under Netlify's function timeout: detail fetches run in
@@ -108,12 +112,22 @@ Pending / known issues:
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
 
+## Bills paging (frontend)
+
+- `loadBills` queries `bills` with `orderBy('update_date','desc')`, 12 per page,
+  `startAfter(lastDoc)` cursors behind a "Load more bills" button.
+- Category buttons filter in the query (`where('category','==',…)`), which needs the
+  composite index (category ASC, update_date DESC) in `firestore.indexes.json`. Without
+  it the UI shows "Category filtering isn't available yet".
+- Search filters only the loaded pages (Firestore has no text search). Bill-number terms
+  ("HR 1234", "H.R. 1234", "1234") also do an exact `number`/`type` lookup across the
+  whole collection.
+- `billCache` holds every bill seen; the Votes tab uses it to label bills.
+
 ## Next steps (in priority order)
 
 1. ~~Votes tab → `votes` collection.~~ Done; per-member positions belong in the detail modal (#4).
 2. ~~Members for all states.~~ Done (all states + delegates, current only, real photos).
-3. **Server-side ordering + pagination** for bills (`orderBy('update_date','desc')`,
-   `startAfter` cursors). Safe once the backfill has run — docs missing the field
-   would drop out of an orderBy query.
+3. ~~Server-side ordering + pagination~~ Done (see Bills paging below).
 4. **Detail modal** per bill/vote (full summary, actions, how each member voted).
 5. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).

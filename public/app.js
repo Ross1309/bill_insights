@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, limit, orderBy } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, limit, orderBy, startAfter } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 import { STATES, DELEGATE_JURISDICTIONS } from "./states.js";
 
@@ -17,6 +17,7 @@ const db = getFirestore(app);
 
 // DOM Elements
 const billsContainer = document.getElementById("bills-container");
+const billsMore = document.getElementById("bills-more");
 const votesContainer = document.getElementById("votes-container");
 const membersContainer = document.getElementById("members-container");
 const searchInput = document.getElementById("search-input");
@@ -31,7 +32,10 @@ const viewBills = document.getElementById("view-bills");
 const viewVotes = document.getElementById("view-votes");
 const viewMembers = document.getElementById("view-members");
 
+// Bills loaded for the active category, newest update first (one or more pages).
 let allBills = [];
+// Every bill seen this session, by id (used to label votes with bill titles).
+const billCache = new Map();
 let votesLoaded = false;
 let activeCategory = "all";
 
@@ -40,7 +44,7 @@ async function init() {
   setupTabs();
   setupStateListener();
   setupBillFilters();
-  await fetchBills();
+  await loadBills({ reset: true });
 }
 
 function setupTabs() {
@@ -79,26 +83,83 @@ function switchTab(tabName) {
   }
 }
 
-async function fetchBills() {
+// --- Bills: server-side ordering + cursor pagination ---
+
+const BILLS_PAGE_SIZE = 12;
+let billsCursor = null;     // last doc of the most recent page
+let billsExhausted = false;
+let billsLoading = false;
+let billsGeneration = 0;    // bumps on category change so stale pages are dropped
+let billsError = null;      // message shown instead of bills until the next reset
+
+function rememberBills(bills) {
+  for (const bill of bills) billCache.set(bill.id, bill);
+}
+
+async function loadBills({ reset = false } = {}) {
+  if (reset) {
+    billsGeneration++;
+    allBills = [];
+    billsCursor = null;
+    billsExhausted = false;
+    billsLoading = false;
+    billsError = null;
+    billsContainer.innerHTML = `
+      <div class="text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-4"></div>
+        <p class="text-gray-500">Loading bills...</p>
+      </div>`;
+    billsMore.innerHTML = "";
+  }
+  if (billsLoading || billsExhausted) return;
+
+  const generation = billsGeneration;
+  billsLoading = true;
+  renderLoadMore();
+
   try {
-    const billsRef = collection(db, "bills");
-    const q = query(billsRef, limit(50));
-    const snapshot = await getDocs(q);
+    // Category filtering happens in the query so every page is full; this
+    // needs the (category ASC, update_date DESC) index in firestore.indexes.json.
+    const constraints = [];
+    if (activeCategory !== "all") constraints.push(where("category", "==", activeCategory));
+    constraints.push(orderBy("update_date", "desc"));
+    if (billsCursor) constraints.push(startAfter(billsCursor));
+    constraints.push(limit(BILLS_PAGE_SIZE));
 
-    if (snapshot.empty) {
-      billsContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No bills found in database.</p>`;
-      return;
-    }
+    const snapshot = await getDocs(query(collection(db, "bills"), ...constraints));
+    if (generation !== billsGeneration) return;
 
-    allBills = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .sort((a, b) => billDate(b).localeCompare(billDate(a)));
-
+    const page = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    rememberBills(page);
+    allBills.push(...page);
+    billsCursor = snapshot.docs.at(-1) || billsCursor;
+    billsExhausted = snapshot.docs.length < BILLS_PAGE_SIZE;
+    billsLoading = false;
     applyBillFilters();
   } catch (err) {
+    if (generation !== billsGeneration) return;
+    billsLoading = false;
     console.error("Error fetching bills:", err);
-    billsContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load bills: ${escapeHtml(err.message)}</p>`;
+    billsError = err.code === "failed-precondition" && activeCategory !== "all"
+      ? "Category filtering isn't available yet: the Firestore index in firestore.indexes.json hasn't been created."
+      : `Failed to load bills: ${err.message}`;
+    applyBillFilters();
   }
+}
+
+function renderLoadMore() {
+  if (billsExhausted && !billsLoading) {
+    billsMore.innerHTML = allBills.length
+      ? `<p class="text-xs text-gray-400">All ${allBills.length} bills loaded.</p>`
+      : "";
+    return;
+  }
+  billsMore.innerHTML = `
+    <button id="bills-load-more" ${billsLoading ? "disabled" : ""}
+      class="px-4 py-2 text-sm font-semibold rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 shadow-sm">
+      ${billsLoading ? "Loading…" : "Load more bills"}
+    </button>`;
+  document.getElementById("bills-load-more").addEventListener("click", () => loadBills());
 }
 
 // --- Bill field helpers (schema written by netlify/functions/sync-votes.js) ---
@@ -107,10 +168,6 @@ function billLabel(bill) {
   if (bill.bill_number) return bill.bill_number;
   if (bill.type || bill.number) return `${bill.type || ''} ${bill.number || ''}`.trim();
   return 'BILL';
-}
-
-function billDate(bill) {
-  return bill.latestAction?.actionDate || bill.update_date || '';
 }
 
 const SUMMARY_SOURCE_LABELS = {
@@ -132,13 +189,16 @@ function renderSummary(bill) {
   `;
 }
 
-function renderBills(bills) {
+function renderBills(bills, term = "") {
+  const scopeNote = term && !billsExhausted
+    ? `<p class="text-xs text-gray-400 mb-4">Searching the ${allBills.length} bills loaded so far (bill numbers are searched across all bills). Load more to search further.</p>`
+    : "";
   if (bills.length === 0) {
-    billsContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No matching bills found.</p>`;
+    billsContainer.innerHTML = scopeNote + `<p class="text-center text-gray-500 py-12">${allBills.length ? "No matching bills found." : "No bills found."}</p>`;
     return;
   }
 
-  billsContainer.innerHTML = `
+  billsContainer.innerHTML = scopeNote + `
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       ${bills.map(bill => `
         <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
@@ -191,7 +251,7 @@ function ordinal(n) {
 // otherwise straight to Congress.gov.
 function voteBillInfo(vote) {
   if (!vote.bill_id) return null;
-  const bill = allBills.find(b => b.id === vote.bill_id);
+  const bill = billCache.get(vote.bill_id);
   const m = /^([a-z]+)(\d+)-(\d+)$/.exec(vote.bill_id);
   const fallbackUrl = m && BILL_TYPE_SLUGS[m[1]]
     ? `https://www.congress.gov/bill/${ordinal(Number(m[3]))}-congress/${BILL_TYPE_SLUGS[m[1]]}/${m[2]}`
@@ -404,11 +464,17 @@ function escapeHtml(str) {
 
 function setupBillFilters() {
   if (searchInput) {
-    searchInput.addEventListener("input", applyBillFilters);
+    let debounce;
+    searchInput.addEventListener("input", () => {
+      applyBillFilters();
+      clearTimeout(debounce);
+      debounce = setTimeout(lookupBillNumber, 300);
+    });
   }
 
   document.querySelectorAll("#category-filters .filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {
+      if (btn.dataset.category === activeCategory) return;
       activeCategory = btn.dataset.category;
       document.querySelectorAll("#category-filters .filter-btn").forEach(b => {
         const active = b === btn;
@@ -418,26 +484,73 @@ function setupBillFilters() {
         b.classList.toggle("text-gray-700", !active);
         b.classList.toggle("hover:bg-gray-300", !active);
       });
-      applyBillFilters();
+      loadBills({ reset: true });
     });
   });
 }
 
+// "HR 1234", "hr1234", "H.R. 1234" or "1234" -> { type: "HR" | null, number: "1234" }
+function parseBillNumberTerm(term) {
+  const m = /^([a-z.]*)\s*(\d+)$/.exec(term.trim().toLowerCase());
+  if (!m) return null;
+  const type = m[1].replace(/\./g, "").toUpperCase();
+  return { type: type || null, number: String(Number(m[2])) };
+}
+
+// Search can only scan loaded pages (Firestore has no text search), but bill
+// numbers are exact fields, so look those up directly across the collection.
+let numberMatches = [];
+let numberLookupTerm = "";
+
+async function lookupBillNumber() {
+  const term = (searchInput?.value || "").trim();
+  const parsed = parseBillNumberTerm(term);
+  numberLookupTerm = term;
+  if (!parsed) {
+    if (numberMatches.length) { numberMatches = []; applyBillFilters(); }
+    return;
+  }
+  try {
+    const constraints = [where("number", "==", parsed.number)];
+    if (parsed.type) constraints.push(where("type", "==", parsed.type));
+    const snapshot = await getDocs(query(collection(db, "bills"), ...constraints, limit(20)));
+    if (numberLookupTerm !== term) return; // input changed meanwhile
+    numberMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    rememberBills(numberMatches);
+    applyBillFilters();
+  } catch (err) {
+    console.error("Bill number lookup failed:", err);
+  }
+}
+
 function applyBillFilters() {
+  if (billsError) {
+    billsContainer.innerHTML = `<p class="text-center text-red-500 py-12">${escapeHtml(billsError)}</p>`;
+    billsMore.innerHTML = "";
+    return;
+  }
   const term = (searchInput?.value || "").trim().toLowerCase();
   // "HR 1234", "hr1234" and "1234" should all match bill HR 1234
   const compactTerm = term.replace(/[\s.]/g, "");
 
-  const filtered = allBills.filter(bill => {
+  const matches = bill => {
     if (activeCategory !== "all" && bill.category !== activeCategory) return false;
     if (!term) return true;
     const title = (bill.title || "").toLowerCase();
     const policyArea = (bill.policy_area || "").toLowerCase();
     const label = billLabel(bill).toLowerCase().replace(/[\s.]/g, "");
     return title.includes(term) || policyArea.includes(term) || label.includes(compactTerm);
-  });
+  };
 
-  renderBills(filtered);
+  const byId = new Map();
+  for (const bill of allBills) if (matches(bill)) byId.set(bill.id, bill);
+  if (term && numberLookupTerm.toLowerCase() === term) {
+    for (const bill of numberMatches) if (matches(bill)) byId.set(bill.id, bill);
+  }
+  const filtered = [...byId.values()].sort((a, b) => (b.update_date || "").localeCompare(a.update_date || ""));
+
+  renderBills(filtered, term);
+  renderLoadMore();
 }
 
 init();
