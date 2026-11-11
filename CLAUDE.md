@@ -32,6 +32,8 @@ public/states.js                   State/delegate list, shared by UI dropdown an
 firestore.indexes.json             Composite indexes the UI's queries need
 netlify/functions/sync-votes.js    Syncs recent BILLS (name is historical) + AI summaries
 netlify/functions/ingest-votes.js  Syncs all current members + 5 latest House roll-call votes
+netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
+                                   10 latest sponsored bills/amendments (key stays server-side)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
                                    policy-area -> category map, summary generation
 netlify/lib/firebase.js            firebase-admin init (raw or base64 service account)
@@ -107,6 +109,20 @@ Pending / known issues:
 - Votes link to bills that usually aren't in `bills` (bill sync only takes the 10 most
   recently updated). Consider syncing bills referenced by votes.
 
+## Member profile modal (frontend)
+
+- Clicking a member card opens a modal with Overview / Voting Record / Legislation tabs.
+- Overview + Legislation come from `member-profile` (cached 1h by `Cache-Control`). If it
+  fails, the modal still shows Firestore member data plus a Retry button.
+- Voting Record is computed client-side: the latest 50 `votes` (shared with the Votes tab
+  via `getRecentVotes`) filtered to the member's `individual_votes` entry. Counts
+  Yea/Nay/Present/Not voting, and "voted with party majority" = matches the majority of
+  their party's Yea/Nay votes on that roll call (ties and Independents excluded).
+  Senators get "Senate votes aren't tracked yet".
+- Scaling note: once many votes accumulate, filtering the latest 50 client-side will
+  miss older votes. Then add a `voter_ids` array to vote docs and query
+  `array-contains` + `orderBy('date')` (needs a composite index).
+
 ## Bills paging (frontend)
 
 - `loadBills` queries `bills` with `orderBy('update_date','desc')`, 12 per page,
@@ -121,10 +137,42 @@ Pending / known issues:
   whole collection.
 - `billCache` holds every bill seen; the Votes tab uses it to label bills.
 
+## Reference: congress-watch.netlify.app (unmaintained, reviewed 2026-11-10)
+
+A similar member-centric tracker the user likes. Borrow its good ideas, avoid its failures.
+
+**Borrow**
+- Member profile modal with tabs: Overview, Voting Record, Legislation, Money & Donors.
+- Per-member Yea / Nay / Absent counts, computed from our `votes.individual_votes`.
+- Directory filters: name/state/district search, party and chamber toggles.
+- Headline counts (senators / representatives / states) and a stronger visual identity
+  (it used dark navy + gold with serif headings; ours is plain gray Tailwind).
+
+**Avoid**
+- Hardcoded member lists: its 43 hand-picked members went stale (Gaetz, Rubio still
+  listed). Always sync from Congress.gov with `currentMember=true`.
+- Unsourced scores: its "Accountability ~ Estimated" numbers have no stated method. Only
+  show numbers we can compute from stored source data, and say how.
+- AI judging politicians ("promise kept rate"): not neutral. AI stays limited to
+  summarizing official text, labeled with its source.
+- Live-AI-only pages: its profiles now fail with "Failed to fetch". Keep the core data in
+  Firestore so the site degrades gracefully when a backend call fails.
+
+**Real data sources for member profiles**
+- Voting record: `votes` collection (House only so far; 5 votes per ingest run).
+- Legislation: Congress.gov `/member/{bioguideId}/sponsored-legislation` and
+  `/cosponsored-legislation` (same API key, server side only).
+- Money & donors: OpenFEC API (free key, not set up yet). Net worth / financial
+  disclosures: messy, defer.
+
 ## Next steps (in priority order)
 
-1. ~~Votes tab → `votes` collection.~~ Done; per-member positions belong in the detail modal (#4).
+1. ~~Votes tab → `votes` collection.~~ Done.
 2. ~~Members for all states.~~ Done (all states + delegates, current only, real photos).
-3. ~~Server-side ordering + pagination~~ Done (see Bills paging below).
-4. **Detail modal** per bill/vote (full summary, actions, how each member voted).
-5. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).
+3. ~~Server-side ordering + pagination~~ Done (see Bills paging above).
+4. **Detail modals.** ~~Member profile~~ done (see above). Next: bill and vote modals
+   (full summary, actions, how each member voted, linking to member profiles).
+5. Directory filters (name search, party, chamber) and headline counts.
+6. Money & donors tab via OpenFEC.
+7. Visual refresh.
+8. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).

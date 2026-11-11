@@ -44,6 +44,7 @@ async function init() {
   setupTabs();
   setupStateListener();
   setupBillFilters();
+  setupMemberProfiles();
   await loadBills({ reset: true });
 }
 
@@ -223,12 +224,22 @@ function renderBills(bills, term = "") {
 
 // --- Roll-call votes (schema written by netlify/functions/ingest-votes.js) ---
 
+// Most recent synced roll-call votes, shared by the Votes tab and member profiles.
+const RECENT_VOTES_LIMIT = 50;
+let recentVotesPromise = null;
+
+function getRecentVotes() {
+  recentVotesPromise ??= getDocs(query(collection(db, "votes"), orderBy("date", "desc"), limit(RECENT_VOTES_LIMIT)))
+    .then(snapshot => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+    .catch(err => { recentVotesPromise = null; throw err; });
+  return recentVotesPromise;
+}
+
 async function fetchVotes() {
   try {
-    const q = query(collection(db, "votes"), orderBy("date", "desc"), limit(25));
-    const snapshot = await getDocs(q);
+    const votes = await getRecentVotes();
     votesLoaded = true;
-    renderVotes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    renderVotes(votes);
   } catch (err) {
     console.error("Error fetching votes:", err);
     votesContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load votes: ${escapeHtml(err.message)}</p>`;
@@ -432,17 +443,20 @@ async function fetchMembers(stateCode) {
     }
 
     const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(compareMembers);
+    members.forEach(m => memberById.set(m.id, m));
     membersContainer.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         ${members.map(m => `
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+          <button type="button" data-member-id="${escapeHtml(m.id)}" aria-label="View profile of ${escapeHtml(m.name || "member")}"
+            class="member-card text-left bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
             ${memberPhoto(m)}
             <div class="min-w-0">
               ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
               <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
               <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}</p>
+              <p class="text-xs text-blue-600 mt-1">View profile →</p>
             </div>
-          </div>
+          </button>
         `).join("")}
       </div>
       <p class="text-xs text-gray-400 mt-4">${members.length} current member${members.length === 1 ? "" : "s"} · Source: Congress.gov</p>
@@ -452,6 +466,267 @@ async function fetchMembers(stateCode) {
     console.error("Error fetching members:", err);
     membersContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load members: ${escapeHtml(err.message)}</p>`;
   }
+}
+
+// --- Member profile modal ---------------------------------------------------
+// Overview + sponsored legislation come from Congress.gov via the member-profile
+// Netlify function; the voting record is computed from our synced `votes`.
+// If the function fails, the Firestore data still renders.
+
+const memberById = new Map();
+const modalRoot = document.getElementById("modal-root");
+const PARTY_LETTERS = { Democratic: "D", Republican: "R", Independent: "I" };
+const POSITION_BADGES = {
+  yea: "bg-green-100 text-green-800", nay: "bg-red-100 text-red-800",
+  present: "bg-gray-100 text-gray-700", not_voting: "bg-yellow-50 text-yellow-800",
+};
+const profileCache = new Map();
+let profileState = null; // { member, tab, profile, profileError, votes, votesError }
+let lastFocused = null;
+
+function fetchMemberProfile(id) {
+  if (!profileCache.has(id)) {
+    profileCache.set(id, fetch(`/.netlify/functions/member-profile?id=${encodeURIComponent(id)}`)
+      .then(async res => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        return body;
+      })
+      .catch(err => { profileCache.delete(id); throw err; }));
+  }
+  return profileCache.get(id);
+}
+
+// For each synced vote this member took part in: their position, and whether
+// it matched the majority of their party's Yea/Nay votes on that roll call.
+function memberVotingRecord(bioguideId, votes) {
+  const rows = [];
+  const counts = { yea: 0, nay: 0, present: 0, not_voting: 0 };
+  let withParty = 0, partyComparable = 0;
+
+  for (const vote of votes) {
+    const own = (vote.individual_votes || []).find(v => v.bioguideId === bioguideId);
+    if (!own) continue;
+    const group = POSITION_GROUPS[(own.position || "").toLowerCase()] || null;
+    if (group) counts[group]++;
+
+    let partyMajority = null;
+    if (own.party && own.party !== "I" && (group === "yea" || group === "nay")) {
+      let y = 0, n = 0;
+      for (const v of vote.individual_votes) {
+        if (v.party !== own.party) continue;
+        const g = POSITION_GROUPS[(v.position || "").toLowerCase()];
+        if (g === "yea") y++; else if (g === "nay") n++;
+      }
+      if (y !== n) {
+        partyMajority = y > n ? "yea" : "nay";
+        partyComparable++;
+        if (partyMajority === group) withParty++;
+      }
+    }
+    rows.push({ vote, position: own.position || null, group, partyMajority });
+  }
+  return { rows, counts, withParty, partyComparable };
+}
+
+function openMemberProfile(id) {
+  const member = memberById.get(id);
+  if (!member) return;
+  if (!profileState) lastFocused = document.activeElement; // keep the card, not Retry
+  profileState = { member, tab: "overview", profile: null, profileError: null, votes: null, votesError: null };
+  renderProfileModal();
+  document.body.classList.add("overflow-hidden");
+  modalRoot.querySelector("[data-close]")?.focus();
+
+  const state = profileState;
+  fetchMemberProfile(id)
+    .then(p => { state.profile = p; })
+    .catch(err => { state.profileError = err.message; })
+    .finally(() => { if (profileState === state) renderProfileModal(); });
+  getRecentVotes()
+    .then(v => { state.votes = v; })
+    .catch(err => { state.votesError = err.message; })
+    .finally(() => { if (profileState === state) renderProfileModal(); });
+}
+
+function closeMemberProfile() {
+  profileState = null;
+  modalRoot.innerHTML = "";
+  document.body.classList.remove("overflow-hidden");
+  lastFocused?.focus?.();
+}
+
+function spinner(text) {
+  return `<div class="text-center py-10"><div class="inline-block animate-spin rounded-full h-6 w-6 border-4 border-blue-500 border-t-transparent mb-3"></div><p class="text-sm text-gray-500">${escapeHtml(text)}</p></div>`;
+}
+
+function profileErrorBlock(message) {
+  return `
+    <div class="text-center py-8">
+      <p class="text-sm text-red-600">Couldn't load this from Congress.gov right now.</p>
+      <p class="text-xs text-gray-400 mt-1">${escapeHtml(message)}</p>
+      <button type="button" data-retry class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700">Retry</button>
+    </div>`;
+}
+
+function renderOverviewTab(s) {
+  const m = s.member, p = s.profile;
+  const facts = [
+    ["Role", memberRole(m)],
+    ["State", STATE_NAMES[m.state] || m.state],
+    ["Party", m.party],
+  ];
+  if (p) {
+    if (p.leadership?.length) facts.unshift(["Leadership", p.leadership.join(", ")]);
+    facts.push(["First took office", p.firstTermStart]);
+    facts.push(["Born", p.birthYear]);
+    facts.push(["Office", p.office?.address]);
+    facts.push(["Phone", p.office?.phone]);
+  }
+  const rows = facts.filter(([, v]) => v).map(([k, v]) =>
+    `<div class="flex gap-3 py-1.5 border-b border-gray-100 text-sm"><dt class="w-36 shrink-0 text-gray-500">${escapeHtml(k)}</dt><dd class="text-gray-900">${escapeHtml(String(v))}</dd></div>`).join("");
+
+  const links = p ? [
+    p.website ? `<a href="${escapeHtml(p.website)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">Official website →</a>` : "",
+    `<a href="${escapeHtml(p.bioguideUrl)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">Congressional biography →</a>`,
+  ].filter(Boolean).join(`<span class="text-gray-300">·</span>`) : "";
+
+  return `
+    <dl>${rows}</dl>
+    ${p ? `
+      <div class="grid grid-cols-2 gap-3 mt-4">
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center"><p class="text-xs text-gray-500 uppercase font-semibold">Bills sponsored</p><p class="text-xl font-bold text-gray-900">${p.sponsoredCount ?? "—"}</p></div>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center"><p class="text-xs text-gray-500 uppercase font-semibold">Bills cosponsored</p><p class="text-xl font-bold text-gray-900">${p.cosponsoredCount ?? "—"}</p></div>
+      </div>
+      <p class="text-[11px] text-gray-400 mt-1">Career totals, including amendments, per Congress.gov.</p>
+      <div class="flex flex-wrap gap-2 mt-4 text-sm">${links}</div>`
+    : s.profileError ? profileErrorBlock(s.profileError) : spinner("Loading details from Congress.gov…")}
+  `;
+}
+
+function renderVotesTab(s) {
+  const m = s.member;
+  if (m.chamber === "Senate") {
+    return `<p class="text-sm text-gray-500 py-8 text-center">Senate roll-call votes aren't tracked yet. Only House votes are synced so far.</p>`;
+  }
+  if (s.votesError) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load votes: ${escapeHtml(s.votesError)}</p>`;
+  if (!s.votes) return spinner("Loading votes…");
+
+  const rec = memberVotingRecord(m.id, s.votes);
+  if (!rec.rows.length) {
+    return `<p class="text-sm text-gray-500 py-8 text-center">No record of this member in the ${s.votes.length} most recent synced House votes.</p>`;
+  }
+  const c = rec.counts;
+  const stat = (label, value, cls) => `<div class="${cls} border rounded-lg p-2 text-center"><p class="text-[11px] font-semibold uppercase">${label}</p><p class="text-lg font-bold">${value}</p></div>`;
+  return `
+    <p class="text-xs text-gray-500 mb-3">Based on the ${s.votes.length} most recent House roll-call votes synced from the House Clerk.</p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      ${stat("Yea", c.yea, "bg-green-50 border-green-100 text-green-700")}
+      ${stat("Nay", c.nay, "bg-red-50 border-red-100 text-red-700")}
+      ${stat("Present", c.present, "bg-gray-50 border-gray-200 text-gray-700")}
+      ${stat("Not voting", c.not_voting, "bg-yellow-50 border-yellow-100 text-yellow-800")}
+    </div>
+    ${rec.partyComparable ? `<p class="text-sm text-gray-700 mt-3">Voted with the majority of their party on <strong>${rec.withParty} of ${rec.partyComparable}</strong> votes where they voted Yea or Nay.</p>` : ""}
+    <ul class="mt-4 divide-y divide-gray-100">
+      ${rec.rows.map(({ vote, position, group, partyMajority }) => {
+        const bill = voteBillInfo(vote);
+        return `
+        <li class="py-3 flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900">${escapeHtml(vote.question || "Question not available")}</p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              Roll call #${escapeHtml(String(vote.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(vote.date))}
+              ${bill ? ` · ${bill.url ? `<a href="${escapeHtml(bill.url)}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${escapeHtml(bill.label)}</a>` : escapeHtml(bill.label)}` : ""}
+              · ${escapeHtml(vote.result || "Result pending")}
+            </p>
+            ${partyMajority && group !== partyMajority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
+          </div>
+          <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${POSITION_BADGES[group] || "bg-gray-100 text-gray-700"}">${escapeHtml(position || "Not recorded")}</span>
+        </li>`;
+      }).join("")}
+    </ul>`;
+}
+
+function renderLegislationTab(s) {
+  const p = s.profile;
+  if (s.profileError) return profileErrorBlock(s.profileError);
+  if (!p) return spinner("Loading sponsored legislation…");
+  if (!p.sponsored) return profileErrorBlock("Sponsored legislation is unavailable right now.");
+  if (!p.sponsored.length) return `<p class="text-sm text-gray-500 py-8 text-center">No sponsored legislation found.</p>`;
+  return `
+    <p class="text-xs text-gray-500 mb-3">${p.sponsored.length} most recent of ${p.sponsoredCount ?? "?"} sponsored bills and amendments, from Congress.gov.</p>
+    <ul class="divide-y divide-gray-100">
+      ${p.sponsored.map(item => `
+        <li class="py-3">
+          <div class="flex items-center gap-2 text-xs">
+            ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="font-semibold text-blue-600 hover:underline">${escapeHtml(item.label)}</a>` : `<span class="font-semibold">${escapeHtml(item.label)}</span>`}
+            ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(item.introducedDate)}</span>` : ""}
+            ${item.policyArea ? `<span class="text-gray-500">· ${escapeHtml(item.policyArea)}</span>` : ""}
+          </div>
+          ${item.title ? `<p class="text-sm text-gray-900 mt-1">${escapeHtml(item.title)}</p>` : ""}
+          ${item.latestAction?.text ? `<p class="text-xs text-gray-500 mt-1"><strong class="text-gray-600">Latest action${item.latestAction.actionDate ? ` (${escapeHtml(item.latestAction.actionDate)})` : ""}:</strong> ${escapeHtml(item.latestAction.text)}</p>` : ""}
+        </li>`).join("")}
+    </ul>`;
+}
+
+const PROFILE_TABS = [
+  ["overview", "Overview", renderOverviewTab],
+  ["votes", "Voting Record", renderVotesTab],
+  ["legislation", "Legislation", renderLegislationTab],
+];
+
+function renderProfileModal() {
+  const s = profileState;
+  if (!s) return;
+  const m = s.member;
+  // Keep the scroll position when data arrives for the same tab; reset on tab change.
+  const panel = modalRoot.querySelector("[data-panel]");
+  const scrollTop = panel?.dataset.tabKey === s.tab ? panel.scrollTop : 0;
+  const [, , renderTab] = PROFILE_TABS.find(([key]) => key === s.tab);
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-gray-900/50 p-0 sm:p-6" data-backdrop>
+      <div role="dialog" aria-modal="true" aria-labelledby="profile-title"
+        class="bg-white w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-xl flex flex-col">
+        <div class="shrink-0 flex items-start gap-4 p-5 border-b border-gray-200">
+          ${memberPhoto(m)}
+          <div class="min-w-0 flex-1">
+            ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
+            <h2 id="profile-title" class="text-xl font-bold text-gray-900 mt-1">${escapeHtml(s.profile?.name || m.name || "Member")}</h2>
+            <p class="text-sm text-gray-500">${escapeHtml(memberRole(m))} · ${escapeHtml(STATE_NAMES[m.state] || m.state || "")}</p>
+          </div>
+          <button type="button" data-close aria-label="Close profile" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">✕</button>
+        </div>
+        <div role="tablist" class="shrink-0 flex gap-4 px-5 border-b border-gray-200 overflow-x-auto">
+          ${PROFILE_TABS.map(([key, label]) => `
+            <button type="button" role="tab" data-tab="${key}" aria-selected="${key === s.tab}"
+              class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === s.tab ? "text-blue-600 border-blue-600" : "text-gray-500 border-transparent hover:text-gray-700"}">${label}</button>`).join("")}
+        </div>
+        <div data-panel data-tab-key="${s.tab}" role="tabpanel" class="p-5 overflow-y-auto flex-1">${renderTab(s)}</div>
+      </div>
+    </div>`;
+  modalRoot.querySelector("[data-panel]").scrollTop = scrollTop;
+}
+
+function setupMemberProfiles() {
+  membersContainer.addEventListener("click", e => {
+    const card = e.target.closest("[data-member-id]");
+    if (card) openMemberProfile(card.dataset.memberId);
+  });
+  modalRoot.addEventListener("click", e => {
+    if (e.target.matches("[data-backdrop]") || e.target.closest("[data-close]")) return closeMemberProfile();
+    const tab = e.target.closest("[data-tab]");
+    if (tab && profileState) {
+      profileState.tab = tab.dataset.tab;
+      renderProfileModal();
+      modalRoot.querySelector(`[data-tab="${tab.dataset.tab}"]`)?.focus();
+      return;
+    }
+    if (e.target.closest("[data-retry]") && profileState) openMemberProfile(profileState.member.id);
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && profileState) closeMemberProfile();
+  });
 }
 
 function escapeHtml(str) {
