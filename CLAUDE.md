@@ -231,6 +231,21 @@ Live at https://congress-watcher.netlify.app: Overview, Issues, Bills, Votes, Le
 tabs, detail modals, campaign finance. Data is complete for the 119th Congress (votes
 1,600/1,600, laws 140/140 as of 2026-11-11) and kept current by the two scheduled syncs.
 
+### Pending deploy (do first on 2026-11-12)
+Commits a547327..HEAD (member_votes, vote_index, stats/health) are committed but **not
+pushed**. Firestore's free 50k reads/day ran out on 2026-11-11 (resets midnight Pacific).
+Do these in order:
+1. After the 10:00 UTC scheduled ingest (still old code, which writes votes without
+   `members_applied`): `node scripts/build-member-votes.js --write`. It builds
+   member_votes + vote_index and flags every vote applied.
+2. Publish `firestore.rules` (adds the `member_votes` read rule), with the user's OK,
+   **before** the deploy, or the Voting Record tab gets permission errors.
+3. Verify locally (Voting Record, Overview numbers ≈1,600 votes, footer), then push all
+   commits at once. The newest commit must not say `[skip netlify]`, or the deploy is skipped.
+4. Next scheduled runs write stats/health; check the logs and the footer.
+Why this order: deployed before the backfill, the ingest would create a partial
+vote_index and the stats rebuild would trust it. Remove this section once done.
+
 ### Project review fixes (2026-11-11)
 A full review found four must-fix problems; all fixed:
 1. **Vote ingest dropped votes.** It took the 5 newest per chamber; 76 chamber-days had
