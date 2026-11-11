@@ -22,6 +22,7 @@ import {
 import { currentCongress } from '../lib/congress.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { recordRun } from '../lib/health.js';
+import { loadTracked, markTracked } from '../lib/tracked-bills.js';
 
 const BILLS_PER_RUN = 10;
 const MAX_SUMMARIES = 3; // keeps each run inside Netlify's function timeout
@@ -54,7 +55,12 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds) {
     listLawBillIds(currentCongress().congress, apiKey),
   ]);
   const lawSet = new Set(lawIds);
-  const candidates = [...new Set([...updatedIds, ...lawIds])].filter(id => !skipIds.has(id) && parseBillId(id));
+  let candidates = [...new Set([...updatedIds, ...lawIds])].filter(id => !skipIds.has(id) && parseBillId(id));
+
+  // The tracked-bills doc (1 read) narrows the candidates to bills we follow, so only
+  // those are read. Without it, every candidate is read and checked.
+  const tracked = await loadTracked(db);
+  if (tracked) candidates = candidates.filter(id => lawSet.has(id) ? !tracked.laws.has(id) : tracked.ids.has(id));
 
   const snaps = [];
   for (let i = 0; i < candidates.length; i += 300) {
@@ -68,9 +74,11 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds) {
 
   const batch = todo.slice(0, MAX_REFRESH);
   if (todo.length > batch.length) console.warn(`refresh: ${todo.length} bills to refresh; doing ${batch.length}, rest next run`);
+  const done = [];
   await pool(batch, 6, async snap => {
     const { congress, type, number } = parseBillId(snap.id);
     const fields = await fetchEnrichedBill(congress, type, number, apiKey);
+    done.push({ id: snap.id, stage: fields.stage });
     const d = snap.exists ? snap.data() : {};
     const neverChecked = !d.ai_summary && d.crs_summary_available === undefined;
     await snap.ref.set({
@@ -79,6 +87,8 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds) {
       synced_at: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   });
+
+  await markTracked(db, admin, done);
 
   // Only advance the window when everything in it was handled.
   if (todo.length <= batch.length) await stateRef.set({ last_refresh: runStart }, { merge: true });
@@ -152,6 +162,8 @@ export default async () => {
       updated++;
     }
     await Promise.all(writes);
+    await markTracked(db, admin, refs.map((r, i) => ({ id: r.id, stage: enrichments[i]?.enriched_at ? enrichments[i].stage : null }))
+      .filter((b, i) => enrichments[i]?.enriched_at));
 
     // Issue tracker freshness: tracked bills that changed + newly enacted laws.
     let refreshed = 0;

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { getDb, admin } from '../lib/firebase.js';
 import { getJson } from '../lib/http.js';
 import { STATE_CODES } from '../../public/states.js';
@@ -9,6 +10,7 @@ import { currentCongress } from '../lib/congress.js';
 import { applyNewMemberVotes } from '../lib/member-votes.js';
 import { loadVoteIndex } from '../lib/vote-index.js';
 import { recordRun } from '../lib/health.js';
+import { markTracked } from '../lib/tracked-bills.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -37,8 +39,11 @@ export async function handler(event, context) {
     // congress-legislators: bioguide -> FEC ids and Senate LIS ids. Optional.
     const legislators = await fetchLegislators();
 
-    // 1. Sync all current members of Congress
-    await syncCurrentMembers(legislators);
+    // Last run's health: a failed stats rebuild is retried even on a quiet night.
+    const lastRun = (await db.collection("stats").doc("health").get()).data()?.ingest_votes;
+
+    // 1. Sync all current members of Congress (writes only members that changed)
+    const memberChanges = await syncCurrentMembers(legislators);
 
     // 2 + 3. Latest House and Senate roll-call votes. Independent, so one source
     // failing doesn't block the other.
@@ -59,17 +64,21 @@ export async function handler(event, context) {
     }
 
     // 5. Issue tracker: enrich the bills these votes are on (sync-bills summarizes them).
+    let enriched = 0;
     try {
       const billIds = results.filter(r => r.status === "fulfilled").flatMap(r => r.value || []);
-      const n = await enrichVotedBills(billIds);
+      const n = enriched = await enrichVotedBills(billIds);
       if (n) console.log(`Enriched ${n} newly voted-on bills`);
     } catch (err) {
       failures.push(`enrich: ${err.message}`);
       console.error("Bill enrichment failed:", err);
     }
 
-    // 6. Rebuild the Overview tab's precomputed stats (small fields only).
-    try {
+    // 6. Rebuild the precomputed stats, only when something they show changed (most
+    //    nights in a recess nothing did) or the last run didn't finish cleanly.
+    const changed = applied.votes || enriched || memberChanges;
+    if (!changed && lastRun?.ok) console.log("No new votes, bills or member changes; stats left as they are.");
+    else try {
       const stats = await writeOverviewStats(db, admin, { congress: CONGRESS_NUM });
       console.log(`stats rebuilt for the ${stats.congress}th Congress from ${stats.votes} votes`);
     } catch (err) {
@@ -120,8 +129,13 @@ export async function syncSenateVotes(legislators, indexed) {
     .filter(l => l.id?.lis && l.id?.bioguide)
     .map(l => [l.id.lis, l.id.bioguide]));
 
+  // In session 2, last session's vote list is final once January is over (the Senate
+  // can still vote in session 1 until January 3), so it's only fetched in January or
+  // when none of its votes are indexed yet.
   const { session } = currentCongress();
-  const entries = await listSenateVotes(CONGRESS_NUM, session === 2 ? [2, 1] : [1]); // newest first
+  const hasSession1 = [...indexed].some(id => id.startsWith(`${CONGRESS_NUM}-1-senate-`));
+  const sessions = session === 2 ? (new Date().getUTCMonth() === 0 || !hasSession1 ? [2, 1] : [2]) : [1];
+  const entries = await listSenateVotes(CONGRESS_NUM, sessions); // newest first
   const unstored = await unstoredIds(entries.map(senateVoteId), indexed);
   const missing = entries.filter(e => unstored.has(senateVoteId(e)));
   const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
@@ -159,9 +173,11 @@ async function enrichVotedBills(ids) {
   const unique = [...new Set(ids)].filter(id => parseBillId(id));
   const snaps = await Promise.all(unique.map(id => db.collection("bills").doc(id).get()));
   const todo = unique.map((id, i) => [id, snaps[i]]).filter(([, s]) => !s.exists || !s.data().enriched_at);
+  const done = [];
   await Promise.all(todo.map(async ([id, snap]) => {
     const { congress, type, number } = parseBillId(id);
     const fields = await fetchEnrichedBill(congress, type, number, CONGRESS_API_KEY);
+    done.push({ id, stage: fields.stage });
     const data = snap.exists ? snap.data() : {};
     const neverChecked = !data.ai_summary && data.crs_summary_available === undefined;
     await db.collection("bills").doc(id).set({
@@ -170,6 +186,7 @@ async function enrichVotedBills(ids) {
       synced_at: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   }));
+  await markTracked(db, admin, done);
   return todo.length;
 }
 
@@ -190,6 +207,12 @@ async function fetchLegislators() {
 
 // Writes every sitting member (all states, plus non-voting delegates) and marks
 // members already in Firestore who are no longer serving as `current: false`.
+// A fingerprint of each member's stored fields is kept in sync_state/members (one
+// read), so only members whose data changed are written; without it (first run) every
+// member is written and retirements come from reading the members collection.
+// Returns how many member docs (incl. the directory) were written.
+const fingerprint = value => createHash("sha1").update(JSON.stringify(value)).digest("base64").slice(0, 12);
+
 async function syncCurrentMembers(legislators) {
   const members = [];
   for (let offset = 0; ; offset += 250) {
@@ -204,6 +227,7 @@ async function syncCurrentMembers(legislators) {
     : null;
 
   const ops = [];
+  const pending = []; // [bioguideId, fields] for every current member
   const currentIds = new Set();
   const directory = [];
   const unknownStates = new Set();
@@ -227,7 +251,7 @@ async function syncCurrentMembers(legislators) {
       district: m.district ?? null,
       imageUrl: m.depiction?.imageUrl || null,
     });
-    ops.push([db.collection("members").doc(m.bioguideId), {
+    pending.push([m.bioguideId, {
       bioguideId: m.bioguideId,
       name: m.name || null,
       state: state || null,
@@ -239,16 +263,28 @@ async function syncCurrentMembers(legislators) {
       // Only written when the mapping loaded, so a failed fetch never wipes it.
       ...(fecIds ? { fec_ids: fecIds.get(m.bioguideId) || [] } : {}),
       current: true,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }]);
   }
 
+  const stateRef = db.collection("sync_state").doc("members");
+  const state = (await stateRef.get()).data();
+  const prints = { ...(state?.members || {}) };
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  for (const [id, data] of pending) {
+    const print = fingerprint(data);
+    if (prints[id] === print) continue;
+    ops.push([db.collection("members").doc(id), { ...data, updatedAt: now }]);
+    // Without the FEC mapping the write leaves fec_ids alone, so keep the old print.
+    if (fecIds || !prints[id]) prints[id] = print;
+  }
+
   // Anyone stored earlier who isn't in the current list has left office.
-  const existing = await db.collection("members").select().get();
+  const previousIds = state ? Object.keys(state.members || {}) : (await db.collection("members").where("current", "==", true).select().get()).docs.map(d => d.id);
   let retired = 0;
-  for (const doc of existing.docs) {
-    if (currentIds.has(doc.id)) continue;
-    ops.push([doc.ref, { current: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() }]);
+  for (const id of previousIds) {
+    if (currentIds.has(id)) continue;
+    ops.push([db.collection("members").doc(id), { current: false, updatedAt: now }]);
+    delete prints[id];
     retired++;
   }
 
@@ -260,12 +296,15 @@ async function syncCurrentMembers(legislators) {
 
   // One compact doc with every current member (~100 KB), so the directory page can
   // search and filter nationwide with a single read instead of ~540.
-  await db.collection("directory").doc("members").set({
-    members: directory.sort((a, b) => (a.name || "").localeCompare(b.name || "")),
-    count: directory.length,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  directory.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const directoryPrint = fingerprint(directory);
+  if (directoryPrint !== state?.directory) {
+    await db.collection("directory").doc("members").set({ members: directory, count: directory.length, updatedAt: now });
+  }
+  await stateRef.set({ members: prints, directory: directoryPrint, updated_at: now });
 
   if (unknownStates.size) console.warn(`Unmapped state names: ${[...unknownStates].join(', ')}`);
-  console.log(`Synced ${currentIds.size} current members; marked ${retired} as no longer serving.`);
+  const directoryChanged = directoryPrint !== state?.directory;
+  console.log(`Members: ${currentIds.size} current; wrote ${ops.length - retired} changed, marked ${retired} as no longer serving${directoryChanged ? "; directory updated" : ""}.`);
+  return ops.length + (directoryChanged ? 1 : 0);
 }

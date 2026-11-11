@@ -14,15 +14,16 @@ export function houseVoteId(congress, session, rollCall) {
 }
 
 // Every House roll call in a congress, newest first. The list endpoint ignores `sort`
-// and returns votes unordered, so page through all of it and sort by start time.
+// and returns votes unordered, so fetch all of it (first page, then the rest in
+// parallel from its total count) and sort by start time.
 export async function listHouseVotes(congress, apiKey) {
-  const all = [];
-  for (let offset = 0; ; offset += 250) {
-    const page = await getJson(`${API}/house-vote/${congress}?api_key=${apiKey}&format=json&limit=250&offset=${offset}`);
-    const items = page.houseRollCallVotes || [];
-    all.push(...items);
-    if (items.length < 250 || all.length >= (page.pagination?.count ?? 0)) break;
-  }
+  const page = offset => getJson(`${API}/house-vote/${congress}?api_key=${apiKey}&format=json&limit=250&offset=${offset}`);
+  const first = await page(0);
+  const total = first.pagination?.count ?? 0;
+  const offsets = [];
+  for (let o = 250; o < total; o += 250) offsets.push(o);
+  const rest = await Promise.all(offsets.map(page));
+  const all = [first, ...rest].flatMap(p => p.houseRollCallVotes || []);
   return all
     .filter(v => v.sessionNumber && v.rollCallNumber && v.startDate)
     .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));

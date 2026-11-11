@@ -13,6 +13,7 @@ import 'dotenv/config';
 import { getDb, admin } from '../netlify/lib/firebase.js';
 import { fetchEnrichedBill, parseBillId } from '../netlify/lib/bills.js';
 import { currentCongress } from '../netlify/lib/congress.js';
+import { markTracked } from '../netlify/lib/tracked-bills.js';
 
 const WRITE = process.argv.includes('--write');
 const FORCE = process.argv.includes('--force');
@@ -52,11 +53,13 @@ async function main() {
 
   const writer = db.bulkWriter();
   const counts = { written: 0, failed: 0 };
+  const done = [];
   await pool(todo, 5, async id => {
     const { congress: c, type, number } = parseBillId(id);
     try {
       const fields = await fetchEnrichedBill(c, type, number, CONGRESS_API_KEY);
       writer.set(db.collection('bills').doc(id), { ...fields, synced_at: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      done.push({ id, stage: fields.stage });
       counts.written++;
     } catch (err) {
       console.error(`  ✗ ${id}: ${err.message}`);
@@ -66,6 +69,7 @@ async function main() {
     if (done % 100 === 0) console.log(`  ${done}/${todo.length}`);
   });
   await writer.close();
+  for (let i = 0; i < done.length; i += 500) await markTracked(db, admin, done.slice(i, i + 500));
   console.log(`\nDone. ${JSON.stringify(counts)}`);
 }
 
