@@ -2,6 +2,12 @@
   command = "npm install"
   publish = "public"
   functions = "netlify/functions"
+
+# Netlify's secret scanner flags the Firebase *web* config apiKey in public/app.js.
+# That key is a public project identifier (it ships to every browser); data is protected
+# by Firestore security rules. Exempt only this value so real secrets are still caught.
+[build.environment]
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyB53n86BTG9co1S8Ek0Acvx4onbzvXQD8Y"
 # Nightly syncs (Netlify scheduled functions, cron in UTC; 30s limit; can't be called by
 # URL in production; use "Run now" in the Netlify UI to trigger one manually).
 # 10:00 UTC = 5-6 AM Eastern, after any late-night floor votes are published.

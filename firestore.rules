@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// Congress Watcher: the website only ever READS Firestore. All writes come from server
+// code (Netlify functions and scripts using firebase-admin), which bypasses these rules.
+// So: public read for the collections the site shows, and no client writes anywhere.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /bills/{id}     { allow read: if true; }
+    match /votes/{id}     { allow read: if true; }
+    match /members/{id}   { allow read: if true; }
+    match /directory/{id} { allow read: if true; }
+    match /stats/{id}     { allow read: if true; }
+
+    // Everything else (and all writes): denied to browsers.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
