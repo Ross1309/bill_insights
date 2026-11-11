@@ -127,21 +127,34 @@ function parseVote(xml, { congress, session, number }, lisToBioguide) {
   };
 }
 
+// Vote entries ({ congress, session, number }) for the given sessions, newest first.
+export async function listSenateVotes(congress, sessions = [2, 1]) {
+  const entries = [];
+  for (const session of sessions) {
+    entries.push(...await fetchMenu(congress, session).catch(err => {
+      console.warn(`Senate vote menu ${congress}-${session} unavailable: ${err.message}`);
+      return [];
+    }));
+  }
+  return entries.sort((a, b) => b.session - a.session || b.number - a.number);
+}
+
+export function senateVoteId({ congress, session, number }) {
+  return `${congress}-${session}-senate-vote-${number}`;
+}
+
+// One entry -> { doc, unmapped }.
+export async function fetchSenateVote(entry, lisToBioguide) {
+  const padded = String(entry.number).padStart(5, '0');
+  const xml = await getText(`${LIS}/roll_call_votes/vote${entry.congress}${entry.session}/vote_${entry.congress}_${entry.session}_${padded}.xml`);
+  return parseVote(xml, entry, lisToBioguide);
+}
+
 // The n most recent Senate roll-call votes as `votes` docs (newest first).
 export async function fetchLatestSenateVotes(n, lisToBioguide) {
   const { congress, session } = currentCongressSession();
-  let entries = await fetchMenu(congress, session).catch(err => {
-    if (session === 1) throw err;
-    return []; // early in session 2 the menu may not exist yet
-  });
-  if (entries.length < n && session === 2) entries = entries.concat(await fetchMenu(congress, 1));
-  entries.sort((a, b) => b.session - a.session || b.number - a.number);
-
+  const entries = await listSenateVotes(congress, session === 2 ? [2, 1] : [1]);
   const out = [];
-  for (const entry of entries.slice(0, n)) {
-    const padded = String(entry.number).padStart(5, '0');
-    const xml = await getText(`${LIS}/roll_call_votes/vote${entry.congress}${entry.session}/vote_${entry.congress}_${entry.session}_${padded}.xml`);
-    out.push(parseVote(xml, entry, lisToBioguide));
-  }
+  for (const entry of entries.slice(0, n)) out.push(await fetchSenateVote(entry, lisToBioguide));
   return out;
 }
