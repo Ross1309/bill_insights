@@ -5,8 +5,9 @@
 // election period for their current/next election. Returns only figures the FEC
 // reports; nothing is estimated or scored.
 //
-// Needs FEC_API_KEY (free from api.data.gov). Under `netlify dev` it falls back
-// to the public DEMO_KEY, which is limited to a few dozen requests per hour.
+// Uses an api.data.gov key: FEC_API_KEY if set, otherwise CONGRESS_API_KEY
+// (Congress.gov keys are api.data.gov keys and work for OpenFEC too). Under
+// `netlify dev` with neither set it falls back to the public, heavily limited DEMO_KEY.
 
 import { getDb } from '../lib/firebase.js';
 
@@ -21,6 +22,7 @@ function json(body, status = 200, extraHeaders = {}) {
 
 function fecKey() {
   if (process.env.FEC_API_KEY) return process.env.FEC_API_KEY;
+  if (process.env.CONGRESS_API_KEY) return process.env.CONGRESS_API_KEY;
   if (process.env.NETLIFY_DEV === 'true') return 'DEMO_KEY';
   return null;
 }
@@ -72,7 +74,7 @@ async function loadPeriod(candidateId, year, key) {
 
 export default async (req) => {
   const key = fecKey();
-  if (!key) return json({ error: 'Campaign finance data is not configured (FEC_API_KEY).' }, 503);
+  if (!key) return json({ error: 'Campaign finance data is not configured (no api.data.gov key).' }, 503);
 
   const id = new URL(req.url).searchParams.get('id') || '';
   if (!/^[A-Z]\d{6}$/.test(id)) return json({ error: 'Invalid bioguide id.' }, 400);
@@ -143,6 +145,9 @@ export default async (req) => {
         partyCommittees: num(totals.political_party_committee_contributions),
         candidateSelf: num(totals.candidate_contribution),
         candidateLoans: num(totals.loans_made_by_candidate),
+        transfersIn: num(totals.transfers_from_other_authorized_committee),
+        otherReceipts: num(totals.other_receipts),
+        offsets: num(totals.offsets_to_operating_expenditures),
       },
       // FEC size buckets: 0 = $200 and under, 200 = $200.01–$499.99, 500 = $500–$999.99,
       // 1000 = $1,000–$1,999.99, 2000 = $2,000 and over.

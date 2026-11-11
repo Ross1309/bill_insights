@@ -35,7 +35,7 @@ netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) +
 netlify/functions/member-profile.js  GET ?id={bioguideId}: Congress.gov member detail +
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
-                                   donation-size buckets, itemized by state (needs FEC_API_KEY)
+                                   donation-size buckets, itemized by state (api.data.gov key)
 netlify/functions/bill-detail.js   GET ?id={bill_id}: sponsor, cosponsor count, latest CRS
                                    summary, action history (works for bills not in `bills`)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
@@ -59,9 +59,9 @@ node scripts/backfill-bills.js --write [--summaries]
 ```
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
-`FEC_API_KEY` (free from api.data.gov; **not set yet**. Under `netlify dev` the finance
-function falls back to the public `DEMO_KEY`, ~30 requests/hour per IP; in production it
-returns 503 "not configured" without a key). Set the same vars in Netlify's site settings.
+optional `FEC_API_KEY`. `CONGRESS_API_KEY` is an api.data.gov key, which OpenFEC also
+accepts, so `member-finance` uses `FEC_API_KEY` if set, else `CONGRESS_API_KEY` (else
+`DEMO_KEY` under `netlify dev` only). Set the same vars in Netlify's site settings.
 
 ## Firestore schema
 
@@ -154,9 +154,16 @@ Pending / known issues:
   filings only (no super PACs), state is known only for itemized (>$200) gifts.
 - No employer/"top donor" lists on purpose: they invite misreading (employers of
   individual donors aren't the companies giving) and need more FEC calls.
-- Verified live for a House member (Jayapal). The Senate path (6-year period) and the
-  "previous election" fallback have NOT been exercised against live data yet (DEMO_KEY
-  ran out); check them once `FEC_API_KEY` is set.
+- Receipt sources sum to FEC `receipts`: individuals (unitemized/itemized), PACs, party,
+  candidate (contribution + loans), transfers from other authorized committees (joint
+  fundraising), FEC "other receipts" (dividends/interest), offsets; any remainder shows
+  as "Other (loans, etc.)".
+- The label says "FEC election cycle ending YYYY", not "YYYY election": retiring members
+  (e.g. McConnell) still have a committee filing in the current cycle.
+- Verified live 2026-11-10: House (Jayapal, 2026 cycle), Senate (Thune 2028 and Sanders
+  2030, full 6-year periods), retiring senator (McConnell, 2026 cycle). The "no upcoming
+  election in FEC data -> previous election" fallback hasn't been hit by a real member.
+- Browsers cache responses for 12h, so format changes show up after that.
 
 ## Detail modals (frontend)
 
@@ -231,6 +238,6 @@ A similar member-centric tracker the user likes. Borrow its good ideas, avoid it
 3. ~~Server-side ordering + pagination~~ Done (see Bills paging above).
 4. ~~Detail modals~~ Done for members, bills and votes (see Detail modals above).
 5. ~~Directory filters and headline counts~~ Done (see Legislators tab above).
-6. ~~Money & donors via OpenFEC~~ Done as the member Campaign Finance tab (needs `FEC_API_KEY`).
+6. ~~Money & donors via OpenFEC~~ Done as the member Campaign Finance tab.
 7. Visual refresh.
 8. Consider renaming `sync-votes.js` → `sync-bills.js` (check any schedules first).

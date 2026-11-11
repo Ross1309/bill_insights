@@ -847,10 +847,14 @@ function renderFinanceTab(e) {
     { label: "PACs and other committees", value: t.pacs },
     { label: "Party committees", value: t.partyCommittees },
     { label: "Candidate's own money (incl. loans)", value: self },
+    { label: "Transfers from other authorized committees (e.g. joint fundraising)", value: t.transfersIn },
+    { label: "Other receipts (dividends, interest, etc.)", value: t.otherReceipts },
+    { label: "Offsets to operating expenditures", value: t.offsets },
   ];
+  // Anything the FEC totals include that isn't itemized above (e.g. other loans).
   const known = sources.reduce((sum, r) => sum + (r.value || 0), 0);
   const other = (t.receipts || 0) - known;
-  if (t.receipts && other / t.receipts > 0.005) sources.push({ label: "Other receipts (transfers, offsets, interest)", value: other });
+  if (t.receipts && other / t.receipts > 0.005) sources.push({ label: "Other (loans, etc.)", value: other });
   const sourceRows = sources.filter(r => typeof r.value === "number" && r.value > 0);
 
   const sizes = (f.bySize || []).filter(r => typeof r.total === "number" && r.total > 0)
@@ -863,7 +867,7 @@ function renderFinanceTab(e) {
 
   return `
     <p class="text-xs text-gray-500">
-      ${escapeHtml(String(f.candidate.electionYear))} election · reported ${escapeHtml(formatDay(f.period.start))} – ${escapeHtml(formatDay(f.period.end))}
+      FEC election cycle ending ${escapeHtml(String(f.candidate.electionYear))} · reported ${escapeHtml(formatDay(f.period.start))} – ${escapeHtml(formatDay(f.period.end))}
       · ${externalLink(f.sourceUrl, "FEC filings")}
     </p>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
