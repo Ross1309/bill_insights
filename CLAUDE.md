@@ -28,6 +28,10 @@ file is the working reference. Dated history lives in docs/HISTORY.md.
   The site only reads; all writes go through firebase-admin (functions/scripts), which
   bypasses rules. **Adding a new collection the site reads? Add a read rule** and
   republish (Firebase console → Firestore → Rules, or the Rules API).
+- **Server writes:** use `bulkWriter(db)` from `netlify/lib/firebase.js`, never
+  `db.bulkWriter()`: Firestore's `close()` never rejects, so a failed write would go
+  unnoticed (and e.g. votes get flagged applied anyway). Nightly steps must be safe to
+  re-run after a crash at any point (see member_votes `applied`).
 - The Firebase *web* config in `public/data.js` (`apiKey: "AIza…"`) is public by design.
   Netlify's secret scanner flags it, so `netlify.toml` exempts that one value via
   `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`. Never exempt or disable scanning for
@@ -86,6 +90,7 @@ netlify/lib/health.js              recordRun(): stats/health, latest run of each
 netlify/lib/tracked-bills.js       sync_state/tracked: enriched bill ids + stored laws (markTracked)
 scripts/build-tracked-bills.js     Rebuild sync_state/tracked from `bills` [--write]
 netlify/lib/http.js                fetchWithRetry/getJson/getText (timeouts, retries, key masking), json()
+netlify/lib/pool.js                pool(items, concurrency, fn), shared by functions and scripts
 scripts/build-member-votes.js      Rebuild member_votes + vote_index from full votes [--write] [--congress N]
 scripts/build-stats.js             Rebuild stats/overview [--backfill party_breakdown]
 scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
@@ -224,8 +229,13 @@ votes], broad [bill] } }, watchlist_order, congress, generated_at
 bioguideId, congress, chamber, name, party, state,
 totals { votes, yea, nay, present, not_voting, with_party, party_comparable },
 recent [latest 50: { id, date, chamber, roll, question, result, bill_id, legislation,
-  position, group (yea|nay|present|not_voting|other), party_majority }], updated_at
+  position, group (yea|nay|present|not_voting|other), party_majority }],
+applied [voteKey of every vote counted, e.g. "2h323"], updated_at
 ```
+One doc per member who voted this Congress (556: the 539 current members plus former
+members). `applied` makes applying idempotent: a vote already in it is skipped, so a run
+that crashed after writing member docs but before flagging votes can't double-count
+(verified 2026-11-12 by re-applying a vote: totals unchanged). ~7 KB for a senator.
 The member modal's Voting Record reads this one doc. Each `votes` doc has `members_applied`
 (false when written by ingest/import, true once counted). Every ingest applies all
 unapplied votes of the Congress to member_votes, vote_index **and** vote_summaries, then flags them, so
@@ -253,9 +263,14 @@ About 300 bytes per vote, so a session's doc stays far below the 1 MB limit.
 
 **`stats/health`** — public read, written by both scheduled syncs (`recordRun`)
 ```
-ingest_votes | sync_bills: { last_run, last_success, ok, failed_steps[], counts }
+ingest_votes | sync_bills: { last_run, last_success, ok, scheduled, failed_steps[], counts,
+  last_scheduled_run, last_scheduled_ok, last_scheduled_success }
 ```
-Step names only, no error text. The footer shows "Data last updated"; a notice appears
+Step names only, no error text. `scheduled` = a real Netlify scheduled run (body has
+`next_run` and `NETLIFY_DEV` is unset); run-ingest.js and `netlify dev` runs are manual.
+`npm run health` judges the scheduled fields, so a manual run can't hide a failed night.
+sync-bills fails its `summaries` step when every summary attempt fails (e.g. a revoked
+OpenAI key), so that shows up too. The footer shows "Data last updated"; a notice appears
 when either sync's last success is more than 36 h old.
 
 **`members`** — doc id = bioguideId, written by `ingest-votes.js`
@@ -302,7 +317,15 @@ per-state `members` query and says nationwide search is unavailable.
   `MIN_VOTES_TO_DISPLAY` (25) votes. member_votes reset per Congress. find-district picks
   the new district map by itself (reorder its `VINTAGES` then).
 - **Tracked bills stay current:** `sync-bills` re-enriches every tracked bill Congress.gov
-  changed since `sync_state/bills.last_refresh`, plus new laws (≤60/run), then rebuilds stats.
+  changed since `sync_state/bills.last_refresh`, plus new laws (≤60/run), then rebuilds
+  stats. The list comes oldest first with dates only; with a backlog the window moves to
+  the start of the earliest date still pending, and a bill enriched on/after its update
+  date is skipped, so every run makes progress. Steps check a 28 s budget and stop early.
+- **Waiting bills** (no CRS summary yet) are re-checked oldest check first via the
+  (crs_summary_available, crs_checked_at) index (fallback: first 100 by id). A failed
+  check still sets `crs_checked_at` (+ `crs_check_errors`), so it can't block the queue.
+- **Member sync** refuses a list under 500 members (API trouble would otherwise retire
+  everyone) and runs on its own, so its failure doesn't stop the vote sync.
 - Data is complete for the 119th Congress (all votes; all 140 laws as of 2026-11-12).
 
 `sync_state` is server-only (no read rule in firestore.rules, so browsers are denied):
@@ -316,6 +339,14 @@ per-state `members` query and says nationwide search is unavailable.
 **Firestore read budget (free tier: 50k/day).** A visit costs ~2 reads (stats/overview,
 stats/health); Bills loads on its tab, the 100 KB directory on Legislators. Nightly runs
 cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting day).
+
+### Code review (2026-11-12)
+Three parallel reviews (backend, frontend, ops/data) found no data damage (every derived
+collection reconciled exactly) but fixed: non-idempotent member apply + silent BulkWriter
+failures; refresh window that could stall; member-list sanity; Issues tab breaking
+browser Back and leaking listeners; a malformed link crashing startup; races in Issues
+Back/Forward and the state picker; health check fooled by manual runs. The smoke test
+now covers Back from Issues, repeated topic switches and malformed links.
 
 ### Open work (as of 2026-11-12)
 - Healthcare/Economy coverage: focused/broad watchlists like Foreign Affairs (Healthcare shows

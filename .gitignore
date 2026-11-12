@@ -6,3 +6,8 @@
 
 # Dependencies
 node_modules/
+
+# OS / tool output
+.DS_Store
+test-results/
+playwright-report/
