@@ -149,3 +149,24 @@ test('topicTags: Healthcare and Economy watchlists reach beyond the policy area'
   assert.ok(!topicTags({ title: 'Taxi Safety Act' }).topics.includes('taxes'));
   assert.ok(topicTags({ title: 'Reciprocal Trade Act' }).topics.includes('tariffs'));
 });
+
+test('fillUnmappedSenators: LIS map first, then unique name + state', async () => {
+  const { fillUnmappedSenators, senatorNameIndex } = await import('../netlify/lib/senate-votes.js');
+  const index = senatorNameIndex([
+    { id: 'C000127', name: 'Cantwell, Maria', state: 'WA' },
+    { id: 'X1', name: 'Smith, Ann', state: 'MN' },
+    { id: 'X2', name: 'Smith, Bob', state: 'MN' },          // ambiguous: left out
+    { id: 'L000570', name: 'Luján, Ben Ray', state: 'NM' },
+  ]);
+  const lis = new Map([['S100', 'B000001']]);
+  const ivs = [
+    { bioguideId: null, lis_member_id: 'S100', name: 'Old, Senator', state: 'OH' },  // from the LIS map
+    { bioguideId: null, lis_member_id: 'S999', name: 'Cantwell, Maria', state: 'WA' }, // by name + state
+    { bioguideId: null, lis_member_id: 'S998', name: 'Lujan, Ben', state: 'NM' },      // accent-insensitive
+    { bioguideId: null, lis_member_id: 'S997', name: 'Smith, Ann', state: 'MN' },      // ambiguous: stays
+    { bioguideId: 'K1', lis_member_id: 'S1', name: 'Known, A', state: 'TX' },
+  ];
+  assert.equal(fillUnmappedSenators(ivs, lis, index), 1);
+  assert.deepEqual(ivs.map(v => v.bioguideId), ['B000001', 'C000127', 'L000570', null, 'K1']);
+  assert.equal(lis.get('S999'), 'C000127');   // learned for later votes
+});

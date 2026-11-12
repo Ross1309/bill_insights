@@ -108,7 +108,8 @@ netlify/functions/bill-detail.js   GET /api/bill-detail?id={bill_id}: sponsor, c
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
                                    policy-area -> category map, summary generation
 netlify/lib/firebase.js            firebase-admin init (raw or base64 service account)
-run-ingest.js                      Runs ingest-votes handler locally
+run-ingest.js                      Runs ingest-votes once locally (exit 1 on failure)
+run-sync-bills.js                  Runs sync-bills once locally with .env keys (incl. OpenAI)
 docs/HISTORY.md                    Dated notes: reviews, backfills, first deploys, reference site
 ```
 
@@ -119,8 +120,8 @@ as a function; esbuild bundles it via imports.
 
 ```
 netlify dev                                         # app + functions on :8888
-node run-ingest.js                                  # all current members + House votes
-curl localhost:8888/.netlify/functions/sync-bills   # bill sync (10 bills, ≤3 summaries/run)
+node run-ingest.js                                  # nightly ingest once: members, House + Senate votes, member records, stats
+node run-sync-bills.js                              # bill sync once, with .env keys (see note below)
 node scripts/import-votes.js [--write] [--chamber house|senate] [--congress 118] [--limit N]
 node scripts/import-bills.js [--write] [--limit 2000]
 node scripts/summarize-bills.js [--write] [--limit N] [--recheck-days 3]
@@ -140,6 +141,11 @@ Netlify functions (their 404s are ignored; Campaign Finance is only checked live
 modes read the real Firestore (~30 reads). GitHub Actions emails the repo owner when a
 workflow fails, including the daily health check: that's the alert for failed nightly runs
 (the site's stale notice only appears after 36 h).
+
+**`netlify dev` and secrets:** `OPENAI_API_KEY` is a *secret* variable in Netlify, and
+`netlify dev` injects it as a masked placeholder (`****…`) instead of the `.env` value, so
+OpenAI calls 401 there (and `netlify env:get` shows the mask too). Run the bill sync with
+`node run-sync-bills.js` (uses `.env`) to test summaries locally. Production is unaffected.
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
 optional `FEC_API_KEY`. `CONGRESS_API_KEY` is an api.data.gov key, which OpenFEC also
@@ -184,7 +190,10 @@ individual_votes[].lis_member_id
 - Senate: Congress.gov has no Senate vote endpoint (404 as of 2026-11-10), so votes come
   from senate.gov LIS XML (`vote_menu_{c}_{s}.xml`, newest first, then each
   `vote_{c}_{s}_{00000}.xml`). Senators are identified by LIS id and mapped to bioguideId
-  via congress-legislators `id.lis` (100/100 mapped). Times are Eastern, converted to UTC
+  via congress-legislators `id.lis` (100/100 mapped). Senators the *current* file lacks
+  (left office, or appointed days ago) are mapped by the historical file (loaded only then)
+  and, failing that, by unique last name + state in `directory/members`
+  (`fillUnmappedSenators`). Times are Eastern, converted to UTC
   with DST. Nominations (`PN`) get `legislation` + `document_title` but no `bill_id`.
 - House and Senate syncs run in parallel and independently (`Promise.allSettled`). A full
   ingest takes ~3–15 s locally (Congress.gov's House list is the slow part); scheduled
@@ -322,9 +331,13 @@ per-state `members` query and says nationwide search is unavailable.
   stats. The list comes oldest first with dates only; with a backlog the window moves to
   the start of the earliest date still pending, and a bill enriched on/after its update
   date is skipped, so every run makes progress. Steps check a 28 s budget and stop early.
-- **Waiting bills** (no CRS summary yet) are re-checked oldest check first via the
-  (crs_summary_available, crs_checked_at) index (fallback: first 100 by id). A failed
-  check still sets `crs_checked_at` (+ `crs_check_errors`), so it can't block the queue.
+- **Waiting bills** (~1,090 with no CRS summary yet): 25 re-checked per night, CRS checks 5
+  at a time, then OpenAI only for those that now have one (≤6/run, within the time budget;
+  leftovers stay first in line). Order: tracked bills the refresh just re-enriched (most
+  likely to have a new summary), never-checked bills, then oldest check first via the
+  (crs_summary_available, crs_checked_at) index (fallback: first 100 by id); each at most
+  every 3 days, so the whole backlog cycles in ~6 weeks. A failed check still sets
+  `crs_checked_at` (+ `crs_check_errors`), so it can't block the queue.
 - **Member sync** refuses a list under 500 members (API trouble would otherwise retire
   everyone) and runs on its own, so its failure doesn't stop the vote sync.
 - Data is complete for the 119th Congress (all votes; all 140 laws as of 2026-11-12).
@@ -352,11 +365,6 @@ now covers Back from Issues, repeated topic switches and malformed links.
 ### Open work (as of 2026-11-12)
 - "What Congress did this week" digest; more topics (Immigration, Defense: add to topics.js
   + a chip in index.html + ISSUE_TOPICS in app.js, then retag-topics + build-stats).
-- Waiting bills are re-checked 5 per sync run; with ~1,000 waiting, run
-  `summarize-bills.js --write` occasionally (or schedule it) to catch new CRS summaries.
-- Senate votes: the nightly ingest maps senators with the *current* congress-legislators
-  file, so a senator who leaves can show unlinked on later votes;
-  `import-votes.js --write --chamber senate` (uses historical too) fixes that.
 
 ## Issues tab (frontend)
 

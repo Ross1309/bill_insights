@@ -150,3 +150,40 @@ export async function fetchSenateVote(entry, lisToBioguide) {
   return parseVote(xml, entry, lisToBioguide);
 }
 
+// --- Senators the current LIS -> bioguide map doesn't know --------------------------
+// The congress-legislators "current" file misses senators who have left (their older
+// votes) and can lag new appointees by days. Fallbacks, used only when needed:
+//  - the historical file (13.5 MB, departed senators), and
+//  - name + state against our members directory (Congress.gov, updated nightly): a
+//    match only when exactly one senator from that state has that last name.
+const fold = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+// senators: [{ id (bioguide), name ("Last, First"), state }] -> Map "WA|cantwell" -> id,
+// leaving out ambiguous keys (two senators from one state sharing a last name).
+export function senatorNameIndex(senators) {
+  const out = new Map();
+  for (const m of senators) {
+    const key = `${m.state}|${fold(String(m.name || '').split(',')[0])}`;
+    out.set(key, out.has(key) ? null : m.id);
+  }
+  for (const [k, v] of out) if (!v) out.delete(k);
+  return out;
+}
+
+// Fill missing bioguideIds in a vote's individual_votes. Learns lis -> bioguide pairs
+// into `lisMap` for later votes. Returns how many are still unmapped.
+export function fillUnmappedSenators(individualVotes, lisMap, nameIndex) {
+  let left = 0;
+  for (const iv of individualVotes) {
+    if (iv.bioguideId) continue;
+    const id = (iv.lis_member_id && lisMap.get(iv.lis_member_id))
+      || nameIndex?.get(`${iv.state}|${fold(String(iv.name || '').split(',')[0])}`) || null;
+    if (id) {
+      iv.bioguideId = id;
+      if (iv.lis_member_id) lisMap.set(iv.lis_member_id, id);
+    } else {
+      left++;
+    }
+  }
+  return left;
+}

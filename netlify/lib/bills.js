@@ -202,6 +202,28 @@ export async function generateSummary({ title, crsSummary }, openaiKey) {
   };
 }
 
+// The bill's latest CRS summary text, or null if CRS hasn't published one. CRS bill
+// summaries start with the 93rd Congress (1973); older records (which Congress.gov
+// sometimes re-touches) have none, and their endpoint can error. Throws on API errors.
+export async function checkCrsSummary(bill, congressKey) {
+  if (Number(bill.congress) < 93) return null;
+  return fetchLatestCrsSummary(bill.congress, bill.type, bill.number, congressKey);
+}
+
+// Fields once the CRS check is done (`crs` = text or null): no CRS -> mark waiting (and
+// drop any old title-only/legacy summary); CRS -> generate from it (OpenAI).
+export async function summaryFromCrs(bill, crs, existingSummary, { openaiKey, deleteField }) {
+  const checked = { crs_checked_at: new Date().toISOString() };
+  if (!crs) {
+    const fields = { ...checked, crs_summary_available: false };
+    if (existingSummary) fields.ai_summary = deleteField();
+    return { fields, generated: false, status: 'no_crs' };
+  }
+  const summary = await generateSummary({ title: bill.title, crsSummary: crs }, openaiKey);
+  if (!summary) return { fields: {}, generated: false, status: 'error', error: 'OpenAI request failed' };
+  return { fields: { ...checked, crs_summary_available: true, ai_summary: summary }, generated: true, status: 'generated' };
+}
+
 // Summary fields to write for one bill (CRS-only policy):
 //  - already has a CRS-based summary         -> nothing to do
 //  - CRS summary exists                      -> generate from it
@@ -209,30 +231,15 @@ export async function generateSummary({ title, crsSummary }, openaiKey) {
 //                                               drop any old title-only/legacy summary)
 //  - CRS or OpenAI request failed            -> nothing written; retried next time
 // `deleteField` is admin.firestore.FieldValue.delete().
-export async function summaryUpdate(bill, existingSummary, { congressKey, openaiKey, deleteField }) {
+export async function summaryUpdate(bill, existingSummary, keys) {
   if (existingSummary?.source === 'crs_summary') return { fields: {}, generated: false, status: 'has_summary' };
-
   let crs;
   try {
-    // CRS bill summaries start with the 93rd Congress (1973); older records (which
-    // Congress.gov sometimes re-touches) have none, and their endpoint can error.
-    crs = Number(bill.congress) < 93
-      ? null
-      : await fetchLatestCrsSummary(bill.congress, bill.type, bill.number, congressKey);
+    crs = await checkCrsSummary(bill, keys.congressKey);
   } catch (err) {
     return { fields: {}, generated: false, status: 'error', error: err.message };
   }
-  const checked = { crs_checked_at: new Date().toISOString() };
-
-  if (!crs) {
-    const fields = { ...checked, crs_summary_available: false };
-    if (existingSummary) fields.ai_summary = deleteField();
-    return { fields, generated: false, status: 'no_crs' };
-  }
-
-  const summary = await generateSummary({ title: bill.title, crsSummary: crs }, openaiKey);
-  if (!summary) return { fields: {}, generated: false, status: 'error', error: 'OpenAI request failed' };
-  return { fields: { ...checked, crs_summary_available: true, ai_summary: summary }, generated: true, status: 'generated' };
+  return summaryFromCrs(bill, crs, existingSummary, keys);
 }
 
 // --- Issue-tracker enrichment: CRS subjects, legislative stage, sponsor, topics ---

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { getDb, admin } from '../lib/firebase.js';
 import { getJson } from '../lib/http.js';
 import { STATE_CODES } from '../../public/states.js';
-import { listSenateVotes, fetchSenateVote, senateVoteId } from '../lib/senate-votes.js';
+import { listSenateVotes, fetchSenateVote, senateVoteId, fillUnmappedSenators, senatorNameIndex } from '../lib/senate-votes.js';
 import { listHouseVotes, buildHouseVoteDoc, houseVoteId } from '../lib/house-votes.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
@@ -150,11 +150,27 @@ export async function syncSenateVotes(legislators, indexed) {
   const missing = entries.filter(e => unstored.has(senateVoteId(e)));
   const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
   if (missing.length > todo.length) console.warn(`Senate: ${missing.length} missing votes; ingesting ${todo.length}, the rest next run`);
+  // Fallbacks for senators the current file doesn't know (loaded once, only if needed).
+  let fallbacks = null;
+  const loadFallbacks = () => (fallbacks ??= (async () => {
+    const historical = await getJson(LEGISLATORS_HISTORICAL_URL, { timeoutMs: 15000 }).catch(err => {
+      console.warn(`congress-legislators historical file unavailable: ${err.message}`);
+      return [];
+    });
+    for (const l of historical) if (l.id?.lis && l.id?.bioguide && !lisToBioguide.has(l.id.lis)) lisToBioguide.set(l.id.lis, l.id.bioguide);
+    const dir = (await db.collection("directory").doc("members").get()).data()?.members || [];
+    return senatorNameIndex(dir.filter(m => m.chamber === "Senate"));
+  })());
+
   const billIds = [];
   await pool(todo, 3, async entry => {
     const { doc, unmapped } = await fetchSenateVote(entry, lisToBioguide);
+    if (unmapped) {
+      const left = fillUnmappedSenators(doc.individual_votes, lisToBioguide, await loadFallbacks());
+      if (left) console.warn(`Senate vote ${doc.vote_id}: ${left} senator(s) without a bioguide mapping`);
+      else console.log(`Senate vote ${doc.vote_id}: mapped ${unmapped} senator(s) via the historical file or name + state`);
+    }
     await db.collection("votes").doc(doc.vote_id).set({ ...doc, members_applied: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    if (unmapped) console.warn(`Senate vote ${doc.vote_id}: ${unmapped} senator(s) without a bioguide mapping`);
     if (doc.bill_id) billIds.push(doc.bill_id);
   });
   console.log(`Senate: ingested ${todo.length} new votes`);
@@ -213,6 +229,7 @@ const CHAMBERS = { 'House of Representatives': 'House', 'Senate': 'Senate' };
 // Public-domain congress-legislators dataset: maps bioguideId to FEC candidate ids
 // and Senate LIS ids (Congress.gov carries neither). Returns null if unavailable.
 const LEGISLATORS_URL = 'https://unitedstates.github.io/congress-legislators/legislators-current.json';
+const LEGISLATORS_HISTORICAL_URL = 'https://unitedstates.github.io/congress-legislators/legislators-historical.json';
 
 async function fetchLegislators() {
   try {

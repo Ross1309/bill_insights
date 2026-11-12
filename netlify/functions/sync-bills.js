@@ -13,6 +13,8 @@ import {
   fetchRecentBills,
   makeBillId,
   summaryUpdate,
+  checkCrsSummary,
+  summaryFromCrs,
   fetchBillEnrichment,
   fetchEnrichedBill,
   listBillsUpdatedSince,
@@ -26,8 +28,8 @@ import { loadTracked, markTracked } from '../lib/tracked-bills.js';
 import { pool } from '../lib/pool.js';
 
 const BILLS_PER_RUN = 10;
-const MAX_SUMMARIES = 3; // keeps each run inside Netlify's function timeout
-const RECHECK_PER_RUN = 5; // waiting bills re-checked for a new CRS summary
+const MAX_SUMMARIES = 6; // new AI summaries per run (also capped by the time budget)
+const RECHECK_PER_RUN = 25; // waiting bills re-checked for a new CRS summary (~1 s each, 5 at a time)
 const RECHECK_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_REFRESH = 60; // tracked bills re-enriched per run (stage, subjects, topics)
 const FIRST_RUN_LOOKBACK_MS = 26 * 60 * 60 * 1000;
@@ -88,7 +90,7 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds, timeLeft) {
         ...(neverChecked ? { crs_summary_available: null } : {}),
         synced_at: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
-      done.push({ id: snap.id, stage: fields.stage });
+      done.push({ id: snap.id, stage: fields.stage, waiting: d.crs_summary_available === false });
     } catch (err) {
       errors.push(`${snap.id}: ${err.message}`);
     }
@@ -110,13 +112,16 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds, timeLeft) {
   console.log(`refresh: ${updated.length}${truncated ? '+' : ''} bills updated since ${since}; ${todo.length} to refresh; refreshed ${done.length}`
     + `${errors.length ? `; ${errors.length} failed` : ''}; window -> ${next && next > since ? next : 'unchanged'}`);
   if (errors.length) console.error(`refresh: ${errors.length} failed (retried next run): ${errors.slice(0, 3).join('; ')}`);
-  return { refreshed: done.length, failed: errors.length };
+  // Bills that just changed and still lack a CRS summary are the likeliest to have a new
+  // one: the backlog step checks them first.
+  return { refreshed: done.length, failed: errors.length, waitingIds: done.filter(b => b.waiting).map(b => b.id) };
 }
 
 // Scheduled functions get 30 s. Steps check the time left and stop early (what's left
 // is picked up next run) instead of being killed mid-write.
 const RUN_BUDGET_MS = 28000;
 const SUMMARY_NEEDS_MS = 14000;   // one CRS fetch + one OpenAI call (12 s timeout)
+const OPENAI_NEEDS_MS = 13000;    // one OpenAI call (CRS text already fetched)
 
 // Bills with no CRS summary yet, longest since their last check first. Needs the
 // (crs_summary_available ASC, crs_checked_at ASC) index; without it, falls back to the
@@ -212,41 +217,59 @@ export default async request => {
     // Issue tracker freshness: tracked bills that changed + newly enacted laws.
     const failedSteps = [];
     let refreshed = 0;
+    let changedWaiting = [];
     try {
       const r = await refreshTrackedBills(db, admin, CONGRESS_API_KEY,
         new Set(billsList.map(item => makeBillId(item.type, item.number, item.congress))), timeLeft);
       refreshed = r.refreshed;
+      changedWaiting = r.waitingIds;
       if (r.failed) failedSteps.push('refresh');
     } catch (err) {
       failedSteps.push('refresh');
       console.error('Tracked-bill refresh failed:', err);
     }
 
-    // Backlog: re-check a few bills still waiting for a CRS summary.
+    // Backlog: bills still waiting for a CRS summary (~1,000). The CRS checks are cheap
+    // and run in parallel; only bills that now have a summary need OpenAI, one at a time
+    // within the time budget (those left over stay first in line for the next run).
+    // Order: tracked bills that just changed (likeliest to have a new summary), never-
+    // checked bills, then the longest since their last check (each at most every 3 days).
     let rechecked = 0;
-    if (summarized < MAX_SUMMARIES) {
+    {
       const recent = new Set(billsList.map(item => makeBillId(item.type, item.number, item.congress)));
-      // Never-checked bills first (enriched by ingest-votes, marked null), then bills
-      // that had no CRS summary last time (re-checked at most every 3 days).
-      // A bill whose check failed gets crs_checked_at too, so it moves to the back
-      // instead of blocking the queue every night.
       const byLastCheck = (a, b) => (a.data().crs_checked_at || '').localeCompare(b.data().crs_checked_at || '');
-      const neverChecked = (await db.collection('bills').where('crs_summary_available', '==', null).limit(20).get()).docs
-        .filter(d => !recent.has(d.id)).sort(byLastCheck);
-      const stale = (await waitingBills(db, RECHECK_PER_RUN * 4))
-        .filter(d => !recent.has(d.id) && Date.now() - Date.parse(d.data().crs_checked_at || 0) > RECHECK_AFTER_MS);
-      const waiting = [...neverChecked, ...stale].slice(0, RECHECK_PER_RUN);
-      for (const d of waiting) {
-        if (summarized >= MAX_SUMMARIES || timeLeft() < SUMMARY_NEEDS_MS) break;
-        const result = await summaryUpdate(d.data(), d.data().ai_summary, keys);
-        if (result.status === 'error') summaryErrors++;
-        const fields = result.status === 'error'
-          ? { crs_checked_at: new Date().toISOString(), crs_check_errors: FieldValue.increment(1) }
-          : result.fields;
-        if (Object.keys(fields).length) await d.ref.set(fields, { merge: true });
-        if (result.generated) summarized++;
+      const changed = changedWaiting.length ? (await db.getAll(...changedWaiting.map(id => db.collection('bills').doc(id)))).filter(d => d.exists) : [];
+      const neverChecked = (await db.collection('bills').where('crs_summary_available', '==', null).limit(RECHECK_PER_RUN).get()).docs.sort(byLastCheck);
+      const stale = (await waitingBills(db, RECHECK_PER_RUN * 2))
+        .filter(d => Date.now() - Date.parse(d.data().crs_checked_at || 0) > RECHECK_AFTER_MS);
+      const seen = new Set();
+      const waiting = [...changed, ...neverChecked, ...stale]
+        .filter(d => !recent.has(d.id) && !seen.has(d.id) && seen.add(d.id))
+        .slice(0, RECHECK_PER_RUN);
+
+      // A failed check still gets crs_checked_at, so it moves to the back of the queue.
+      const failed = d => { summaryErrors++; return d.ref.set({ crs_checked_at: new Date().toISOString(), crs_check_errors: FieldValue.increment(1) }, { merge: true }); };
+      const ready = [];
+      await pool(waiting, 5, async d => {
+        if (timeLeft() < 8000) return;
+        let crs;
+        try {
+          crs = await checkCrsSummary(d.data(), CONGRESS_API_KEY);
+        } catch {
+          return failed(d);
+        }
         rechecked++;
+        if (crs) ready.push({ d, crs });
+        else await d.ref.set((await summaryFromCrs(d.data(), null, d.data().ai_summary, keys)).fields, { merge: true });
+      });
+      for (const { d, crs } of ready) {
+        if (summarized >= MAX_SUMMARIES || timeLeft() < OPENAI_NEEDS_MS) break;
+        const result = await summaryFromCrs(d.data(), crs, d.data().ai_summary, keys);
+        if (result.status === 'error') { await failed(d); continue; }
+        await d.ref.set(result.fields, { merge: true });
+        summarized++;
       }
+      if (ready.length) console.log(`backlog: ${ready.length} waiting bills now have a CRS summary; summarized ${summarized}`);
     }
 
     // Rebuild Overview + Issues stats so today's stage changes show up today.
