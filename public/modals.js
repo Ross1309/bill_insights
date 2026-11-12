@@ -8,6 +8,7 @@ import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
+import { backDetail, closeAllDetails, detailHash, pushDetail, setRouteHandlers } from "./router.js";
 
 const modalRoot = document.getElementById("modal-root");
 let modalStack = [];
@@ -338,11 +339,14 @@ export function loadInto(entry, key, promise) {
     .finally(() => { if (modalStack.at(-1) === entry) renderModal(); });
 }
 
-function openModal(kind, id) {
+// `push`: add a history entry (the visitor opened it). The router passes false when
+// it's showing a detail from the URL (pasted link, Back/Forward).
+function openModal(kind, id, { push = true } = {}) {
   const def = MODAL_KINDS[kind];
   if (!def || !id) return;
   const top = modalStack.at(-1);
   if (top && top.kind === kind && top.id === id) return;
+  if (push) pushDetail(kind, id);
   if (!modalStack.length) lastFocused = document.activeElement;
   const entry = { kind, id, tab: def.tabs[0][0], data: {}, errors: {}, filter: {} };
   modalStack.push(entry);
@@ -358,6 +362,21 @@ function closeModals() {
   document.body.classList.remove("overflow-hidden");
   lastFocused?.focus?.();
 }
+
+// The router's view of details: show this one (popping back to it if it's already
+// on the stack, e.g. after the browser's Back button), or close them all.
+function showModalFromRoute(kind, id) {
+  const i = modalStack.findIndex(e => e.kind === kind && e.id === id);
+  if (i === -1) return openModal(kind, id, { push: false });
+  if (i === modalStack.length - 1) return;
+  modalStack = modalStack.slice(0, i + 1);
+  renderModal();
+  modalRoot.querySelector("[data-close]")?.focus();
+}
+
+// User actions: go through browser history when we pushed entries for these details.
+const userClose = () => { if (!closeAllDetails(modalStack.length)) closeModals(); };
+const userBack = () => { if (!backDetail()) backModal(); };
 
 function backModal() {
   modalStack.pop();
@@ -383,6 +402,7 @@ function renderModal() {
         <div class="shrink-0 flex items-start gap-4 p-5 border-b border-gray-200">
           ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">←</button>` : ""}
           ${def.header(e)}
+          <button type="button" data-copy-link="${escapeHtml(detailHash(e.kind, e.id))}" class="shrink-0 mt-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
           <button type="button" data-close aria-label="Close" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">✕</button>
         </div>
         <div role="tablist" class="shrink-0 flex gap-4 px-5 border-b border-gray-200 overflow-x-auto">
@@ -405,8 +425,8 @@ export function setupModals() {
       return;
     }
     if (!modalStack.length) return;
-    if (ev.target.matches("[data-backdrop]") || ev.target.closest("[data-close]")) return closeModals();
-    if (ev.target.closest("[data-back]")) return backModal();
+    if (ev.target.matches("[data-backdrop]") || ev.target.closest("[data-close]")) return userClose();
+    if (ev.target.closest("[data-back]")) return userBack();
     const tab = ev.target.closest("[data-tab]");
     if (tab) {
       modalStack.at(-1).tab = tab.dataset.tab;
@@ -432,6 +452,10 @@ export function setupModals() {
   modalRoot.addEventListener("input", onFilter);
   modalRoot.addEventListener("change", onFilter);
   document.addEventListener("keydown", ev => {
-    if (ev.key === "Escape" && modalStack.length) closeModals();
+    if (ev.key === "Escape" && modalStack.length) userClose();
+  });
+  setRouteHandlers({
+    showDetail: showModalFromRoute,
+    closeDetails: () => { if (modalStack.length) closeModals(); },
   });
 }

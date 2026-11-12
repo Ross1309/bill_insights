@@ -4,11 +4,12 @@ import { renderIssue } from "./issues.js";
 import { renderOverview } from "./overview.js";
 import { db, getOverviewDoc, getVote } from "./data.js";
 import { escapeHtml, store } from "./util.js";
-import { navBills, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
+import { activeTab, navBills, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
 import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
-import { DEFAULT_STATE, loadHeadlineStats, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
+import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, loadHeadlineStats, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
+import { onTabArg, setRouteHandlers, shareUrl, startRouter, tabArg, replaceTab } from "./router.js";
 
 let overviewLoaded = false;
 
@@ -24,6 +25,7 @@ async function loadIssue(slug) {
   const request = ++issueRequest;
   currentIssue = slug;
   store.set("cw-issue", slug);
+  if (activeTab() === "issues") replaceTab("issues");
   setChipGroup("issue-topics", "topic", slug);
   try {
     if (!issueCache.has(slug)) {
@@ -46,6 +48,35 @@ async function loadIssue(slug) {
     console.error("Error loading issue:", err);
     container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load this issue: ${escapeHtml(err.message)}</p>`;
   }
+}
+
+// Clipboard API, else the older execCommand route (some in-app browsers), else a
+// prompt the visitor can copy from. Returns whether it was copied.
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* try the next way */ }
+  try {
+    const ta = Object.assign(document.createElement("textarea"), { value: text });
+    ta.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    if (ok) return true;
+  } catch { /* try the next way */ }
+  try { window.prompt("Copy this link:", text); } catch { /* nothing else to try */ }
+  return false;
+}
+
+// Copy a shareable link: data-copy-link="#bill/…" (or empty = the page as shown now).
+function setupCopyLinks() {
+  document.addEventListener("click", async ev => {
+    const btn = ev.target.closest("[data-copy-link]");
+    if (!btn) return;
+    const url = shareUrl(btn.dataset.copyLink || location.hash);
+    const label = btn.textContent;
+    btn.textContent = await copyText(url) ? "Link copied" : "Copy failed";
+    setTimeout(() => { btn.textContent = label; }, 2000);
+  });
 }
 
 function setupIssues() {
@@ -113,17 +144,30 @@ async function init() {
   onTabOpen.issues = () => { if (!issueLoaded) loadIssue(currentIssue); };
   onTabOpen.bills = startBills;
   onTabOpen.votes = () => { if (!votesLoaded) fetchVotes(); };
+  onTabOpen.members = showDirectory;
+  // URL arguments (see router.js): Issues topic, Legislators state / district.
+  tabArg.issues = () => currentIssue;
+  onTabArg.issues = slug => {
+    if (!ISSUE_TOPICS.includes(slug)) return;
+    if (issueLoaded && slug !== currentIssue) loadIssue(slug);
+    else currentIssue = slug;
+  };
+  tabArg.members = legislatorsArg;
+  onTabArg.members = applyLegislatorsArg;
+  setRouteHandlers({ showTab: tab => switchTab(tab, { push: false }) });
   populateStateSelect();
   setupTabs();
-  switchTab("overview");
   setupMemberFilters();
   setupVoteFilters();
   setupBillFilters();
   setupModals();
   setupIssues();
+  setupCopyLinks();
   loadHeadlineStats();
   loadHealth();
-  // Bills load when their tab is first opened (Overview is the default tab).
+  // Shows the tab / detail in the URL (Overview if none). Bills load when their tab
+  // is first opened.
+  startRouter();
 }
 
 function setupTabs() {
@@ -131,10 +175,7 @@ function setupTabs() {
   navIssues.addEventListener("click", () => switchTab("issues"));
   navBills.addEventListener("click", () => switchTab("bills"));
   navVotes.addEventListener("click", () => switchTab("votes"));
-  navMembers.addEventListener("click", () => {
-    switchTab("members");
-    showDirectory();
-  });
+  navMembers.addEventListener("click", () => switchTab("members"));
 }
 
 init();

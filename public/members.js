@@ -3,7 +3,8 @@ import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { collection, doc, getCountFromServer, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { db, getOverviewDoc, memberById } from "./data.js";
 import { PARTY_ABBR, PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate } from "./util.js";
-import { switchTab } from "./tabs.js";
+import { activeTab, switchTab } from "./tabs.js";
+import { replaceTab } from "./router.js";
 
 const membersContainer = document.getElementById("members-container");
 const stateSelect = document.getElementById("state-select");
@@ -200,8 +201,20 @@ export function setChipGroup(groupId, attr, value) {
   });
 }
 
+// URL argument for the Legislators tab (router.js): a state code or "all".
+export function legislatorsArg() {
+  return memberFilters.state || "all";
+}
+
+export function applyLegislatorsArg(arg) {
+  const code = String(arg).toUpperCase();
+  if (code === "ALL") return setMemberFilters({ state: "" });
+  if (STATE_NAMES[code]) return setMemberFilters({ state: code });
+}
+
 export function setMemberFilters(changes) {
   Object.assign(memberFilters, changes);
+  if (activeTab() === "members") replaceTab("members");
   membersShown = MEMBERS_PAGE;
   if (stateSelect) stateSelect.value = memberFilters.state;
   const search = document.getElementById("member-search");
