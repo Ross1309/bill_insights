@@ -637,7 +637,6 @@ function renderVotes(votes) {
 
 const DEFAULT_STATE = "WA";
 const STATE_NAMES = Object.fromEntries([...STATES, ...DELEGATE_JURISDICTIONS]);
-let membersRequest = 0;
 
 function populateStateSelect() {
   if (!stateSelect) return;
