@@ -113,6 +113,7 @@ bill_id, congress (number), type ("HR"), number ("1234"), bill_number ("HR 1234"
 title, chamber, policy_area (CRS name or null),
 category ("Economy" | "Healthcare" | "Foreign Affairs" | "Other" | "Uncategorized"),
 introduced_date, update_date, latestAction { actionDate, text },
+latest_action_date (= latestAction.actionDate, top-level for ordering; null if none),
 congress_gov_url,
 ai_summary { bullet_points[], source: "crs_summary", model, generated_at } (or absent),
 crs_summary_available (bool; null = enriched but never checked; absent on old docs),
@@ -236,22 +237,12 @@ Live at https://congress-watcher.netlify.app: Overview, Issues, Bills, Votes, Le
 tabs, detail modals, campaign finance. Data is complete for the 119th Congress (votes
 1,600/1,600, laws 140/140 as of 2026-11-11) and kept current by the two scheduled syncs.
 
-### Pending deploy (do first on 2026-11-12)
-Commits a547327..HEAD (member_votes, vote_index, stats/health) are committed but **not
-pushed**. Firestore's free 50k reads/day ran out on 2026-11-11 (resets midnight Pacific).
-Do these in order:
-1. After the 10:00 UTC scheduled ingest (still old code, which writes votes without
-   `members_applied`): `node scripts/build-member-votes.js --write`. It builds
-   member_votes + vote_index and flags every vote applied. Then
-   `node scripts/build-tracked-bills.js --write` (sync_state/tracked, ~2,500 small reads)
-   and `node scripts/build-stats.js` (adds `headline` to stats/overview).
-2. Publish `firestore.rules` (adds the `member_votes` read rule), with the user's OK,
-   **before** the deploy, or the Voting Record tab gets permission errors.
-3. Verify locally (Voting Record, Overview numbers ≈1,600 votes, footer), then push all
-   commits at once. The newest commit must not say `[skip netlify]`, or the deploy is skipped.
-4. Next scheduled runs write stats/health; check the logs and the footer.
-Why this order: deployed before the backfill, the ingest would create a partial
-vote_index and the stats rebuild would trust it. Remove this section once done.
+### Second-tier deploy (2026-11-12)
+Built member_votes (556), vote_index (4 docs), sync_state/tracked (611 bills + 140 laws)
+and stats headline; published the member_votes read rule; then pushed. The Nov 12 10:00
+UTC ingest on the *old* deploy crashed at init (`node-fetch` -> fetch-blob breaks on
+Netlify's Node 24 runtime; removed in 66a1108). Both syncs then ran fine locally on the new
+code (ingest 14 s first run / 2.7 s quiet run; sync-bills 8.6 s).
 
 ### Project review fixes (2026-11-11)
 A full review found four must-fix problems; all fixed:
@@ -457,10 +448,13 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 
 ## Bills paging (frontend)
 
-- `loadBills` queries `bills` with `orderBy('update_date','desc')`, 12 per page,
-  `startAfter(lastDoc)` cursors behind a "Load more bills" button.
+- `loadBills` queries `bills` with `orderBy('latest_action_date','desc')` (the date each
+  card shows), 12 per page, `startAfter(lastDoc)` cursors behind "Load more bills".
+  It used to order by `update_date` (when Congress.gov last edited the record), which put
+  68 of the first 120 cards out of order, incl. re-touched 118th Congress bills from 2024.
 - Category buttons filter in the query (`where('category','==',…)`), which needs the
-  composite index (category ASC, update_date DESC) in `firestore.indexes.json`. Without
+  composite index (category ASC, latest_action_date DESC) in `firestore.indexes.json`.
+  If it's missing, `loadBills` falls back to the older (category, update_date) index. Without
   it the UI shows "Category filtering isn't available yet". Created in the Firebase console
   2026-11-10; add new indexes to the JSON and create them the same way (or
   `firebase deploy --only firestore:indexes`).
