@@ -1,0 +1,27 @@
+# On every push to main: lint + unit tests (the same `npm test` that gates the Netlify
+# build) and the browser smoke test against ./public. Netlify deploys in parallel;
+# a failure here emails you (Settings -> Notifications -> Actions).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Lint + unit tests
+        run: npm test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke test (local copy of public/)
+        run: npm run smoke

@@ -25,16 +25,16 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
   The site only reads; all writes go through firebase-admin (functions/scripts), which
   bypasses rules. **Adding a new collection the site reads? Add a read rule** and
   republish (Firebase console → Firestore → Rules, or the Rules API).
-- The Firebase *web* config in `public/app.js` (`apiKey: "AIza…"`) is public by design.
+- The Firebase *web* config in `public/data.js` (`apiKey: "AIza…"`) is public by design.
   Netlify's secret scanner flags it, so `netlify.toml` exempts that one value via
   `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`. Never exempt or disable scanning for
   anything else.
 
 ## Stack
 
-- **Frontend:** `public/index.html` + `public/app.js` — vanilla ES modules, Tailwind via
-  CDN, Firebase **v13.2.0** modular web SDK loaded from gstatic, reading Firestore
-  directly. Three tabs: Bills & Summaries, Roll-Call Votes, Legislators by State.
+- **Frontend:** `public/index.html` + ES modules (entry `public/app.js`), no build step,
+  Tailwind via CDN, Firebase **v13.2.0** modular web SDK loaded from gstatic, reading
+  Firestore directly. Tabs: Overview, Issues, Bills & Summaries, Roll-Call Votes, Legislators.
 - **Backend:** Netlify Functions (Node 20+, ESM, `"type": "module"`) using
   `firebase-admin`. Data sources: Congress.gov API v3, OpenAI (`gpt-4o-mini`).
 - **Local dev:** `netlify dev` → http://localhost:8888 (publish dir `public`,
@@ -43,7 +43,14 @@ plain-language AI summaries, House roll-call votes, and a member directory by st
 ## Layout
 
 ```
-public/index.html, public/app.js   UI (no build step)
+public/index.html                  Page shell, Tailwind config (no build step)
+public/app.js                      Entry: startup, tab wiring, Overview/Issues loading, data freshness
+public/data.js                     Firestore client + web config, caches, getMember/getBill/getVote, functions
+public/util.js                     escapeHtml, formatting, party/state labels, modal building blocks
+public/tabs.js                     switchTab + onTabOpen registry (each tab registers its loader)
+public/bills.js, votes.js,         One module per tab (state stays inside its module; ESLint's
+  members.js                         no-import-assign stops other modules reassigning it)
+public/modals.js, finance.js       Detail modals (member/bill/vote) and the Campaign Finance tab
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
 public/overview.js                 Overview tab charts (plain SVG/HTML) from stats/overview
 public/issues.js                   Issues tab topic pages from stats/topic-<slug> (+ explainers, glossary)
@@ -56,7 +63,11 @@ netlify/functions/sync-bills.js    Syncs recent bills + AI summaries (was sync-v
 netlify/functions/ingest-votes.js  Syncs all current members (+ directory doc) + every House and
                                    Senate roll-call vote not yet stored (≤40/chamber/run)
 netlify/lib/congress.js            currentCongress() (Jan 3 rollover), ordinal(), MIN_VOTES_TO_DISPLAY
-tests/rules.test.js                Unit tests for rule functions (`npm test`; gates Netlify builds)
+tests/*.test.js                    Unit tests (node:test); `npm test` = ESLint + these, gates Netlify builds
+tests/smoke.js                     Browser smoke test (Playwright): every tab, filters, search, modals
+scripts/check-health.js            Reads public stats/health; exit 1 if a nightly sync failed or is >20 h old
+.github/workflows/ci.yml           On push: npm test + smoke test against ./public
+.github/workflows/health.yml       Daily 12:00 UTC: check-health + smoke test against the live site
 netlify/lib/senate-votes.js        senate.gov LIS XML -> `votes` docs (menu, vote parse, ET->UTC)
 netlify/lib/house-votes.js         Congress.gov House votes -> `votes` docs (list + build doc)
 netlify/lib/vote-stats.js          party_breakdown, alignment/category/outcome rules, computeOverview
@@ -98,7 +109,19 @@ node scripts/import-bills.js [--write] [--limit 2000]
 node scripts/summarize-bills.js [--write] [--limit N] [--recheck-days 3]
 node scripts/build-stats.js [--backfill]          # stats/overview + stats/topic-*
 node scripts/import-topic-bills.js [--write] [--force]
+npm test                                          # ESLint (correctness rules) + unit tests
+npm run smoke                                     # browser smoke test on ./public (needs: npx playwright install chromium)
+SMOKE_URL=https://congress-watcher.netlify.app npm run smoke   # same, against the live site
+npm run health                                    # did last night's syncs succeed?
 ```
+
+**Checks and alerts.** ESLint runs in `npm test` (Netlify build) and catches undefined
+names; it would have blocked the Nov 12 regression (a refactor deleted `renderFinanceTab`).
+The smoke test fails on any page/console error. Locally it serves `public/` without
+Netlify functions (their 404s are ignored; Campaign Finance is only checked live); both
+modes read the real Firestore (~30 reads). GitHub Actions emails the repo owner when a
+workflow fails, including the daily health check: that's the alert for failed nightly runs
+(the site's stale notice only appears after 36 h).
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
 optional `FEC_API_KEY`. `CONGRESS_API_KEY` is an api.data.gov key, which OpenFEC also
@@ -285,10 +308,14 @@ cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting
   (Firestore's free tier is 50k reads/day; it ran out on 2026-11-11 during backfills.)
 - `stats/health` + "Data last updated" footer + stale-data notice.
 
+### Review: third tier (done 2026-11-12)
+- Bills tab ordered by `latest_action_date` (see Bills paging).
+- ESLint gate + Playwright smoke test + GitHub Actions (CI on push, daily health check
+  that emails on failure). app.js split into modules (see Layout).
+
 ### Review: remaining recommendations (not done yet)
-- Alert on failed scheduled runs (email/webhook); today the site notice is the signal.
-- Frontend: split the 1,700-line app.js into modules; Tailwind build step (CDN warns in
-  production); URL routing for shareable links; modal focus trap.
+- Frontend: Tailwind build step (CDN warns in production); URL routing for shareable
+  links; modal focus trap.
 - Product: find-your-representative by address (Census geocoder); shareable links;
   "what Congress did this week" digest; focused/broad split for every topic (Healthcare
   shows only 11 measures because health provisions ride in budget bills); reframe the

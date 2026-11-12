@@ -14,6 +14,7 @@
     "scripts": {
         "test": "eslint . && node --test tests/*.test.js",
         "lint": "eslint .",
-        "smoke": "node tests/smoke.js"
+        "smoke": "node tests/smoke.js",
+        "health": "node scripts/check-health.js"
     }
 }

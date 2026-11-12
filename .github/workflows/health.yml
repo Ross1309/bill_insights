@@ -1,0 +1,31 @@
+# Daily check after the nightly syncs (ingest-votes 10:00 UTC, sync-bills 10:30 UTC).
+# Fails if either sync failed or didn't run, or if the live site is broken. GitHub
+# emails the repo owner when a scheduled workflow fails (Settings -> Notifications ->
+# Actions). Run it by hand from the Actions tab with "Run workflow".
+name: Nightly health
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Nightly syncs succeeded
+        run: node scripts/check-health.js
+      - name: Install dependencies
+        if: always()
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Live site smoke test
+        if: always()
+        run: npm run smoke
+        env:
+          SMOKE_URL: https://congress-watcher.netlify.app
