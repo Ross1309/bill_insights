@@ -207,6 +207,7 @@ let billsExhausted = false;
 let billsLoading = false;
 let billsGeneration = 0;    // bumps on category change so stale pages are dropped
 let billsStarted = false;   // first page is requested when the Bills tab opens
+let categoryIndexReady = true; // false once the (category, latest_action_date) index is found missing
 let billsError = null;      // message shown instead of bills until the next reset
 
 function rememberBills(bills) {
@@ -235,11 +236,13 @@ async function loadBills({ reset = false } = {}) {
   renderLoadMore();
 
   try {
-    // Category filtering happens in the query so every page is full; this
-    // needs the (category ASC, update_date DESC) index in firestore.indexes.json.
+    // Newest latest action first (the date each card shows). Category filtering
+    // happens in the query so every page is full; it needs the (category ASC,
+    // latest_action_date DESC) index in firestore.indexes.json. Until that index
+    // exists, categories fall back to the older (category, update_date) index.
     const constraints = [];
     if (activeCategory !== "all") constraints.push(where("category", "==", activeCategory));
-    constraints.push(orderBy("update_date", "desc"));
+    constraints.push(orderBy(activeCategory !== "all" && !categoryIndexReady ? "update_date" : "latest_action_date", "desc"));
     if (billsCursor) constraints.push(startAfter(billsCursor));
     constraints.push(limit(BILLS_PAGE_SIZE));
 
@@ -257,6 +260,10 @@ async function loadBills({ reset = false } = {}) {
     if (generation !== billsGeneration) return;
     billsLoading = false;
     console.error("Error fetching bills:", err);
+    if (err.code === "failed-precondition" && activeCategory !== "all" && categoryIndexReady) {
+      categoryIndexReady = false; // retry this page on the older index
+      return loadBills({ reset: true });
+    }
     billsError = err.code === "failed-precondition" && activeCategory !== "all"
       ? "Category filtering isn't available yet: the Firestore index in firestore.indexes.json hasn't been created."
       : `Failed to load bills: ${err.message}`;
@@ -1542,7 +1549,7 @@ function applyBillFilters() {
   const parsed = term ? parseBillNumberTerm(term) : null;
   const exact = b => parsed && String(Number(b.number)) === parsed.number && (!parsed.type || b.type === parsed.type);
   const filtered = [...byId.values()].sort((a, b) =>
-    (exact(b) ? 1 : 0) - (exact(a) ? 1 : 0) || (b.update_date || "").localeCompare(a.update_date || ""));
+    (exact(b) ? 1 : 0) - (exact(a) ? 1 : 0) || (b.latest_action_date || "").localeCompare(a.latest_action_date || ""));
 
   renderBills(filtered, term);
   renderLoadMore();

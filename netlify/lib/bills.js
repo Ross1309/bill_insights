@@ -135,6 +135,9 @@ export function billMetadata(detail = {}, fallback = {}) {
     latestAction: action
       ? { actionDate: action.actionDate || null, text: action.text || null }
       : null,
+    // Top-level copy for ordering the Bills tab by latest action (Firestore indexes
+    // and orderBy work best on top-level fields). null still sorts (last, descending).
+    latest_action_date: action?.actionDate || null,
     update_date: detail.updateDate || fallback.updateDate || null,
     congress_gov_url: congressGovUrl(congress, type, number),
   };
