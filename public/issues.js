@@ -283,7 +283,7 @@ function definition(s) {
     <section class="text-xs text-gray-500 border-t border-gray-200 pt-5 space-y-1.5">
       <p><strong class="text-gray-700">What counts as ${esc(s.label.toLowerCase())} here:</strong> measures whose CRS policy area is <em>${s.policy_areas.map(esc).join("</em>, <em>")}</em>.${w.length ? ` Watchlists use CRS subject tags (${w.map(x => `${esc(x.label)}: <em>${x.subjects.map(esc).join("</em>, <em>")}</em>`).join("; ")}) or the topic named in the title, and can include bills from other policy areas, such as defense and appropriations.` : ""}</p>
       ${w.length ? `<p><strong class="text-gray-700">Focused vs. broad:</strong> a watchlist measure is focused if its title names the topic or CRS assigned it ${FOCUSED_MAX_SUBJECTS} or fewer subjects; otherwise it's a broad bill that includes the topic.</p>` : ""}
-      <p><strong class="text-gray-700">Coverage:</strong> bills that became law or got a recorded floor vote this Congress. Bills that never reached the floor aren't counted.</p>
+      <p><strong class="text-gray-700">Coverage:</strong> bills that became law or got a recorded floor vote this Congress. Bills that never reached the floor aren't counted. More in <a href="#methodology" class="text-accent hover:underline">How we count</a>.</p>
       <p><strong class="text-gray-700">Sources:</strong> Congress.gov (bills, CRS subjects and summaries, actions, laws), Office of the Clerk of the U.S. House, U.S. Senate (senate.gov).${s.generated_at?.toDate ? ` Updated ${esc(s.generated_at.toDate().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))}.` : ""}</p>
     </section>`;
 }

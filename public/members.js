@@ -358,7 +358,7 @@ export async function loadHeadlineStats() {
     cards.push(card(house.count, "Representatives", `${house.count < 435 ? `${435 - house.count} of 435 seats vacant · ` : ""}${split(house.parties)}`, "House"));
     cards.push(card(delegates.count, "Delegates", "Non-voting: DC, PR and territories", "Delegates"));
   }
-  if (billCount != null) cards.push(card(billCount, "Bills tracked", "Synced from Congress.gov"));
+  if (billCount != null) cards.push(card(billCount, "Bills covered", "Every law and voted-on bill, plus recent ones"));
   if (voteCount != null) cards.push(card(voteCount, "Roll-call votes", "House + Senate, synced"));
   el.innerHTML = cards.join("");
   if (!el.dataset.wired) {

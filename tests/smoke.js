@@ -73,7 +73,7 @@ try {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
   await waitText('#overview-container', /How busy has Congress been/, 'Overview charts render');
-  await waitText('#headline-stats', /SENATORS[\s\S]*ROLL-CALL VOTES/i, 'Header cards render');
+  await waitText('#headline-stats', /SENATORS[\s\S]*BILLS COVERED[\s\S]*ROLL-CALL VOTES/i, 'Header cards render');
   await waitText('footer', /Data last updated/, 'Footer shows data freshness');
 
   await page.click('#nav-issues');
@@ -122,6 +122,16 @@ try {
   await modalTab('Votes');
   await page.locator('#modal-root [data-open="vote"]').first().click({ timeout: 20000 });
   await waitText('#modal-root', /Yea|Nay|Aye/, 'Vote opens inside the bill detail');
+  // Keyboard focus stays in the dialog: Tab from the last control wraps to the first.
+  const wrapped = await page.evaluate(async () => {
+    const d = document.querySelector('#modal-root [role=dialog]');
+    const items = [...d.querySelectorAll('a[href], button:not([disabled]), input, select, textarea')].filter(el => el.offsetParent !== null);
+    items.at(-1).focus();
+    return items.length > 1 && d.contains(document.activeElement);
+  });
+  await page.keyboard.press('Tab');
+  const inDialog = await page.evaluate(() => document.querySelector('#modal-root [role=dialog]').contains(document.activeElement));
+  check(wrapped && inDialog, 'Tab focus stays inside the detail window');
   await page.click('#modal-root [data-back]');
   await waitText('#modal-root', /H\.?R\.? ?1\b/, 'Back returns to the bill');
   await closeModal();
@@ -134,6 +144,9 @@ try {
     await waitText('#modal-root', /Yea|Nay|Aye|No/, 'Vote detail opens');
     await closeModal();
   }
+  await page.click('footer a[href="#methodology"]');
+  await waitText('#view-methodology', /How we count[\s\S]*Party agreement[\s\S]*Campaign finance/, 'Footer link opens How we count');
+
   // Shareable links: a pasted URL opens the right view; Back/Forward move through.
   await page.goto(`${url}#issues/healthcare`, { waitUntil: 'domcontentloaded' });
   await waitText('#issue-title', /Healthcare/, 'Link #issues/healthcare opens that topic');

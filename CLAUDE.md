@@ -316,12 +316,12 @@ cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting
   that emails on failure). app.js split into modules (see Layout).
 
 - Shareable links (router.js) and "Find your representatives" by address (Census geocoder).
+- "How we count" page, Report an error links, modal focus trap, "Bills covered" card.
 
 ### Review: remaining recommendations (not done yet)
-- Frontend: Tailwind build step (CDN warns in production); modal focus trap.
+- Frontend: Tailwind build step (CDN warns in production).
 - Product: "what Congress did this week" digest; focused/broad split for every topic (Healthcare
-  shows only 11 measures because health provisions ride in budget bills); reframe the
-  "bills tracked" headline; a "How we count" methodology page; "report an error".
+  shows only 11 measures because health provisions ride in budget bills).
 - Docs: real README; trim this file (it's part changelog).
 
 ## Issues tab (frontend)
@@ -414,7 +414,8 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   chamber chips (Senate / House = voting reps / Delegates). 48 cards per page + "Show more".
   Scoped search with no hits offers "Search all states instead".
 - Headline cards under the page title: senators and representatives with party split and
-  House vacancies (out of 435), delegates, bills tracked and votes synced, all from
+  House vacancies (out of 435), delegates, "Bills covered" (every law and voted-on bill
+  plus recent ones; not all ~20k introduced) and votes synced, all from
   `stats/overview.headline` (falls back to the directory doc + `getCountFromServer` if
   the stats doc predates it). Member cards are clickable and set the directory filters.
 
@@ -432,6 +433,20 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - **Copy link** buttons (`data-copy-link="#…"`, empty = current URL) in every detail
   header, on Issues and on the "Your representatives" panel. Clipboard API, then
   `execCommand("copy")`, then `prompt()` (some in-app browsers block the first two).
+
+## How we count, Report an error, keyboard focus
+
+- `#methodology` = "How we count" (`view-methodology` in index.html, a page with no tab
+  button; linked from the footer, every detail window and the Issues definitions). It
+  restates the rules in plain words: which bills are stored, stage, summaries policy,
+  vote types/outcomes, party agreement, voting records, Issues measures/watchlists/
+  focused, campaign finance, address lookup. **Changing a counting rule? Update this page
+  in the same commit.** Each statement was checked against the code on 2026-11-12.
+- Report an error (`data-report-error`, footer + bottom of every detail): opens a prefilled
+  GitHub issue on the public repo with the page's link. Needs a GitHub account; a form or
+  email would avoid that but needs a mail service.
+- Detail windows trap Tab/Shift+Tab inside the dialog and pull escaped focus back; a
+  re-render (data arriving) restores focus to the same control (`focusKey`).
 
 ## Find your representatives (Legislators tab)
 
@@ -494,7 +509,7 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - Voting Record = the member's `member_votes` doc: participation and party agreement over
   the whole Congress, plus the latest 50 votes. "Voted with party majority" = matches most
   of their party's Yea/Nay on that roll call (ties and Independents excluded).
-- Deep links: see Shareable links. Not done: Tab-key focus trap inside the modal.
+- Deep links: see Shareable links. Keyboard focus: see How we count, Report an error, keyboard focus.
 
 ## Votes paging (frontend)
 

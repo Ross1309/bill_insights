@@ -394,10 +394,12 @@ function renderModal() {
   const sameView = panel && panel.dataset.view === `${modalStack.length}:${e.kind}:${e.id}:${e.tab}`;
   const scrollTop = sameView ? panel.scrollTop : 0;
   const [, , renderTab] = def.tabs.find(([key]) => key === e.tab);
+  // Re-rendering replaces every element; note which control had focus to restore it.
+  const refocus = focusKey(document.activeElement);
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 p-0 sm:p-6" data-backdrop>
-      <div role="dialog" aria-modal="true" aria-labelledby="modal-title"
+      <div role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"
         class="bg-surface w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-xl flex flex-col">
         <div class="shrink-0 flex items-start gap-4 p-5 border-b border-gray-200">
           ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">←</button>` : ""}
@@ -410,10 +412,45 @@ function renderModal() {
             <button type="button" role="tab" data-tab="${key}" aria-selected="${key === e.tab}"
               class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-gray-900 border-pink" : "text-gray-500 border-transparent hover:text-gray-700"}">${label}</button>`).join("")}
         </div>
-        <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" class="p-5 overflow-y-auto flex-1">${renderTab(e)}</div>
+        <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" class="p-5 overflow-y-auto flex-1">${renderTab(e)}
+          <p class="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-500">Something wrong here? <a href="#" data-report-error="${escapeHtml(detailHash(e.kind, e.id))}" class="text-accent hover:underline">Report an error</a> · <a href="#methodology" class="text-accent hover:underline">How we count</a></p></div>
       </div>
     </div>`;
   modalRoot.querySelector("[data-panel]").scrollTop = scrollTop;
+  if (refocus) (modalRoot.querySelector(refocus) || modalRoot.querySelector("[role=dialog]"))?.focus();
+}
+
+// --- Keyboard focus stays inside the open detail ------------------------------
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUS_ATTRS = ["data-tab", "data-close", "data-back", "data-copy-link", "data-retry", "data-vote-filter", "data-open"];
+
+// A selector that finds "the same" control after a re-render (or null if focus
+// wasn't inside the modal).
+function focusKey(el) {
+  if (!el || !modalRoot.contains(el)) return null;
+  for (const attr of FOCUS_ATTRS) {
+    if (!el.hasAttribute(attr)) continue;
+    const v = el.getAttribute(attr);
+    const sel = v ? `[${attr}="${CSS.escape(v)}"]` : `[${attr}]`;
+    return attr === "data-open" ? `[data-open="${CSS.escape(el.dataset.open)}"][data-id="${CSS.escape(el.dataset.id || "")}"]` : sel;
+  }
+  return "[role=dialog]";
+}
+
+// Tab / Shift+Tab wrap around within the dialog; focus that escaped is pulled back.
+function trapFocus(ev) {
+  const dialog = modalRoot.querySelector("[role=dialog]");
+  if (!dialog) return;
+  const items = [...dialog.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null);
+  if (!items.length) { ev.preventDefault(); dialog.focus(); return; }
+  const first = items[0], last = items.at(-1);
+  const inside = dialog.contains(document.activeElement);
+  if (ev.shiftKey && (!inside || document.activeElement === first || document.activeElement === dialog)) {
+    ev.preventDefault(); last.focus();
+  } else if (!ev.shiftKey && (!inside || document.activeElement === last)) {
+    ev.preventDefault(); first.focus();
+  }
 }
 
 export function setupModals() {
@@ -453,6 +490,7 @@ export function setupModals() {
   modalRoot.addEventListener("change", onFilter);
   document.addEventListener("keydown", ev => {
     if (ev.key === "Escape" && modalStack.length) userClose();
+    else if (ev.key === "Tab" && modalStack.length) trapFocus(ev);
   });
   setRouteHandlers({
     showDetail: showModalFromRoute,

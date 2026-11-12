@@ -219,6 +219,94 @@
       <div id="members-more" class="text-center mt-6"></div>
     </section>
 
+
+    <section id="view-methodology" class="tab-view hidden">
+      <div class="max-w-3xl">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">How we count</h2>
+        <p class="text-sm text-gray-500 mt-1">Where every number on this site comes from, and the rules we use. If something looks wrong, <a class="text-accent hover:underline" data-report-error href="#">report an error</a>.</p>
+
+        <div class="mt-6 space-y-6 text-sm text-gray-700 leading-relaxed [&_h3]:font-serif [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1">
+          <section>
+            <h3>Sources and updates</h3>
+            <ul>
+              <li><strong>Bills, actions, laws, CRS summaries and subjects, members:</strong> the Congress.gov API (Library of Congress).</li>
+              <li><strong>House roll-call votes:</strong> the Office of the Clerk of the U.S. House, via Congress.gov. <strong>Senate roll-call votes:</strong> senate.gov's official vote records.</li>
+              <li><strong>Campaign finance:</strong> the Federal Election Commission (OpenFEC). <strong>Congressional districts for an address:</strong> the U.S. Census Bureau geocoder.</li>
+              <li>Two automatic updates run every night (votes and members at 10:00 UTC, bills at 10:30 UTC). The footer shows when each last finished, and a notice appears if one hasn't succeeded in 36 hours. We only show what these sources publish; when a value isn't available, we say so instead of estimating.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Which bills are here</h3>
+            <ul>
+              <li>Not all of the ~20,000 bills introduced each Congress. We store every bill that <strong>became law</strong> or got a <strong>recorded floor vote</strong>, plus recently active bills: the 10 most recently updated on Congress.gov each night, and the ~2,000 most recently updated when the site launched.</li>
+              <li>The Bills tab lists them by the date of their <strong>latest action</strong>, newest first.</li>
+              <li>Categories (Economy, Healthcare, Foreign Affairs) come from the bill's <strong>policy area</strong>, which the Congressional Research Service (CRS) assigns.</li>
+              <li><strong>Stage</strong> comes from the official action history: a chamber counts as passing a bill only when an action <em>starts</em> with "Passed/agreed to in House/Senate". "Became law" requires a law number or a "Became Public Law" action.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Plain-language summaries</h3>
+            <ul>
+              <li>Written by an AI model (OpenAI gpt-4o-mini) <strong>only from the official CRS summary</strong>, and labeled with that source. The model is told to stay neutral and not add anything that isn't in the CRS text.</li>
+              <li>No CRS summary yet means no AI summary: the bill says CRS hasn't published one. We never summarize from a title alone. Bills are re-checked every few days until CRS publishes.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Roll-call votes</h3>
+            <ul>
+              <li>Every recorded House and Senate vote of the current Congress. "Aye" and "No" (used on some House votes) are counted as Yea and Nay.</li>
+              <li>Times are converted from Eastern time. Senate nomination votes show the nominee but have no bill.</li>
+              <li><strong>Vote types</strong> are grouped from the official question text: cloture (ending debate), nominations, passage (bills and resolutions, including suspension votes, concurring in the other chamber's changes and veto overrides), amendments, procedural motions, and other.</li>
+              <li><strong>Outcomes:</strong> "succeeded" means the official result says passed, agreed to, confirmed, adopted or sustained. A failed procedural motion can still be a win for the side that opposed it.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Party agreement</h3>
+            <ul>
+              <li>On each vote, a party's <strong>majority position</strong> is whichever of Yea or Nay most of its members chose. Present and Not Voting are ignored, and votes where a party tied are left out.</li>
+              <li><strong>Majorities opposed</strong> = most Democrats and most Republicans voted opposite ways; <strong>agreed</strong> = they voted the same way. Independents aren't counted as a party here.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Members' voting records</h3>
+            <ul>
+              <li>Counts cover every recorded vote in the member's own chamber this Congress on which the official record lists them, including as Not Voting.</li>
+              <li><strong>Voted on</strong> = Yea, Nay or Present. <strong>Voted with their party's majority</strong> compares their Yea or Nay with their party's majority position on that vote (as above); Independents aren't compared.</li>
+              <li>We don't score, rank or rate members, and AI is never used to judge them.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Issues pages</h3>
+            <ul>
+              <li>A topic's <strong>measures</strong> are bills with that CRS policy area that became law or got a recorded floor vote this Congress. Bills that never reached the floor aren't counted: most bills are never taken up, which isn't the same as being rejected.</li>
+              <li><strong>Watchlists</strong> (Iran, Israel, foreign aid) include a bill if CRS tagged it with a matching subject or its title names the topic, so they can include defense and spending bills.</li>
+              <li>A watchlist bill is <strong>focused</strong> if its title names the topic or CRS gave it 10 or fewer subjects; otherwise it's a <strong>broad</strong> bill (like an annual spending or defense bill) that includes the topic among many others.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Campaign finance</h3>
+            <ul>
+              <li>Totals as reported to the FEC by the member's own campaign committee for their next election period (the full 2-year House or 6-year Senate cycle), or the previous one if nothing is reported yet.</li>
+              <li>Not included: outside spending such as super PACs. A donor's state is only known for itemized gifts (over $200). We don't list employers or "top donors", because an individual's employer isn't the one giving.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Your representatives</h3>
+            <ul>
+              <li>Your address is sent to the U.S. Census Bureau's geocoder to find your congressional district, using the district map of the Congress now in office. We don't store or log the address.</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="bg-surface-deep text-gray-600 mt-12">
@@ -230,6 +318,10 @@
           No scores, rankings or judgments of members.
         </p>
         <p id="data-asof" class="mt-3 text-xs"></p>
+        <p class="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+          <a href="#methodology" class="underline decoration-accent/50 hover:text-white">How we count</a>
+          <a href="#" data-report-error class="underline decoration-accent/50 hover:text-white">Report an error</a>
+        </p>
       </div>
       <div>
         <p class="font-semibold text-white">Data sources</p>

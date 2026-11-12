@@ -13,13 +13,14 @@ const viewIssues = document.getElementById("view-issues");
 const viewBills = document.getElementById("view-bills");
 const viewVotes = document.getElementById("view-votes");
 const viewMembers = document.getElementById("view-members");
+const viewMethodology = document.getElementById("view-methodology");   // no tab-bar button
 
 // Each tab's loader, called every time it's shown (loaders skip work already done).
 export const onTabOpen = {};
 
 // Which tab is showing (for modules that only update the URL while they're visible).
-export const activeTab = () => Object.entries({ overview: viewOverview, issues: viewIssues, bills: viewBills, votes: viewVotes, members: viewMembers })
-  .find(([, v]) => !v.classList.contains("hidden"))?.[0] || "overview";
+export const activeTab = () => Object.entries({ overview: viewOverview, issues: viewIssues, bills: viewBills, votes: viewVotes, members: viewMembers, methodology: viewMethodology })
+  .find(([, v]) => v && !v.classList.contains("hidden"))?.[0] || "overview";
 
 const TAB_BASE = "nav-tab py-3.5 text-sm sm:text-base font-semibold whitespace-nowrap border-b-2 focus:outline-none focus-visible:text-gray-900";
 const TAB_ACTIVE = `${TAB_BASE} text-gray-900 border-pink`;
@@ -28,12 +29,14 @@ const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-8
 // `push`: record it in browser history / the URL (false when the router is applying
 // a URL, e.g. Back/Forward or a pasted link).
 export function switchTab(tabName, { push = true } = {}) {
-  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers] };
+  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers], methodology: [null, viewMethodology] };
   for (const [name, [nav, view]] of Object.entries(tabs)) {
     const active = name === tabName;
-    nav.className = active ? TAB_ACTIVE : TAB_IDLE;
-    nav.setAttribute("aria-selected", String(active));
-    view.classList.toggle("hidden", !active);
+    if (nav) {
+      nav.className = active ? TAB_ACTIVE : TAB_IDLE;
+      nav.setAttribute("aria-selected", String(active));
+    }
+    view?.classList.toggle("hidden", !active);
   }
   onTabOpen[tabName]?.();
   if (push) pushTab(tabName);

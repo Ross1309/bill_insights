@@ -67,6 +67,24 @@ async function copyText(text) {
   return false;
 }
 
+// "Report an error": a prefilled GitHub issue (public repo) naming the page shown.
+// data-report-error="#bill/…" reports that detail; empty = the current URL.
+const ISSUES_URL = "https://github.com/Ross1309/bill_insights/issues/new";
+
+function setupReportError() {
+  document.addEventListener("click", ev => {
+    const link = ev.target.closest("[data-report-error]");
+    if (!link) return;
+    ev.preventDefault();
+    const page = shareUrl(link.dataset.reportError || location.hash);
+    const params = new URLSearchParams({
+      title: `Data error: ${page.replace(/^https?:\/\//, "")}`,
+      body: `Page: ${page}\n\nWhat looks wrong:\n\n\nWhat it should say (and a source, if you have one):\n\n`,
+    });
+    window.open(`${ISSUES_URL}?${params}`, "_blank", "noopener");
+  });
+}
+
 // Copy a shareable link: data-copy-link="#bill/…" (or empty = the page as shown now).
 function setupCopyLinks() {
   document.addEventListener("click", async ev => {
@@ -163,6 +181,7 @@ async function init() {
   setupModals();
   setupIssues();
   setupCopyLinks();
+  setupReportError();
   loadHeadlineStats();
   loadHealth();
   // Shows the tab / detail in the URL (Overview if none). Bills load when their tab
