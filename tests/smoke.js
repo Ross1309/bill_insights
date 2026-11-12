@@ -8,6 +8,7 @@
 // function calls are skipped there and their 404s are ignored. Both modes read the
 // real Firestore (~30 reads per run). Needs: npx playwright install chromium
 
+/* global document */ // used inside page.evaluate / waitForFunction callbacks (run in the browser)
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -82,12 +83,22 @@ try {
   await waitText('#bills-container', /Latest action \(\d{4}-\d{2}-\d{2}\)/, 'Bills tab lists bills');
   const dates = await page.$$eval('#bills-container', els => [...els[0].innerText.matchAll(/Latest action \((\d{4}-\d{2}-\d{2})\)/g)].map(m => m[1]));
   check(dates.length > 0 && dates.every((d, i) => !i || dates[i - 1] >= d), `Bills are newest first (${dates.length} checked)`);
+  await page.fill('#search-input', 'HR 1');
+  await waitText('#bills-container', /H\.?R\.? ?1\b/, 'Bill-number search finds H.R. 1');
+  await page.fill('#search-input', '');
 
   await page.click('#nav-votes');
   await waitText('#votes-container', /Roll call|roll call/, 'Votes tab lists votes');
+  await page.click('#view-votes [data-chamber="Senate"]');
+  await waitText('#votes-container', /Senate roll call/, 'Senate chamber filter');
+  const houseShown = await page.$eval('#votes-container', el => /House roll call/i.test(el.innerText));
+  check(!houseShown, 'Senate filter hides House votes');
+  await page.click('#view-votes [data-chamber=""]');
 
   await page.click('#nav-members');
   await waitText('#members-container', /\w/, 'Legislators tab lists members');
+  await page.selectOption('#state-select', 'TX');
+  await waitText('#members-container', /Cornyn/, 'State filter shows Texas members');
 
   await openDetail('member', MEMBER);
   await waitText('#modal-root', /Jayapal/, 'Member detail opens');
@@ -101,6 +112,12 @@ try {
 
   await openDetail('bill', BILL);
   await waitText('#modal-root', /H\.?R\.? ?1\b/, 'Bill detail opens');
+  // A recorded vote from the bill's Votes tab opens on the stack; Back returns.
+  await modalTab('Votes');
+  await page.locator('#modal-root [data-open="vote"]').first().click({ timeout: 20000 });
+  await waitText('#modal-root', /Yea|Nay|Aye/, 'Vote opens inside the bill detail');
+  await page.click('#modal-root [data-back]');
+  await waitText('#modal-root', /H\.?R\.? ?1\b/, 'Back returns to the bill');
   await closeModal();
 
   // Newest vote in the Votes tab -> its detail.
