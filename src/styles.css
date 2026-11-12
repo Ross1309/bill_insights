@@ -1,0 +1,7 @@
+/* Source for public/styles.css (built by `npm run build:css`; see tailwind.config.js). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
