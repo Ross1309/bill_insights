@@ -170,3 +170,16 @@ test('fillUnmappedSenators: LIS map first, then unique name + state', async () =
   assert.deepEqual(ivs.map(v => v.bioguideId), ['B000001', 'C000127', 'L000570', null, 'K1']);
   assert.equal(lis.get('S999'), 'C000127');   // learned for later votes
 });
+
+test('stageFromActions: law_date from the Became Public/Private Law action', async () => {
+  const { stageFromActions } = await import('../netlify/lib/bills.js');
+  const r = stageFromActions([
+    { actionDate: '2026-02-11', text: 'By Senator Lee from Committee filed written report.' },
+    { actionDate: '2026-02-01', text: 'Became Public Law No: 119-68.' },
+    { actionDate: '2026-01-20', text: 'Presented to President.' },
+  ]);
+  assert.equal(r.stage, 'law');
+  assert.equal(r.law_date, '2026-02-01');
+  assert.equal(stageFromActions([{ actionDate: '2026-03-26', text: 'Became Private Law No: 119-1.' }]).law_date, '2026-03-26');
+  assert.equal(stageFromActions([{ actionDate: '2026-01-01', text: 'Referred to committee.' }]).law_date, null);
+});

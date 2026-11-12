@@ -169,6 +169,7 @@ crs_summary_available (bool; null = enriched but never checked; absent on old do
 crs_checked_at (ISO),
 issue tracker (from fetchBillEnrichment): subjects[] (CRS legislative subjects),
 subject_count, stage (introduced|committee|passed_one|passed_both|to_president|law),
+law_date (date of the "Became Public/Private Law" action; null if not law),
 passed_house, passed_senate, failed_house, failed_senate, vetoed, law_number,
 sponsor { bioguideId, name, party, state }, cosponsors_count,
 topics[] (topic + watchlist slugs), topic_focus { <watchlist>: bool }, enriched_at,
@@ -191,7 +192,9 @@ individual_votes[].lis_member_id
   pages through the whole congress and takes the newest by `startDate`.
 - Senate: Congress.gov has no Senate vote endpoint (404 as of 2026-11-10), so votes come
   from senate.gov LIS XML (`vote_menu_{c}_{s}.xml`, newest first, then each
-  `vote_{c}_{s}_{00000}.xml`). Senators are identified by LIS id and mapped to bioguideId
+  `vote_{c}_{s}_{00000}.xml`). A vote whose record is still incomplete (no members or
+  date yet; senate.gov lists new votes early) isn't stored until a later run.
+  Senators are identified by LIS id and mapped to bioguideId
   via congress-legislators `id.lis` (100/100 mapped). Senators the *current* file lacks
   (left office, or appointed days ago) are mapped by the historical file (loaded only then)
   and, failing that, by unique last name + state in `directory/members`
@@ -382,12 +385,16 @@ Back/Forward and the state picker; health check fooled by manual runs. The smoke
 now covers Back from Issues, repeated topic switches and malformed links.
 
 ### Weekly digest (2026-11-12)
-Built and committed locally (backend 450e357 + UI), **not pushed**: Firestore's free reads
-ran out on 2026-11-12 before its data could be built. After the reset (midnight Pacific):
-`node scripts/build-member-votes.js --write` (index gets the new fields), then
-`node scripts/build-stats.js` (all weeks), check `stats/weeks` + a week doc, run the smoke
-test (it now covers the card, the week page and Earlier week), then push. Dev work used up
-the free tier twice (Nov 11, Nov 12): keep script runs that read every vote to a minimum.
+Live: Overview card + `#week/<Monday>` pages; all 85 active weeks built (all 140 laws, all
+1,606 votes accounted for). Building it on real data found: two *private* laws and one
+law whose latest action came after signing (fixed: `law_date` from the action history at
+enrichment, "Became Private Law" recognized), and a Senate vote stored as an empty shell
+because senate.gov listed it before its record was complete (fixed: the ingest now skips
+incomplete Senate records like House ones; vote 262 re-fetched).
+
+**Firestore: Blaze plan since 2026-11-12** (free daily allowances still apply; budget alert
+set). The free tier ran out on Nov 11 and Nov 12 from dev scripts. After upgrading,
+requests failed intermittently with RESOURCE_EXHAUSTED for ~15 minutes while it applied.
 
 ### Open work (as of 2026-11-12)
 - More topics (Immigration, Defense: add to topics.js

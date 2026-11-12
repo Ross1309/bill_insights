@@ -77,7 +77,7 @@ async function writeDigest(db, now, votes, congress, allWeeks) {
   const inScope = v => v.date && (!onlyWeeks || onlyWeeks.has(weekStart(easternDate(v.date))));
 
   const lawSnap = await db.collection('bills').where('stage', '==', 'law')
-    .select('bill_number', 'title', 'law_number', 'latestAction', 'ai_summary', 'sponsor', 'congress').get();
+    .select('bill_number', 'title', 'law_number', 'law_date', 'latestAction', 'ai_summary', 'sponsor', 'congress').get();
   const laws = lawSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => Number(b.congress) === congress);
 
   const billIds = [...new Set(votes.filter(inScope).map(v => v.bill_id).filter(Boolean))];

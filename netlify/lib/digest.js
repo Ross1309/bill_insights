@@ -19,7 +19,7 @@ import { easternDate, weekStart, addDays, voteCategory, voteOutcome, partyAlignm
 const CLOSE_CATEGORIES = new Set(['passage', 'cloture', 'nomination', 'amendment']);
 export const CLOSEST_N = 3;
 
-const LAW_ACTION = /^Became Public Law No:?\s*([\d-]+)/i;
+const LAW_ACTION = /^Became (Public|Private) Law No:?\s*([\d-]+)/i;
 
 const billLabel = (b, fallback) => b?.bill_number || fallback || null;
 
@@ -49,9 +49,11 @@ function voteItem(v, billsById) {
   };
 }
 
-// Laws: bill docs with stage 'law'. The signing date is the latest action's date when it
-// is the "Became Public Law" action (it normally stays the latest action).
+// Laws: bill docs with stage 'law'. The signing date is `law_date` (from the action
+// history, set at enrichment), else the latest action's date when that is the "Became
+// Public/Private Law" action (it normally stays the latest action).
 export function lawSigning(bill) {
+  if (bill.law_date) return bill.law_date;
   const a = bill.latestAction;
   if (!a?.actionDate || !LAW_ACTION.test(a.text || '')) return null;
   return a.actionDate;

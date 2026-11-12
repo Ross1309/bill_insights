@@ -165,6 +165,12 @@ export async function syncSenateVotes(legislators, indexed) {
   const billIds = [];
   await pool(todo, 3, async entry => {
     const { doc, unmapped } = await fetchSenateVote(entry, lisToBioguide);
+    // senate.gov can list a new vote before its record is complete (no members, date or
+    // question yet): don't store a shell; it's picked up again next run.
+    if (!doc.individual_votes.length || !doc.date) {
+      console.warn(`Senate ${doc.vote_id}: record not complete yet; will retry next run`);
+      return;
+    }
     if (unmapped) {
       const left = fillUnmappedSenators(doc.individual_votes, lisToBioguide, await loadFallbacks());
       if (left) console.warn(`Senate vote ${doc.vote_id}: ${left} senator(s) without a bioguide mapping`);

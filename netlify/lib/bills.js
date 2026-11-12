@@ -260,9 +260,13 @@ export function stageFromActions(actions = [], { isLaw = false } = {}) {
   if (passedHouse || passedSenate) stage = 'passed_one';
   if (passedHouse && passedSenate) stage = 'passed_both';
   if (has(/presented to president/)) stage = 'to_president';
-  if (isLaw || has(/became public law/)) stage = 'law';
+  if (isLaw || has(/became (public|private) law/)) stage = 'law';
+  // Signing date: the "Became Public/Private Law" action (later actions, e.g. a committee
+  // report filed afterwards, can follow it, so the latest action isn't always it).
+  const lawAction = actions.find(a => /^became (public|private) law/i.test((a.text || '').trim()));
   return {
     stage,
+    law_date: lawAction?.actionDate || null,
     passed_house: passedHouse,
     passed_senate: passedSenate,
     failed_house: has(/^failed of passage\/not agreed to in house/),

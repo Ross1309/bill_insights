@@ -54,6 +54,8 @@ test('computeWeeks: onlyWeeks limits the work; lawSigning; thisWeek', () => {
   assert.deepEqual([...only.keys()], ['2026-11-16']);
   assert.equal(lawSigning({ latestAction: { actionDate: '2026-01-02', text: 'Became Public Law No: 119-3.' } }), '2026-01-02');
   assert.equal(lawSigning({ latestAction: { actionDate: '2026-01-02', text: 'Signed by President.' } }), null);
+  assert.equal(lawSigning({ latestAction: { actionDate: '2026-03-26', text: 'Became Private Law No: 119-1.' } }), '2026-03-26');
+  assert.equal(lawSigning({ law_date: '2026-02-01', latestAction: { actionDate: '2026-02-11', text: 'Committee filed written report.' } }), '2026-02-01');
   const card = thisWeek(computeWeeks(votes, laws, titles).get('2026-11-09'));
   assert.equal(card.law_count, 1);
   assert.deepEqual(card.passed_items.map(p => p.id), ['h4', 'h1']);
