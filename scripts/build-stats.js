@@ -31,7 +31,8 @@ async function main() {
     console.log(`party_breakdown added to ${added} of ${snap.size} votes`);
   }
 
-  const result = await writeOverviewStats(db, admin, { congress });
+  // Scripts recompute every week of the digest; the nightly runs only the recent ones.
+  const result = await writeOverviewStats(db, admin, { congress, allWeeks: true });
   console.log(`stats rebuilt (current: ${congress}th; displayed: ${result.congress}th): ${JSON.stringify(result)}`);
   if (result.missing) console.warn(`${result.missing} votes lack party_breakdown; run with --backfill.`);
 }

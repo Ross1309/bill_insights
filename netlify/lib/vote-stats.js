@@ -62,19 +62,19 @@ export function voteOutcome(result = '') {
 }
 
 // Calendar date of a vote in Eastern time (where Congress votes), "YYYY-MM-DD".
-function easternDate(iso) {
+export function easternDate(iso) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
 // Monday of the week containing a "YYYY-MM-DD" date.
-function weekStart(ymd) {
+export function weekStart(ymd) {
   const d = new Date(`${ymd}T12:00:00Z`);
   const dow = (d.getUTCDay() + 6) % 7; // Monday = 0
   d.setUTCDate(d.getUTCDate() - dow);
   return d.toISOString().slice(0, 10);
 }
 
-function addDays(ymd, n) {
+export function addDays(ymd, n) {
   const d = new Date(`${ymd}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);

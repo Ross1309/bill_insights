@@ -22,6 +22,8 @@ export function indexEntry(vote) {
     question: vote.question || null,
     result: vote.result || null,
     bill_id: vote.bill_id || null,
+    legislation: vote.legislation || null,            // "HR 2102", "PN 1129" (nominations)
+    document_title: vote.document_title || null,      // Senate: bill title or nominee
     tallies: vote.tallies || null,
     party_breakdown: vote.party_breakdown || null,
   };
