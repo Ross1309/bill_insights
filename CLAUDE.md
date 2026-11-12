@@ -381,6 +381,29 @@ per-state `members` query and says nationwide search is unavailable.
   everyone) and runs on its own, so its failure doesn't stop the vote sync.
 - Data is complete for the 119th Congress (all votes; all 140 laws as of 2026-11-12).
 
+### Backups and restore (set up 2026-11-12)
+- **Point-in-time recovery (PITR):** on; any minute of the last 7 days can be recovered
+  (`versionRetentionPeriod` 604800s). Best for undoing a bad script run.
+- **Scheduled backups:** weekly, Sunday (UTC), kept 98 days (the max), in `us-central1`.
+  Firestore console -> (default) -> Disaster recovery.
+- Restores always go into a **new** database; the live `(default)` is never overwritten:
+  ```
+  gcloud firestore backups list --location=us-central1 --project=congress-watcher-b0dd3
+  gcloud firestore databases restore --project=congress-watcher-b0dd3 \
+    --source-backup=projects/congress-watcher-b0dd3/locations/us-central1/backups/<BACKUP_ID> \
+    --destination-database=restore-YYYYMMDD
+  ```
+  PITR: clone or export the database at a past `--snapshot-time` (see `gcloud firestore
+  databases clone --help` / `gcloud firestore export --help`). Then read the restored database
+  with firebase-admin (`getFirestore(app, 'restore-YYYYMMDD')`), copy back only what's needed
+  with a script, and delete the restored database afterwards (it's billed while it exists).
+- **Rebuildable without a backup** (scripts, from official sources): votes, members, bills
+  and their enrichment, member_votes / vote_index / vote_summaries
+  (`build-member-votes.js`), all stats incl. the digest (`build-stats.js`), tracked list,
+  topic tags, House bill links (`repair-house-legislation.js`). **Mainly in backups:** the
+  AI summaries (regenerating ~1,500 costs little but takes hours), `crs_checked_at` history,
+  `sync_state` windows. Verified read-only 2026-11-12 (database + backupSchedules REST).
+
 `sync_state` is server-only (no read rule in firestore.rules, so browsers are denied):
 - `sync_state/bills`: `last_refresh` window for sync-bills.
 - `sync_state/members`: a 12-char fingerprint per current member + the directory's, so the
