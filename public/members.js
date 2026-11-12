@@ -2,7 +2,7 @@
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { collection, doc, getCountFromServer, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { db, getOverviewDoc, memberById } from "./data.js";
-import { PARTY_ABBR, PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate } from "./util.js";
+import { PARTY_ABBR, PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, ordinal, store } from "./util.js";
 import { activeTab, switchTab } from "./tabs.js";
 import { replaceTab } from "./router.js";
 
@@ -60,7 +60,8 @@ export function memberPhoto(m) {
 // single read). If that doc can't be read, fall back to a per-state query.
 
 const MEMBERS_PAGE = 48;
-const memberFilters = { text: "", state: DEFAULT_STATE, party: "", chamber: "" };
+// district: set by "Find your representatives" (number, 0 = at-large) or null.
+const memberFilters = { text: "", state: DEFAULT_STATE, party: "", chamber: "", district: null };
 let membersShown = MEMBERS_PAGE;
 let directoryPromise = null;
 let directoryFallbackRequest = 0;
@@ -161,10 +162,59 @@ function renderMemberList(members) {
 export async function showDirectory() {
   try {
     const { members } = await loadDirectory();
+    renderYourReps(members);
     renderMemberList(members);
   } catch (err) {
     console.warn("Directory unavailable, falling back to per-state query:", err.message);
     await showStateFallback();
+  }
+}
+
+// --- Find your representatives: address -> district (/api/find-district) -------
+
+function renderYourReps(members) {
+  const out = document.getElementById("find-reps-result");
+  if (!out) return;
+  const { state, district } = memberFilters;
+  if (district == null || !state) { out.innerHTML = ""; return; }
+  const senators = members.filter(m => m.state === state && m.chamber === "Senate").sort(compareMembers);
+  const rep = members.find(m => m.state === state && m.chamber === "House" && (Number(m.district) || 0) === district);
+  const delegateOnly = DELEGATE_JURISDICTIONS.some(([code]) => code === state);
+  const place = district ? `${STATE_NAMES[state]}'s ${ordinal(district)} congressional district` : `${STATE_NAMES[state]} (at large)`;
+  out.innerHTML = `
+    <div class="border-t border-gray-200 pt-4">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 class="font-serif text-lg font-bold text-gray-900">Your representatives: ${escapeHtml(districtCode(state, district))}</h3>
+        <div class="flex gap-2">
+          <button type="button" data-copy-link="" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
+          <button type="button" data-clear-reps class="px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-600 border border-gray-300 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">Clear</button>
+        </div>
+      </div>
+      <p class="text-sm text-gray-500 mt-1">${escapeHtml(place)}, in the current Congress's district map.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+        ${senators.map(memberCard).join("")}
+        ${rep ? memberCard(rep) : `<div class="border border-dashed border-gray-300 rounded-xl p-5 text-sm text-gray-500">This House seat is currently vacant.</div>`}
+      </div>
+      ${delegateOnly ? `<p class="text-xs text-gray-500 mt-2">${escapeHtml(STATE_NAMES[state])} has no senators. Its delegate can vote in committee but not on final passage of bills.</p>` : ""}
+      <p class="text-xs text-gray-500 mt-3">All members from ${escapeHtml(STATE_NAMES[state])} are listed below.</p>
+    </div>`;
+}
+
+async function findRepresentatives(address) {
+  const out = document.getElementById("find-reps-result");
+  out.innerHTML = `<p class="text-sm text-gray-500">Looking up your district…</p>`;
+  try {
+    const res = await fetch("/api/find-district", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Lookup failed (HTTP ${res.status}).`);
+    store.set("cw-state", body.state);   // Issues tab: "Members from <state>"
+    setMemberFilters({ state: body.state, district: body.district, text: "", party: "", chamber: "" });
+  } catch (err) {
+    out.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -201,8 +251,12 @@ export function setChipGroup(groupId, attr, value) {
   });
 }
 
-// URL argument for the Legislators tab (router.js): a state code or "all".
+const districtCode = (state, district) => `${state}-${district ? district : "AL"}`;
+
+// URL argument for the Legislators tab (router.js): "WA", "all", or a district
+// ("WA-7", "WY-AL") for the "Your representatives" view.
 export function legislatorsArg() {
+  if (memberFilters.district != null && memberFilters.state) return districtCode(memberFilters.state, memberFilters.district);
   return memberFilters.state || "all";
 }
 
@@ -210,9 +264,13 @@ export function applyLegislatorsArg(arg) {
   const code = String(arg).toUpperCase();
   if (code === "ALL") return setMemberFilters({ state: "" });
   if (STATE_NAMES[code]) return setMemberFilters({ state: code });
+  const d = parseDistrictTerm(code);
+  if (d) return setMemberFilters({ state: d.state, district: d.district });
 }
 
 export function setMemberFilters(changes) {
+  // Picking another state (or all) leaves the "your representatives" view.
+  if ("state" in changes && !("district" in changes)) changes = { ...changes, district: null };
   Object.assign(memberFilters, changes);
   if (activeTab() === "members") replaceTab("members");
   membersShown = MEMBERS_PAGE;
@@ -225,6 +283,14 @@ export function setMemberFilters(changes) {
 }
 
 export function setupMemberFilters() {
+  document.getElementById("find-reps")?.addEventListener("submit", ev => {
+    ev.preventDefault();
+    const address = document.getElementById("find-reps-address").value.trim();
+    if (address) findRepresentatives(address);
+  });
+  document.getElementById("find-reps-result")?.addEventListener("click", ev => {
+    if (ev.target.closest("[data-clear-reps]")) setMemberFilters({ district: null });
+  });
   setChipGroup("party-filters", "party", memberFilters.party);
   setChipGroup("chamber-filters", "chamber", memberFilters.chamber);
   stateSelect?.addEventListener("change", e => setMemberFilters({ state: e.target.value }));

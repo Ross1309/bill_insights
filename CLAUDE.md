@@ -48,6 +48,7 @@ public/app.js                      Entry: startup, tab wiring, Overview/Issues l
 public/data.js                     Firestore client + web config, caches, getMember/getBill/getVote, functions
 public/util.js                     escapeHtml, formatting, party/state labels, modal building blocks
 public/tabs.js                     switchTab + onTabOpen registry (each tab registers its loader)
+public/router.js                   Shareable links: URL hash <-> tab/topic/state/detail, Back/Forward
 public/bills.js, votes.js,         One module per tab (state stays inside its module; ESLint's
   members.js                         no-import-assign stops other modules reassigning it)
 public/modals.js, finance.js       Detail modals (member/bill/vote) and the Campaign Finance tab
@@ -87,6 +88,7 @@ netlify/functions/member-profile.js  GET /api/member-profile?id={bioguideId}: Co
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
                                    donation-size buckets, itemized by state (api.data.gov key)
+netlify/functions/find-district.js POST /api/find-district {address}: Census geocoder -> { state, district }
 netlify/functions/bill-detail.js   GET /api/bill-detail?id={bill_id}: sponsor, cosponsor count, latest CRS
                                    summary, action history (works for bills not in `bills`)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
@@ -313,11 +315,11 @@ cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting
 - ESLint gate + Playwright smoke test + GitHub Actions (CI on push, daily health check
   that emails on failure). app.js split into modules (see Layout).
 
+- Shareable links (router.js) and "Find your representatives" by address (Census geocoder).
+
 ### Review: remaining recommendations (not done yet)
-- Frontend: Tailwind build step (CDN warns in production); URL routing for shareable
-  links; modal focus trap.
-- Product: find-your-representative by address (Census geocoder); shareable links;
-  "what Congress did this week" digest; focused/broad split for every topic (Healthcare
+- Frontend: Tailwind build step (CDN warns in production); modal focus trap.
+- Product: "what Congress did this week" digest; focused/broad split for every topic (Healthcare
   shows only 11 measures because health provisions ride in budget bills); reframe the
   "bills tracked" headline; a "How we count" methodology page; "report an error".
 - Docs: real README; trim this file (it's part changelog).
@@ -416,6 +418,38 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   `stats/overview.headline` (falls back to the directory doc + `getCountFromServer` if
   the stats doc predates it). Member cards are clickable and set the directory filters.
 
+## Shareable links (router.js)
+
+- Hash routes: (none) Overview, `#issues/<topic>`, `#bills`, `#votes`,
+  `#legislators/<WA|all|WA-7|WY-AL>`, and details `#bill/<id>`, `#member/<bioguideId>`,
+  `#vote/<vote id>`. Tab switches and opened details `pushState`; topic/state changes
+  `replaceState`. Browser Back/Forward and the modal's ← go through history.
+- `history.state.detailDepth` = how many open details have their own entry. A detail
+  from a pasted link has none, so closing it replaces the URL with the tab (no history
+  to go back through). Details from a pasted link open over the Overview.
+- Modules plug in via `tabArg[tab]` (current argument) and `onTabArg[tab]` (apply one);
+  the router applies the argument before showing the tab.
+- **Copy link** buttons (`data-copy-link="#…"`, empty = current URL) in every detail
+  header, on Issues and on the "Your representatives" panel. Clipboard API, then
+  `execCommand("copy")`, then `prompt()` (some in-app browsers block the first two).
+
+## Find your representatives (Legislators tab)
+
+- Address -> `POST /api/find-district` (POST keeps it out of URLs/logs; not stored, not
+  logged, `Cache-Control: private, no-store`) -> U.S. Census geocoder, layer 54
+  ("<nth> Congressional Districts"). The function asks for the **current Congress's**
+  map: `Current_Current` already has the 120th (redistricted for the 2026 election), so
+  it tries `ACS2025_Current` (119th) first, then newer vintages. From Jan 3, 2027 the
+  120th is picked automatically; reorder `VINTAGES` then to save a request.
+- Census sends no CORS headers, hence the function. No rate limit (the plan's 2 rules are
+  used by member-profile and bill-detail); input is capped at 200 characters.
+- Result: `#legislators/WA-7` view = panel with 2 senators + the district's member (at-large
+  and delegates are district 0; members store at-large as `district: null`; "vacant" if
+  none), then the state's full list. Picking another state clears it; it also sets
+  `cw-state` so the Issues tab's "Members from <state>" uses it.
+- Verified 2026-11-12: Seattle -> WA-7 (Jayapal), Cheyenne -> WY-AL, the White House ->
+  DC-AL (delegate, no senators), unknown address -> message.
+
 ## Campaign finance (member modal → Campaign Finance tab)
 
 - `member-finance` picks the member's FEC candidate id for their current chamber (H/S
@@ -460,7 +494,7 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - Voting Record = the member's `member_votes` doc: participation and party agreement over
   the whole Congress, plus the latest 50 votes. "Voted with party majority" = matches most
   of their party's Yea/Nay on that roll call (ties and Independents excluded).
-- Not done: Tab-key focus trap inside the modal; deep links (e.g. `#bill/hr9612-119`).
+- Deep links: see Shareable links. Not done: Tab-key focus trap inside the modal.
 
 ## Votes paging (frontend)
 

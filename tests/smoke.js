@@ -8,7 +8,7 @@
 // function calls are skipped there and their 404s are ignored. Both modes read the
 // real Firestore (~30 reads per run). Needs: npx playwright install chromium
 
-/* global document */ // used inside page.evaluate / waitForFunction callbacks (run in the browser)
+/* global document, location */ // used inside page.evaluate / waitForFunction callbacks (run in the browser)
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -99,6 +99,12 @@ try {
   await waitText('#members-container', /\w/, 'Legislators tab lists members');
   await page.selectOption('#state-select', 'TX');
   await waitText('#members-container', /Cornyn/, 'State filter shows Texas members');
+  check(page.url().endsWith('#legislators/TX'), `URL follows the state filter (${page.url().split('#')[1]})`);
+  if (LIVE) {
+    await page.fill('#find-reps-address', '400 Broad St, Seattle, WA 98109');
+    await page.click('#find-reps button[type=submit]');
+    await waitText('#find-reps-result', /Your representatives: WA-7[\s\S]*Jayapal/, 'Find your representatives (address -> WA-7)');
+  }
 
   await openDetail('member', MEMBER);
   await waitText('#modal-root', /Jayapal/, 'Member detail opens');
@@ -128,6 +134,25 @@ try {
     await waitText('#modal-root', /Yea|Nay|Aye|No/, 'Vote detail opens');
     await closeModal();
   }
+  // Shareable links: a pasted URL opens the right view; Back/Forward move through.
+  await page.goto(`${url}#issues/healthcare`, { waitUntil: 'domcontentloaded' });
+  await waitText('#issue-title', /Healthcare/, 'Link #issues/healthcare opens that topic');
+  await page.goto(`${url}#legislators/WY-AL`, { waitUntil: 'domcontentloaded' });
+  await waitText('#find-reps-result', /Your representatives: WY-AL[\s\S]*Hageman/, 'Link #legislators/WY-AL shows that district');
+  await page.goto(`${url}?fresh=1#bill/${BILL}`, { waitUntil: 'domcontentloaded' });   // query string = a real page load
+  await waitText('#modal-root', /H\.?R\.? ?1\b/, 'Link #bill/… opens the bill');
+  await closeModal();
+  check(!(await page.evaluate(() => location.hash)), 'Closing a linked detail leaves a clean URL');
+  await page.click('#nav-votes');
+  await waitText('#votes-container', /Roll call/, 'Votes tab (for history test)');
+  await page.locator('#votes-container [data-open="vote"]').first().click();
+  await waitText('#modal-root', /Yea|Nay|Aye/, 'Vote opens');
+  check(/#vote\//.test(page.url()), 'Opening a vote puts it in the URL');
+  await page.goBack();
+  await page.waitForFunction(() => !document.querySelector('#modal-root [data-close]'), null, { timeout: 10000 }).catch(() => {});
+  check(page.url().endsWith('#votes') && !(await page.$('#modal-root [data-close]')), 'Browser Back closes the vote');
+  await page.goForward();
+  await waitText('#modal-root', /Yea|Nay|Aye/, 'Browser Forward reopens it');
 } catch (err) {
   check(false, `test crashed: ${err.message}`);
 } finally {
