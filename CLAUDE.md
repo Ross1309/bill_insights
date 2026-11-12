@@ -534,7 +534,11 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - **Bill** (id = bill_id): Summary (sponsor → member modal, cosponsors, AI summary with
   source label, official CRS summary, latest action) / Actions (timeline; recorded House
   votes link to the vote modal by `{congress}-{session}-house-vote-{roll}`) / Votes
-  (`vote_summaries` where `bill_id ==`). Works for bills not in `bills` via `bill-detail`.
+  (`vote_summaries` where `bill_id ==`). With no roll calls, the Votes tab says what
+  happened from the official actions (`noRollCallHtml`): each chamber's "Passed/agreed to
+  in …" result (voice vote, unanimous consent), "no floor vote yet", or "recorded votes not
+  in our records" (other Congresses). 12 of the 31 laws on the Issues pages passed with no
+  roll call, so this is common. Works for bills not in `bills` via `bill-detail`.
 - **Vote** (id = vote doc id): Results (tallies, party table, bill link, Clerk record) /
   How members voted (grouped by position; filter by name, a bare state code like "WA",
   or party; names open member modals). Unsynced roll calls say so.

@@ -161,6 +161,15 @@ try {
   await page.click('footer a[href="#methodology"]');
   await waitText('#view-methodology', /How we count[\s\S]*Party agreement[\s\S]*Campaign finance/, 'Footer link opens How we count');
 
+  if (LIVE) {
+    // A law passed without roll calls: the Votes tab says how it passed (not "not synced").
+    await page.goto(`${url}?v=1#bill/hr2481-119`, { waitUntil: 'domcontentloaded' });
+    await waitText('#modal-root', /H\.?R\.? ?2481/, 'Bill passed by voice vote opens');
+    await modalTab('Votes');
+    await waitText('#modal-root', /No recorded \(roll-call\) vote[\s\S]*voice vote[\s\S]*Unanimous Consent/, 'Votes tab explains a voice-vote / unanimous-consent law');
+    await closeModal();
+  }
+
   // A malformed link mustn't break startup.
   await page.goto(`${url}?bad=1#bill/%`, { waitUntil: 'domcontentloaded' });
   await waitText('#overview-container', /How busy has Congress been/, 'Malformed link still shows the Overview');

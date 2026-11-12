@@ -225,9 +225,7 @@ const billModal = {
     ["votes", "Votes", e => {
       if (e.errors.votes) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load votes: ${escapeHtml(e.errors.votes)}</p>`;
       if (!e.data.votes) return spinner("Loading votes…");
-      if (!e.data.votes.length) {
-        return `<p class="text-sm text-gray-500 py-8 text-center">No roll-call votes on this bill have been synced. Check the Actions tab for recorded votes.</p>`;
-      }
+      if (!e.data.votes.length) return noRollCallHtml(e);
       return `
         <ul class="divide-y divide-gray-100">
           ${e.data.votes.map(v => `
@@ -371,6 +369,38 @@ function showModalFromRoute(kind, id) {
   modalStack = modalStack.slice(0, i + 1);
   renderModal();
   modalRoot.querySelector("[data-close]")?.focus();
+}
+
+// Bill with no roll calls in our records: say what actually happened, from the official
+// actions (loaded for the Summary tab). Most bills that pass do so by voice vote or
+// unanimous consent, which record no individual votes; most others never reach the floor.
+// Action dates are calendar days ("2026-09-23"); parsed as a Date they'd be UTC midnight,
+// which shows as the previous evening in US time zones.
+const actionDay = ymd => /^\d{4}-\d{2}-\d{2}$/.test(ymd || "")
+  ? new Date(`${ymd}T12:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" })
+  : ymd || "date not available";
+const FLOOR_RESULT = /^(Passed\/agreed to|Failed of passage\/not agreed to) in (House|Senate):\s*/;
+
+function noRollCallHtml(e) {
+  const actions = e.data.detail?.actions;
+  const box = inner => `<div class="text-sm text-gray-700 py-6 space-y-3">${inner}</div>`;
+  const why = `<p class="text-xs text-gray-500">A voice vote or unanimous consent doesn't record how each member voted, so there's no member-by-member result to show.</p>`;
+  if (!actions) {
+    return box(`<p>No recorded (roll-call) votes on this bill in our records.</p>${why}<p class="text-xs text-gray-500">The Actions tab shows how it moved through Congress.</p>`);
+  }
+  const floor = actions.filter(a => FLOOR_RESULT.test(a.text || "")).reverse();   // oldest first
+  if (!floor.length) {
+    return box(`<p>This bill hasn't had a floor vote in either chamber. Most bills are never brought to the floor.</p>`);
+  }
+  if (floor.some(a => a.recordedVotes?.length)) {
+    return box(`<p>This bill had recorded votes, but they aren't in our records (we store every roll call of the current Congress).</p><p class="text-xs text-gray-500">The Actions tab links to the official record of each vote.</p>`);
+  }
+  const chamberOf = a => FLOOR_RESULT.exec(a.text)[2];
+  return box(`
+    <p>No recorded (roll-call) vote: it passed or failed without one.</p>
+    <ul class="space-y-1.5">${floor.map(a => `
+      <li><strong class="text-gray-900">${escapeHtml(chamberOf(a))}</strong>, ${escapeHtml(actionDay(a.actionDate))}: ${escapeHtml(a.text.replace(FLOOR_RESULT, ""))}</li>`).join("")}
+    </ul>${why}`);
 }
 
 // User actions: go through browser history when we pushed entries for these details.
