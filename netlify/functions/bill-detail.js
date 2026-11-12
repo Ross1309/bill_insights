@@ -1,4 +1,4 @@
-// GET /.netlify/functions/bill-detail?id={bill_id}   e.g. id=hr9612-119
+// GET /api/bill-detail?id={bill_id}   e.g. id=hr9612-119
 //
 // Server-side proxy to Congress.gov for a bill's sponsor, cosponsor count, latest
 // official CRS summary and action history. Works for bills that aren't in our

@@ -67,7 +67,9 @@ export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { 
   const t = TOPICS[slug];
   const reached = b => b.stage === 'law' || (votesByBill.get(b.id) || []).length > 0;
   const measures = bills.filter(b => (b.topics || []).includes(slug) && reached(b));
-  const topicVotes = measures.flatMap(b => votesByBill.get(b.id) || []).sort((a, b) => a.date.localeCompare(b.date));
+  // Votes without a date (unparseable source time) can't be placed in time; skip them
+  // here, as computeOverview does.
+  const topicVotes = measures.flatMap(b => votesByBill.get(b.id) || []).filter(v => v.date).sort((a, b) => a.date.localeCompare(b.date));
 
   const agreement = { House: { same: 0, opposed: 0 }, Senate: { same: 0, opposed: 0 } };
   for (const v of topicVotes) {

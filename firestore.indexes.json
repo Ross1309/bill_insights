@@ -43,16 +43,16 @@
       ]
     },
     {
-      "collectionGroup": "votes",
+      "collectionGroup": "bills",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "chamber",
+          "fieldPath": "crs_summary_available",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "date",
-          "order": "DESCENDING"
+          "fieldPath": "crs_checked_at",
+          "order": "ASCENDING"
         }
       ]
     }

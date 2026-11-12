@@ -15,7 +15,7 @@ import {
   summaryUpdate,
   fetchBillEnrichment,
   fetchEnrichedBill,
-  listBillIdsUpdatedSince,
+  listBillsUpdatedSince,
   listLawBillIds,
   parseBillId,
 } from '../lib/bills.js';
@@ -23,6 +23,7 @@ import { currentCongress } from '../lib/congress.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { recordRun } from '../lib/health.js';
 import { loadTracked, markTracked } from '../lib/tracked-bills.js';
+import { pool } from '../lib/pool.js';
 
 const BILLS_PER_RUN = 10;
 const MAX_SUMMARIES = 3; // keeps each run inside Netlify's function timeout
@@ -31,31 +32,29 @@ const RECHECK_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_REFRESH = 60; // tracked bills re-enriched per run (stage, subjects, topics)
 const FIRST_RUN_LOOKBACK_MS = 26 * 60 * 60 * 1000;
 
-async function pool(items, concurrency, fn) {
-  let next = 0;
-  await Promise.all(Array.from({ length: concurrency }, async () => {
-    while (next < items.length) {
-      const i = next++;
-      await fn(items[i]);
-    }
-  }));
-}
-
 // Keep the issue tracker current: re-enrich every *tracked* bill (one we've enriched
 // before) that Congress.gov changed since the last run, plus any bill on the official
 // laws list that we don't have as a law yet. Returns how many were refreshed.
-async function refreshTrackedBills(db, admin, apiKey, skipIds) {
+//
+// Congress.gov lists changed bills oldest first, with dates only (no time). Up to
+// MAX_REFRESH bills are done per run, stopping early if the run's time is nearly up.
+// When some are left, the window advances to the start of the last processed bill's
+// date, and a bill already enriched on or after its update date is skipped, so every
+// run makes progress (a busy day can't stall the queue) and nothing is skipped over.
+async function refreshTrackedBills(db, admin, apiKey, skipIds, timeLeft) {
   const stateRef = db.collection('sync_state').doc('bills');
   const runStart = new Date().toISOString();
   const state = (await stateRef.get()).data() || {};
   const since = state.last_refresh || new Date(Date.now() - FIRST_RUN_LOOKBACK_MS).toISOString();
 
-  const [updatedIds, lawIds] = await Promise.all([
-    listBillIdsUpdatedSince(since, apiKey),
+  const [{ bills: updated, truncated }, lawIds] = await Promise.all([
+    listBillsUpdatedSince(since, apiKey),
     listLawBillIds(currentCongress().congress, apiKey),
   ]);
+  const updateDateOf = new Map(updated.map(b => [b.id, b.updateDate]));
   const lawSet = new Set(lawIds);
-  let candidates = [...new Set([...updatedIds, ...lawIds])].filter(id => !skipIds.has(id) && parseBillId(id));
+  // New laws first (few, and the most important change), then changed bills oldest first.
+  let candidates = [...new Set([...lawIds, ...updated.map(b => b.id)])].filter(id => !skipIds.has(id) && parseBillId(id));
 
   // The tracked-bills doc (1 read) narrows the candidates to bills we follow, so only
   // those are read. Without it, every candidate is read and checked.
@@ -68,35 +67,78 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds) {
   }
   const todo = snaps.filter(s => {
     const d = s.exists ? s.data() : null;
-    if (lawSet.has(s.id)) return !d || d.stage !== 'law';   // newly enacted law
-    return d?.enriched_at;                                    // tracked bill that changed
+    if (lawSet.has(s.id)) return !d || d.stage !== 'law';               // newly enacted law
+    if (!d?.enriched_at) return false;                                   // not tracked
+    const changed = updateDateOf.get(s.id);
+    return !changed || d.enriched_at.slice(0, 10) < changed;             // not yet refreshed since that change
   });
 
   const batch = todo.slice(0, MAX_REFRESH);
-  if (todo.length > batch.length) console.warn(`refresh: ${todo.length} bills to refresh; doing ${batch.length}, rest next run`);
   const done = [];
+  const errors = [];
   await pool(batch, 6, async snap => {
-    const { congress, type, number } = parseBillId(snap.id);
-    const fields = await fetchEnrichedBill(congress, type, number, apiKey);
-    done.push({ id: snap.id, stage: fields.stage });
-    const d = snap.exists ? snap.data() : {};
-    const neverChecked = !d.ai_summary && d.crs_summary_available === undefined;
-    await snap.ref.set({
-      ...fields,
-      ...(neverChecked ? { crs_summary_available: null } : {}),
-      synced_at: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    if (timeLeft() < 6000) return;                                       // out of time: next run
+    try {
+      const { congress, type, number } = parseBillId(snap.id);
+      const fields = await fetchEnrichedBill(congress, type, number, apiKey);
+      const d = snap.exists ? snap.data() : {};
+      const neverChecked = !d.ai_summary && d.crs_summary_available === undefined;
+      await snap.ref.set({
+        ...fields,
+        ...(neverChecked ? { crs_summary_available: null } : {}),
+        synced_at: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      done.push({ id: snap.id, stage: fields.stage });
+    } catch (err) {
+      errors.push(`${snap.id}: ${err.message}`);
+    }
   });
-
   await markTracked(db, admin, done);
 
-  // Only advance the window when everything in it was handled.
-  if (todo.length <= batch.length) await stateRef.set({ last_refresh: runStart }, { merge: true });
-  console.log(`refresh: ${updatedIds.length} bills updated since ${since}; refreshed ${batch.length}`);
-  return batch.length;
+  // Advance the window. All handled (and the list wasn't capped): up to this run's start.
+  // Otherwise only past the dates fully handled: to the start of the earliest date that
+  // still has an unhandled bill (the skip rule above keeps already-done bills of that
+  // date from being redone).
+  const doneIds = new Set(done.map(b => b.id));
+  const pending = todo.filter(s => !doneIds.has(s.id) && updateDateOf.has(s.id)).map(s => updateDateOf.get(s.id)).sort();
+  let next = null;
+  if (pending.length) next = `${pending[0]}T00:00:00Z`;
+  else if (truncated) next = updated.length ? `${updated.at(-1).updateDate}T00:00:00Z` : null;
+  else if (done.length === todo.length) next = runStart;
+  if (next && next > since) await stateRef.set({ last_refresh: next }, { merge: true });
+
+  console.log(`refresh: ${updated.length}${truncated ? '+' : ''} bills updated since ${since}; ${todo.length} to refresh; refreshed ${done.length}`
+    + `${errors.length ? `; ${errors.length} failed` : ''}; window -> ${next && next > since ? next : 'unchanged'}`);
+  if (errors.length) console.error(`refresh: ${errors.length} failed (retried next run): ${errors.slice(0, 3).join('; ')}`);
+  return { refreshed: done.length, failed: errors.length };
 }
 
-export default async () => {
+// Scheduled functions get 30 s. Steps check the time left and stop early (what's left
+// is picked up next run) instead of being killed mid-write.
+const RUN_BUDGET_MS = 28000;
+const SUMMARY_NEEDS_MS = 14000;   // one CRS fetch + one OpenAI call (12 s timeout)
+
+// Bills with no CRS summary yet, longest since their last check first. Needs the
+// (crs_summary_available ASC, crs_checked_at ASC) index; without it, falls back to the
+// first 100 by id (which can starve the rest, hence the index).
+async function waitingBills(db, n) {
+  const q = db.collection('bills').where('crs_summary_available', '==', false);
+  try {
+    return (await q.orderBy('crs_checked_at').limit(n).get()).docs;
+  } catch (err) {
+    if (err.code !== 9) throw err;   // 9 = FAILED_PRECONDITION: index missing
+    console.warn('waitingBills: (crs_summary_available, crs_checked_at) index missing; using unordered fallback');
+    return (await q.limit(100).get()).docs
+      .sort((a, b) => (a.data().crs_checked_at || '').localeCompare(b.data().crs_checked_at || '')).slice(0, n);
+  }
+}
+
+export default async request => {
+  const started = Date.now();
+  const timeLeft = () => RUN_BUDGET_MS - (Date.now() - started);
+  // Netlify's scheduler posts { next_run }. `netlify dev` imitates that locally, hence
+  // the NETLIFY_DEV check: only real scheduled runs count as scheduled.
+  const scheduled = !process.env.NETLIFY_DEV && Boolean((await request?.json?.().catch(() => null))?.next_run);
   const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -113,7 +155,7 @@ export default async () => {
       .filter(item => item.type && item.number && item.congress);
 
     if (billsList.length === 0) {
-      await recordRun(db, 'sync_bills', { failedSteps: ['bill list'] });
+      await recordRun(db, 'sync_bills', { failedSteps: ['bill list'], scheduled });
       return json({ success: false, message: 'Congress API returned 0 bills.' });
     }
 
@@ -128,6 +170,7 @@ export default async () => {
     );
 
     let updated = 0;
+    let summaryErrors = 0;
     let summarized = 0;
 
     // Issue-tracker enrichment (subjects, stage, topics) and existing docs, all in
@@ -153,8 +196,9 @@ export default async () => {
       // at most every 3 days.
       const checkedRecently = existing.crs_summary_available === false
         && Date.now() - Date.parse(existing.crs_checked_at || 0) < RECHECK_AFTER_MS;
-      if (summarized < MAX_SUMMARIES && !checkedRecently) {
+      if (summarized < MAX_SUMMARIES && !checkedRecently && timeLeft() > SUMMARY_NEEDS_MS) {
         const result = await summaryUpdate(meta, existing.ai_summary || null, keys);
+        if (result.status === 'error') summaryErrors++;
         Object.assign(update, result.fields);
         if (result.generated) summarized++;
       }
@@ -166,11 +210,15 @@ export default async () => {
       .filter((b, i) => enrichments[i]?.enriched_at));
 
     // Issue tracker freshness: tracked bills that changed + newly enacted laws.
+    const failedSteps = [];
     let refreshed = 0;
     try {
-      refreshed = await refreshTrackedBills(db, admin, CONGRESS_API_KEY,
-        new Set(billsList.map(item => makeBillId(item.type, item.number, item.congress))));
+      const r = await refreshTrackedBills(db, admin, CONGRESS_API_KEY,
+        new Set(billsList.map(item => makeBillId(item.type, item.number, item.congress))), timeLeft);
+      refreshed = r.refreshed;
+      if (r.failed) failedSteps.push('refresh');
     } catch (err) {
+      failedSteps.push('refresh');
       console.error('Tracked-bill refresh failed:', err);
     }
 
@@ -180,24 +228,33 @@ export default async () => {
       const recent = new Set(billsList.map(item => makeBillId(item.type, item.number, item.congress)));
       // Never-checked bills first (enriched by ingest-votes, marked null), then bills
       // that had no CRS summary last time (re-checked at most every 3 days).
-      const neverChecked = (await db.collection('bills').where('crs_summary_available', '==', null).limit(RECHECK_PER_RUN).get()).docs
-        .filter(d => !recent.has(d.id));
-      const stale = (await db.collection('bills').where('crs_summary_available', '==', false).limit(100).get()).docs
-        .filter(d => !recent.has(d.id) && Date.now() - Date.parse(d.data().crs_checked_at || 0) > RECHECK_AFTER_MS)
-        .sort((a, b) => (a.data().crs_checked_at || '').localeCompare(b.data().crs_checked_at || ''));
+      // A bill whose check failed gets crs_checked_at too, so it moves to the back
+      // instead of blocking the queue every night.
+      const byLastCheck = (a, b) => (a.data().crs_checked_at || '').localeCompare(b.data().crs_checked_at || '');
+      const neverChecked = (await db.collection('bills').where('crs_summary_available', '==', null).limit(20).get()).docs
+        .filter(d => !recent.has(d.id)).sort(byLastCheck);
+      const stale = (await waitingBills(db, RECHECK_PER_RUN * 4))
+        .filter(d => !recent.has(d.id) && Date.now() - Date.parse(d.data().crs_checked_at || 0) > RECHECK_AFTER_MS);
       const waiting = [...neverChecked, ...stale].slice(0, RECHECK_PER_RUN);
       for (const d of waiting) {
-        if (summarized >= MAX_SUMMARIES) break;
+        if (summarized >= MAX_SUMMARIES || timeLeft() < SUMMARY_NEEDS_MS) break;
         const result = await summaryUpdate(d.data(), d.data().ai_summary, keys);
-        if (Object.keys(result.fields).length) await d.ref.set(result.fields, { merge: true });
+        if (result.status === 'error') summaryErrors++;
+        const fields = result.status === 'error'
+          ? { crs_checked_at: new Date().toISOString(), crs_check_errors: FieldValue.increment(1) }
+          : result.fields;
+        if (Object.keys(fields).length) await d.ref.set(fields, { merge: true });
         if (result.generated) summarized++;
         rechecked++;
       }
     }
 
     // Rebuild Overview + Issues stats so today's stage changes show up today.
+    // Every summary attempt failing (e.g. a revoked OpenAI key, a CRS outage) must show in
+    // the health check, or summaries would quietly stop.
+    if (summaryErrors && !summarized) failedSteps.push('summaries');
+
     let statsNote = '';
-    const failedSteps = [];
     if (refreshed) {
       try {
         const stats = await writeOverviewStats(db, admin, { congress: currentCongress().congress });
@@ -207,7 +264,7 @@ export default async () => {
         failedSteps.push('stats');
       }
     }
-    await recordRun(db, 'sync_bills', { failedSteps, counts: { bills: updated, refreshed, summarized } });
+    await recordRun(db, 'sync_bills', { failedSteps, counts: { bills: updated, refreshed, summarized }, scheduled });
 
     return json({
       success: true,
@@ -216,7 +273,7 @@ export default async () => {
     });
   } catch (err) {
     console.error('Fatal sync error:', err);
-    try { await recordRun(getDb(), 'sync_bills', { failedSteps: ['run'] }); } catch { /* no Firestore */ }
+    try { await recordRun(getDb(), 'sync_bills', { failedSteps: ['run'], scheduled }); } catch { /* no Firestore */ }
     return json({ error: err.message }, 500);
   }
 };

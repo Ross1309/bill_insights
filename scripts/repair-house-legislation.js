@@ -12,7 +12,7 @@
 //   node scripts/build-stats.js                  # overview + Issues pages
 
 import 'dotenv/config';
-import { getDb } from '../netlify/lib/firebase.js';
+import { getDb, bulkWriter } from '../netlify/lib/firebase.js';
 import { fetchClerkLegislation } from '../netlify/lib/house-votes.js';
 
 const WRITE = process.argv.includes('--write');
@@ -38,7 +38,7 @@ async function main() {
   console.log(`\n${linked.length} can be linked, ${none} have no measure (quorum calls, adjournment...), ${failed} failed.`);
   if (!WRITE) return console.log('Nothing was written. Re-run with --write.');
 
-  const writer = db.bulkWriter();
+  const writer = bulkWriter(db);
   for (const [d, found] of linked) writer.update(d.ref, { ...found, legislation_source: 'House Clerk' });
   await writer.close();
   console.log(`Updated ${linked.length} votes. Now run the rebuild steps listed at the top of this script.`);

@@ -35,7 +35,8 @@ const FIPS = {
 // vintage doesn't have that Congress's districts.
 async function lookup(address, vintage, layerName) {
   const url = `${GEOCODER}?address=${encodeURIComponent(address)}&benchmark=Public_AR_Current&vintage=${vintage}&layers=${CD_LAYER}&format=json`;
-  const data = await getJson(url, { timeoutMs: 8000, retries: 1 });
+  // Short and no retry: up to 3 vintages are tried in a row, within a 10 s function limit.
+  const data = await getJson(url, { timeoutMs: 3000, retries: 0 });
   const match = data.result?.addressMatches?.[0];
   if (!match) return { match: null };
   const cd = match.geographies?.[layerName]?.[0];

@@ -1,5 +1,5 @@
 {
-    "name": "congressional-impact-dashboard",
+    "name": "congress-watcher",
     "version": "1.0.0",
     "type": "module",
     "dependencies": {
@@ -18,5 +18,8 @@
         "smoke": "node tests/smoke.js",
         "health": "node scripts/check-health.js",
         "build:css": "tailwindcss -i src/styles.css -o public/styles.css --minify"
+    },
+    "engines": {
+        "node": ">=22"
     }
 }

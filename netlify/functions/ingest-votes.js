@@ -11,6 +11,7 @@ import { applyNewMemberVotes } from '../lib/member-votes.js';
 import { loadVoteIndex } from '../lib/vote-index.js';
 import { recordRun } from '../lib/health.js';
 import { markTracked } from '../lib/tracked-bills.js';
+import { pool } from '../lib/pool.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
@@ -22,15 +23,12 @@ const API = 'https://api.congress.gov/v3';
 // picked up the next night. Busy days have had 24 votes in one chamber.
 const MAX_NEW_VOTES_PER_CHAMBER = 40;
 
-async function pool(items, concurrency, fn) {
-  let next = 0;
-  await Promise.all(Array.from({ length: concurrency }, async () => {
-    while (next < items.length) {
-      const i = next++;
-      await fn(items[i]);
-    }
-  }));
-}
+// Netlify's scheduler sends a body with `next_run`; run-ingest.js doesn't, and `netlify
+// dev` (which imitates the scheduler) sets NETLIFY_DEV. Only real scheduled runs count.
+const isScheduled = event => {
+  if (process.env.NETLIFY_DEV) return false;
+  try { return Boolean(JSON.parse(event?.body || "{}").next_run); } catch { return false; }
+};
 
 export async function handler(event, context) {
   try {
@@ -42,15 +40,23 @@ export async function handler(event, context) {
     // Last run's health: a failed stats rebuild is retried even on a quiet night.
     const lastRun = (await db.collection("stats").doc("health").get()).data()?.ingest_votes;
 
-    // 1. Sync all current members of Congress (writes only members that changed)
-    const memberChanges = await syncCurrentMembers(legislators);
+    // 1. Sync all current members of Congress (writes only members that changed). On
+    //    its own: a members-API problem mustn't stop the vote sync.
+    const failures = [];
+    let memberChanges = 0;
+    try {
+      memberChanges = await syncCurrentMembers(legislators);
+    } catch (err) {
+      failures.push(`members: ${err.message}`);
+      console.error("Member sync failed:", err);
+    }
 
     // 2 + 3. Latest House and Senate roll-call votes. Independent, so one source
     // failing doesn't block the other.
     const indexed = new Set((await loadVoteIndex(db, CONGRESS_NUM) || []).map(v => v.id));
     const results = await Promise.allSettled([syncHouseVotes(indexed), syncSenateVotes(legislators, indexed)]);
-    const failures = results.map((r, i) => r.status === "rejected" ? `${["house votes", "senate votes"][i]}: ${r.reason?.message || r.reason}` : null).filter(Boolean);
-    failures.forEach(msg => console.error("Vote sync failed:", msg));
+    results.forEach((r, i) => { if (r.status === "rejected") failures.push(`${["house votes", "senate votes"][i]}: ${r.reason?.message || r.reason}`); });
+    failures.forEach(msg => console.error("Sync step failed:", msg));
 
     // 4. Per-member voting records: count every vote not yet applied (incl. any a
     //    failed earlier run left behind).
@@ -86,7 +92,7 @@ export async function handler(event, context) {
       console.error("Stats rebuild failed:", err);
     }
 
-    await recordRun(db, "ingest_votes", { failedSteps: failures.map(m => m.split(":")[0]), counts: { new_votes: applied.votes } });
+    await recordRun(db, "ingest_votes", { failedSteps: failures.map(m => m.split(":")[0]), counts: { new_votes: applied.votes }, scheduled: isScheduled(event) });
     return {
       statusCode: results.every(r => r.status === "rejected") ? 500 : 200,
       body: JSON.stringify({
@@ -97,7 +103,7 @@ export async function handler(event, context) {
 
   } catch (error) {
     console.error("Ingestion failed:", error);
-    await recordRun(db, "ingest_votes", { failedSteps: ["run"] });
+    await recordRun(db, "ingest_votes", { failedSteps: ["run"], scheduled: isScheduled(event) });
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),
@@ -116,6 +122,10 @@ export async function syncHouseVotes(indexed) {
   const billIds = [];
   await pool(todo, 5, async voteItem => {
     const doc = await buildHouseVoteDoc(voteItem, CONGRESS_NUM, CONGRESS_API_KEY);
+    if (!doc.individual_votes.length) {
+      console.warn(`House ${doc.vote_id}: member positions not published yet; will retry next run`);
+      return;
+    }
     await db.collection("votes").doc(doc.vote_id).set({ ...doc, members_applied: false, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     if (doc.bill_id) billIds.push(doc.bill_id);
   });
@@ -173,20 +183,28 @@ async function enrichVotedBills(ids) {
   const unique = [...new Set(ids)].filter(id => parseBillId(id));
   const snaps = await Promise.all(unique.map(id => db.collection("bills").doc(id).get()));
   const todo = unique.map((id, i) => [id, snaps[i]]).filter(([, s]) => !s.exists || !s.data().enriched_at);
+  // One failure mustn't drop the others from the tracker (they'd be enriched but never
+  // refreshed), so failures are collected and reported after the rest are tracked.
   const done = [];
-  await Promise.all(todo.map(async ([id, snap]) => {
-    const { congress, type, number } = parseBillId(id);
-    const fields = await fetchEnrichedBill(congress, type, number, CONGRESS_API_KEY);
-    done.push({ id, stage: fields.stage });
-    const data = snap.exists ? snap.data() : {};
-    const neverChecked = !data.ai_summary && data.crs_summary_available === undefined;
-    await db.collection("bills").doc(id).set({
-      ...fields,
-      ...(neverChecked ? { crs_summary_available: null } : {}),
-      synced_at: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-  }));
+  const errors = [];
+  await pool(todo, 5, async ([id, snap]) => {
+    try {
+      const { congress, type, number } = parseBillId(id);
+      const fields = await fetchEnrichedBill(congress, type, number, CONGRESS_API_KEY);
+      const data = snap.exists ? snap.data() : {};
+      const neverChecked = !data.ai_summary && data.crs_summary_available === undefined;
+      await db.collection("bills").doc(id).set({
+        ...fields,
+        ...(neverChecked ? { crs_summary_available: null } : {}),
+        synced_at: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      done.push({ id, stage: fields.stage });
+    } catch (err) {
+      errors.push(`${id}: ${err.message}`);
+    }
+  });
   await markTracked(db, admin, done);
+  if (errors.length) throw new Error(`${errors.length} bill(s) failed (retried next run): ${errors.slice(0, 3).join("; ")}`);
   return todo.length;
 }
 
@@ -213,13 +231,21 @@ async function fetchLegislators() {
 // Returns how many member docs (incl. the directory) were written.
 const fingerprint = value => createHash("sha1").update(JSON.stringify(value)).digest("base64").slice(0, 12);
 
+const MIN_CURRENT_MEMBERS = 500;
+
 async function syncCurrentMembers(legislators) {
   const members = [];
   for (let offset = 0; ; offset += 250) {
     const page = await getJson(`${API}/member?api_key=${CONGRESS_API_KEY}&format=json&currentMember=true&limit=250&offset=${offset}`);
     const items = page.members || [];
     members.push(...items);
-    if (items.length < 250 || members.length >= (page.pagination?.count ?? 0)) break;
+    const total = page.pagination?.count;
+    if (items.length < 250 || (total != null && members.length >= total)) break;
+  }
+  // A short or empty list (API trouble) would mark everyone missing as retired and wipe
+  // the directory. Congress has 535 voting members + 6 delegates, minus vacancies.
+  if (members.length < MIN_CURRENT_MEMBERS) {
+    throw new Error(`Congress.gov returned only ${members.length} current members (expected ${MIN_CURRENT_MEMBERS}+); left members unchanged`);
   }
 
   const fecIds = legislators

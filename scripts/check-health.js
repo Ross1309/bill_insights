@@ -33,11 +33,18 @@ const problems = [];
 for (const [key, label] of Object.entries(SYNCS)) {
   const run = doc[key];
   if (!run) { problems.push(`${label}: no run recorded`); continue; }
-  const ageH = run.last_success ? (Date.now() - Date.parse(run.last_success)) / 3600e3 : Infinity;
-  const line = `${label}: last run ${run.last_run}, ${run.ok ? 'ok' : `FAILED (${(run.failed_steps || []).join(', ')})`}, `
-    + `last success ${run.last_success || 'never'}${Number.isFinite(ageH) ? ` (${ageH.toFixed(1)} h ago)` : ''}, counts ${JSON.stringify(run.counts || {})}`;
+  // Judge the *scheduled* runs: a manual run (run-ingest.js, curl) mustn't mask a failed
+  // nightly one. Records written before scheduled runs were tracked fall back to the
+  // plain fields.
+  const tracked = 'last_scheduled_run' in run;
+  const lastSuccess = tracked ? run.last_scheduled_success : run.last_success;
+  const ok = tracked ? run.last_scheduled_ok : run.ok;
+  const ageH = lastSuccess ? (Date.now() - Date.parse(lastSuccess)) / 3600e3 : Infinity;
+  const line = `${label}: last ${tracked ? 'scheduled ' : ''}run ${tracked ? run.last_scheduled_run : run.last_run}, ${ok ? 'ok' : 'FAILED'}, `
+    + `last success ${lastSuccess || 'never'}${Number.isFinite(ageH) ? ` (${ageH.toFixed(1)} h ago)` : ''}`
+    + `; latest run of any kind ${run.last_run} (${run.scheduled ? 'scheduled' : 'manual'}, ${run.ok ? 'ok' : `failed: ${(run.failed_steps || []).join(', ')}`})`;
   console.log(line);
-  if (!run.ok) problems.push(`${label}: last run failed (${(run.failed_steps || []).join(', ') || 'unknown step'})`);
+  if (!ok) problems.push(`${label}: last ${tracked ? 'scheduled ' : ''}run failed`);
   if (ageH > MAX_AGE_H) problems.push(`${label}: no successful run in ${Number.isFinite(ageH) ? `${ageH.toFixed(0)} h` : 'ever'}`);
 }
 

@@ -10,7 +10,7 @@
 // too heavy for a scheduled function.
 
 import 'dotenv/config';
-import { getDb, admin } from '../netlify/lib/firebase.js';
+import { getDb, admin, bulkWriter } from '../netlify/lib/firebase.js';
 import { entriesByMember, mergeMemberDoc } from '../netlify/lib/member-votes.js';
 import { currentCongress } from '../netlify/lib/congress.js';
 import { updateVoteIndex, writeVoteSummaries } from '../netlify/lib/vote-index.js';
@@ -28,7 +28,7 @@ async function main() {
   if (!WRITE) return console.log('Nothing was written. Re-run with --write.');
 
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const writer = db.bulkWriter();
+  const writer = bulkWriter(db);
   let bytes = 0;
   for (const [id, data] of byMember) {
     const doc = mergeMemberDoc(null, id, CONGRESS, data);
@@ -38,7 +38,7 @@ async function main() {
   await writer.close();
   const indexDocs = await updateVoteIndex(db, admin, votes, { replace: true });
   await writeVoteSummaries(db, votes);
-  const flag = db.bulkWriter();
+  const flag = bulkWriter(db);
   for (const d of snap.docs) flag.update(d.ref, { members_applied: true });
   await flag.close();
   console.log(`Done. ${byMember.size} member docs (largest ${(bytes / 1024).toFixed(1)} KB); ${indexDocs} vote index docs; ${votes.length} vote summaries; ${votes.length} votes marked applied.`);

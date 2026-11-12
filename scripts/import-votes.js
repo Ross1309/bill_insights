@@ -10,9 +10,12 @@
 // senate.gov XML (1 request per vote, gently rate limited).
 
 import 'dotenv/config';
-import { getDb, admin } from '../netlify/lib/firebase.js';
+import { getDb, admin, bulkWriter } from '../netlify/lib/firebase.js';
 import { listHouseVotes, buildHouseVoteDoc } from '../netlify/lib/house-votes.js';
-import { listSenateVotes, fetchSenateVote, senateVoteId, currentCongressSession } from '../netlify/lib/senate-votes.js';
+import { listSenateVotes, fetchSenateVote, senateVoteId } from '../netlify/lib/senate-votes.js';
+import { currentCongress } from '../netlify/lib/congress.js';
+import { pool } from '../netlify/lib/pool.js';
+import { getJson } from '../netlify/lib/http.js';
 
 const args = process.argv.slice(2);
 const flag = name => args.includes(`--${name}`);
@@ -22,7 +25,7 @@ const option = (name, fallback) => {
 };
 
 const WRITE = flag('write');
-const CONGRESS = Number(option('congress', currentCongressSession().congress));
+const CONGRESS = Number(option('congress', currentCongress().congress));
 const CHAMBER = option('chamber', 'both');
 const LIMIT = Number(option('limit', Infinity));
 const { CONGRESS_API_KEY } = process.env;
@@ -39,7 +42,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function loadLisMap() {
   const map = new Map();
   for (const url of LEGISLATORS_URLS) {
-    const list = await (await fetch(url)).json();
+    const list = await getJson(url, { timeoutMs: 60000 });   // historical file is ~13 MB
     for (const l of list) if (l.id?.lis && l.id?.bioguide && !map.has(l.id.lis)) map.set(l.id.lis, l.id.bioguide);
   }
   return map;
@@ -48,7 +51,7 @@ async function loadLisMap() {
 // Fill in bioguideId on stored Senate votes where it's missing but now mappable.
 async function remapSenateVotes(db, lisToBioguide) {
   const snap = await db.collection('votes').where('chamber', '==', 'Senate').get();
-  const writer = db.bulkWriter();
+  const writer = bulkWriter(db);
   let docs = 0, entries = 0;
   for (const d of snap.docs) {
     const votes = d.data().individual_votes || [];
@@ -66,17 +69,6 @@ async function remapSenateVotes(db, lisToBioguide) {
   }
   await writer.close();
   return { docs, entries };
-}
-
-// Run `fn` over items with a small concurrency limit.
-async function pool(items, concurrency, fn) {
-  let next = 0;
-  await Promise.all(Array.from({ length: concurrency }, async () => {
-    while (next < items.length) {
-      const i = next++;
-      await fn(items[i], i);
-    }
-  }));
 }
 
 async function main() {
@@ -108,7 +100,7 @@ async function main() {
   const needsSenate = CHAMBER === 'both' || CHAMBER === 'senate';
   const lisToBioguide = needsSenate ? await loadLisMap() : new Map();
 
-  const writer = db.bulkWriter();
+  const writer = bulkWriter(db);
   const counts = { House: 0, Senate: 0, failed: 0, unmapped: 0 };
   const house = todo.filter(t => t.chamber === 'House');
   const senate = todo.filter(t => t.chamber === 'Senate');

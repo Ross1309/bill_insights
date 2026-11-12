@@ -61,3 +61,18 @@ test(`mergeMemberDoc: keeps only the latest ${RECENT_MAX}`, () => {
   assert.equal(doc.totals.votes, RECENT_MAX + 10);
   assert.equal(doc.recent[0].id, `119-2-house-vote-${RECENT_MAX + 10}`);
 });
+
+test('mergeMemberDoc: applying the same votes again changes nothing (retry after a failed run)', () => {
+  const votes = [
+    vote('119-2-house-vote-1', '2026-01-10T15:00:00Z', [{ bioguideId: 'A1', party: 'D', position: 'Yea' }], PB_D_YEA_R_NAY),
+    vote('119-2-house-vote-2', '2026-01-11T15:00:00Z', [{ bioguideId: 'A1', party: 'D', position: 'Nay' }], PB_D_YEA_R_NAY),
+  ];
+  const once = mergeMemberDoc(null, 'A1', 119, entriesByMember(votes).get('A1'));
+  const twice = mergeMemberDoc(once, 'A1', 119, entriesByMember(votes).get('A1'));
+  assert.deepEqual(twice.totals, once.totals);
+  assert.equal(twice.recent.length, 2);
+  assert.deepEqual(twice.applied.sort(), ['2h1', '2h2']);
+  // A new vote alongside an old one: only the new one counts.
+  const more = [votes[1], vote('119-2-house-vote-3', '2026-01-12T15:00:00Z', [{ bioguideId: 'A1', party: 'D', position: 'Yea' }], PB_D_YEA_R_NAY)];
+  assert.equal(mergeMemberDoc(twice, 'A1', 119, entriesByMember(more).get('A1')).totals.votes, 3);
+});

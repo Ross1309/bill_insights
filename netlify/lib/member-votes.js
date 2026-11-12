@@ -4,13 +4,15 @@
 //
 //   { bioguideId, congress, chamber, name, party, state,
 //     totals: { votes, yea, nay, present, not_voting, with_party, party_comparable },
-//     recent: [latest RECENT_MAX entries, newest first], updated_at }
+//     recent: [latest RECENT_MAX entries, newest first],
+//     applied: [voteKey of every vote counted, e.g. "2h323"], updated_at }
 //
 // Totals cover every vote this Congress. Each vote doc carries `members_applied`
 // (false when ingested, true once counted here), so a failed run is picked up by the
 // next one and no vote is counted twice in normal operation.
 
 import { updateVoteIndex, writeVoteSummaries } from './vote-index.js';
+import { bulkWriter } from './firebase.js';
 
 const POSITION = { yea: 'yea', aye: 'yea', nay: 'nay', no: 'nay', present: 'present', 'not voting': 'not_voting' };
 export const RECENT_MAX = 50;
@@ -71,13 +73,29 @@ export function entriesByMember(votes) {
   return out;
 }
 
+// Compact key for a vote within a Congress: "119-2-house-vote-323" -> "2h323".
+export function voteKey(id) {
+  const m = /^\d+-(\d+)-(house|senate)-vote-(\d+)$/.exec(id || '');
+  return m ? `${m[1]}${m[2][0]}${m[3]}` : String(id);
+}
+
 // Merge new entries into an existing member doc (or start fresh for a new Congress).
+// Idempotent: `applied` lists every vote already counted, so re-applying a vote (a run
+// that failed after writing member docs but before flagging the votes) changes nothing.
 export function mergeMemberDoc(existing, bioguideId, congress, { entries, info }) {
   const fresh = !existing || existing.congress !== congress;
   const totals = fresh ? emptyTotals() : { ...emptyTotals(), ...existing.totals };
+  const applied = new Set(fresh ? [] : existing.applied || []);
+  const added = [];
+  for (const e of entries) {
+    const key = voteKey(e.id);
+    if (applied.has(key)) continue;
+    applied.add(key);
+    addToTotals(totals, e);
+    added.push(e);
+  }
   const seen = new Set(fresh ? [] : (existing.recent || []).map(e => e.id));
-  for (const e of entries) addToTotals(totals, e);
-  const recent = [...(fresh ? [] : existing.recent || []), ...entries.filter(e => !seen.has(e.id))]
+  const recent = [...(fresh ? [] : existing.recent || []), ...added.filter(e => !seen.has(e.id))]
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
     .slice(0, RECENT_MAX);
   return {
@@ -89,6 +107,7 @@ export function mergeMemberDoc(existing, bioguideId, congress, { entries, info }
     state: info.state || existing?.state || null,
     totals,
     recent,
+    applied: [...applied],
   };
 }
 
@@ -107,7 +126,7 @@ export async function applyNewMemberVotes(db, admin, congress) {
   for (let i = 0; i < refs.length; i += 300) existing.push(...await db.getAll(...refs.slice(i, i + 300)));
 
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const writer = db.bulkWriter();
+  const writer = bulkWriter(db);
   ids.forEach((id, i) => {
     const doc = mergeMemberDoc(existing[i].exists ? existing[i].data() : null, id, congress, byMember.get(id));
     writer.set(refs[i], { ...doc, updated_at: now });
@@ -116,7 +135,7 @@ export async function applyNewMemberVotes(db, admin, congress) {
   await updateVoteIndex(db, admin, votes);
   await writeVoteSummaries(db, votes);
 
-  const flag = db.bulkWriter();
+  const flag = bulkWriter(db);
   for (const d of snap.docs) flag.update(d.ref, { members_applied: true });
   await flag.close();
   return { votes: votes.length, members: ids.length };

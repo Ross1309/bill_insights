@@ -13,6 +13,7 @@
 import 'dotenv/config';
 import { getDb, admin } from '../netlify/lib/firebase.js';
 import { summaryUpdate } from '../netlify/lib/bills.js';
+import { pool } from '../netlify/lib/pool.js';
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -25,16 +26,6 @@ const RECHECK_MS = opt('recheck-days', 3) * 24 * 60 * 60 * 1000;
 const { CONGRESS_API_KEY, OPENAI_API_KEY } = process.env;
 if (!CONGRESS_API_KEY) throw new Error('CONGRESS_API_KEY is not set.');
 if (WRITE && !OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required with --write.');
-
-async function pool(items, concurrency, fn) {
-  let next = 0;
-  await Promise.all(Array.from({ length: concurrency }, async () => {
-    while (next < items.length) {
-      const i = next++;
-      await fn(items[i], i);
-    }
-  }));
-}
 
 async function main() {
   const db = getDb();

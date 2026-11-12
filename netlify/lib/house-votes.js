@@ -1,5 +1,5 @@
 // House roll-call votes from the Congress.gov API, shaped into the `votes` doc schema.
-// Shared by netlify/functions/ingest-votes.js (latest few) and scripts/import-votes.js
+// Shared by netlify/functions/ingest-votes.js (every vote not yet stored) and scripts/import-votes.js
 // (whole-congress backfill).
 
 import { partyBreakdown } from './vote-stats.js';

@@ -10,6 +10,8 @@
 // flag as member_votes), and scripts/build-member-votes.js rebuilds them from scratch.
 // Firestore rules give browsers no access (only firebase-admin uses it).
 
+import { bulkWriter } from './firebase.js';
+
 export const indexDocId = (congress, session, chamber) => `${congress}-${session}-${String(chamber).toLowerCase()}`;
 
 export function indexEntry(vote) {
@@ -64,7 +66,7 @@ export function voteSummary(vote) {
 }
 
 export async function writeVoteSummaries(db, votes) {
-  const writer = db.bulkWriter();
+  const writer = bulkWriter(db);
   for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v));
   await writer.close();
   return votes.length;

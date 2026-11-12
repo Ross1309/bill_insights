@@ -6,7 +6,7 @@
 //                                               # docs that lack it (reads full docs)
 
 import 'dotenv/config';
-import { getDb, admin } from '../netlify/lib/firebase.js';
+import { getDb, admin, bulkWriter } from '../netlify/lib/firebase.js';
 import { partyBreakdown } from '../netlify/lib/vote-stats.js';
 import { writeOverviewStats } from '../netlify/lib/overview.js';
 import { currentCongress } from '../netlify/lib/congress.js';
@@ -19,7 +19,7 @@ async function main() {
 
   if (BACKFILL) {
     const snap = await db.collection('votes').get();
-    const writer = db.bulkWriter();
+    const writer = bulkWriter(db);
     let added = 0;
     for (const d of snap.docs) {
       const v = d.data();

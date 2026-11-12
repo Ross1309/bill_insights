@@ -10,8 +10,9 @@
 // the detail endpoint and drives the category filter).
 
 import 'dotenv/config';
-import { getDb, admin } from '../netlify/lib/firebase.js';
+import { getDb, admin, bulkWriter } from '../netlify/lib/firebase.js';
 import { billMetadata, fetchBillDetail, makeBillId } from '../netlify/lib/bills.js';
+import { pool } from '../netlify/lib/pool.js';
 
 const args = process.argv.slice(2);
 const WRITE = args.includes('--write');
@@ -34,16 +35,6 @@ async function listRecentBills(limit) {
   return out.slice(0, limit);
 }
 
-async function pool(items, concurrency, fn) {
-  let next = 0;
-  await Promise.all(Array.from({ length: concurrency }, async () => {
-    while (next < items.length) {
-      const idx = next++;
-      await fn(items[idx], idx);
-    }
-  }));
-}
-
 async function main() {
   const db = getDb();
   const { FieldValue } = admin.firestore;
@@ -59,7 +50,7 @@ async function main() {
     return;
   }
 
-  const writer = db.bulkWriter();
+  const writer = bulkWriter(db);
   const counts = { written: 0, failed: 0 };
   await pool(todo, 5, async item => {
     try {

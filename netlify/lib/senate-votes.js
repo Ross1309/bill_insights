@@ -7,7 +7,6 @@
 // lis -> bioguideId map (from the congress-legislators dataset).
 
 import { partyBreakdown } from './vote-stats.js';
-import { currentCongress } from './congress.js';
 import { getText as fetchText } from './http.js';
 
 const getText = url => fetchText(url, { headers: HEADERS });
@@ -58,7 +57,6 @@ export function parseSenateDate(text) {
   return new Date(asUtc - offset * 60000).toISOString();
 }
 
-export { currentCongress as currentCongressSession } from './congress.js';
 
 async function fetchMenu(congress, session) {
   const xml = await getText(`${LIS}/roll_call_lists/vote_menu_${congress}_${session}.xml`);
@@ -126,10 +124,14 @@ function parseVote(xml, { congress, session, number }, lisToBioguide) {
 }
 
 // Vote entries ({ congress, session, number }) for the given sessions, newest first.
+// The first session listed is the current one: if its menu can't be read, throw (a
+// silent empty list would report a healthy run while missing every new vote). An
+// earlier session's menu is optional.
 export async function listSenateVotes(congress, sessions = [2, 1]) {
   const entries = [];
-  for (const session of sessions) {
+  for (const [i, session] of sessions.entries()) {
     entries.push(...await fetchMenu(congress, session).catch(err => {
+      if (i === 0) throw new Error(`Senate vote menu ${congress}-${session} unavailable: ${err.message}`);
       console.warn(`Senate vote menu ${congress}-${session} unavailable: ${err.message}`);
       return [];
     }));
@@ -148,11 +150,3 @@ export async function fetchSenateVote(entry, lisToBioguide) {
   return parseVote(xml, entry, lisToBioguide);
 }
 
-// The n most recent Senate roll-call votes as `votes` docs (newest first).
-export async function fetchLatestSenateVotes(n, lisToBioguide) {
-  const { congress, session } = currentCongress();
-  const entries = await listSenateVotes(congress, session === 2 ? [2, 1] : [1]);
-  const out = [];
-  for (const entry of entries.slice(0, n)) out.push(await fetchSenateVote(entry, lisToBioguide));
-  return out;
-}

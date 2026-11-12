@@ -1,4 +1,4 @@
-// GET /.netlify/functions/member-profile?id={bioguideId}
+// GET /api/member-profile?id={bioguideId}
 //
 // Server-side proxy to Congress.gov for a member's profile and their most recent
 // sponsored legislation (the API key can't be exposed to the browser). Returns
