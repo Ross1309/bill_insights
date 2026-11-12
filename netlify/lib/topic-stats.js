@@ -109,13 +109,18 @@ export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { 
     };
   }
 
+  // Watchlist measures outside the topic's own policy areas (e.g. health provisions in
+  // veterans' or budget bills): counted so the page can say they exist.
+  const measureIds = new Set(measures.map(b => b.id));
+  const beyond = new Set(Object.values(watchlists).flatMap(w => [...w.focused, ...w.broad].map(b => b.id)).filter(id => !measureIds.has(id)));
+
   return {
     slug,
     label: t.label,
     intro: t.intro.replace('{congress}', congress ? ordinal(congress) : 'current'),
     policy_areas: t.policyAreas,
     explainers: t.explainers,
-    counts: { ...stageCounts(measures), votes: topicVotes.length },
+    counts: { ...stageCounts(measures), votes: topicVotes.length, beyond_policy_area: beyond.size },
     laws,
     key_votes: keyVotes,
     agreement,

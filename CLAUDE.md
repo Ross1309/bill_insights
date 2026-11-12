@@ -69,6 +69,7 @@ public/issues.js                   Issues tab topic pages from stats/topic-<slug
 netlify/lib/topics.js              Topic + watchlist definitions (CRS policy areas / subjects)
 netlify/lib/topic-stats.js         computeTopicStats(): one stats/topic-<slug> doc per topic
 scripts/import-topic-bills.js      Store + enrich every law and voted-on bill (resumable)
+scripts/retag-topics.js            Recompute bills' topic/watchlist tags after editing topics.js [--write]
 mockups/                           Design mockups (static, not deployed; `mockups` launch config)
 firestore.indexes.json             Composite indexes the UI's queries need
 netlify/functions/sync-bills.js    Syncs recent bills + AI summaries (was sync-votes.js)
@@ -349,10 +350,8 @@ Back/Forward and the state picker; health check fooled by manual runs. The smoke
 now covers Back from Issues, repeated topic switches and malformed links.
 
 ### Open work (as of 2026-11-12)
-- Healthcare/Economy coverage: focused/broad watchlists like Foreign Affairs (Healthcare shows
-  11 measures because health provisions ride in budget bills).
 - "What Congress did this week" digest; more topics (Immigration, Defense: add to topics.js
-  + a chip in index.html, after the coverage fix).
+  + a chip in index.html + ISSUE_TOPICS in app.js, then retag-topics + build-stats).
 - Waiting bills are re-checked 5 per sync run; with ~1,000 waiting, run
   `summarize-bills.js --write` occasionally (or schedule it) to catch new CRS summaries.
 - Senate votes: the nightly ingest maps senators with the *current* congress-legislators
@@ -363,8 +362,25 @@ now covers Back from Issues, repeated topic switches and malformed links.
 
 Plain-language topic pages, built from the approved mockup (`mockups/foreign-affairs.html`).
 - **Topics** (`netlify/lib/topics.js`): Economy, Healthcare, Foreign Affairs by CRS policy
-  area. Foreign Affairs has **watchlists** Iran, Israel, Foreign aid: CRS subject tag OR the
-  topic named in the title (H.R. 5334 "…Russia and Iran Act" has no *Iran* subject tag).
+  area. **Watchlists** (CRS subject tag OR the topic named in the title; H.R. 5334 "…Russia
+  and Iran Act" has no *Iran* subject tag):
+  - Economy: Tariffs & trade, Taxes, Budget & debt
+  - Healthcare: Coverage & costs (incl. Medicare, Medicaid, prescription drugs), Veterans'
+    health, Mental health & substance use
+  - Foreign Affairs: Iran, Israel, Foreign aid
+  Healthcare/Economy ones were chosen 2026-11-12 from the CRS subjects on floor/law bills:
+  health provisions mostly ride in bills from other policy areas (Healthcare's own area has
+  11 measures; its watchlists add 39). Prescription drugs (only 3 focused) was merged into
+  Coverage & costs; "jobs & cost of living" was dropped (noisy; Labor is already an Economy
+  area). Title patterns use word boundaries ("Trademark" isn't trade).
+- **Changing topics.js?** Run `node scripts/retag-topics.js --write` then
+  `node scripts/build-stats.js` (no API calls; stored subjects are retagged), update the How
+  we count page, and keep watchlist slugs unique across topics (≤30 slugs total: the stats
+  query uses array-contains-any). New bills are tagged at enrichment automatically.
+- `counts.beyond_policy_area` = watchlist measures outside the topic's own policy areas;
+  "At a glance" mentions them so the headline number isn't read as the whole topic.
+- The watchlist vote timeline prints Yea–Nay labels only where they fit (two heights, 7%
+  apart); crowded dots keep their tooltip.
   A watchlist bill is **focused** if its title names the topic or it has ≤10 CRS subjects,
   otherwise **broad** (appropriations/NDAA with ~250 subjects). Pages print these rules.
 - **Measures** = bills tagged with the topic that became law or got a recorded vote.

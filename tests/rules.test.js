@@ -134,3 +134,18 @@ test('legislationFromClerk: House Clerk <legis-num> -> bill id', async () => {
   assert.equal(legislationFromClerk(x('ADJOURN'), 119), null);
   assert.equal(legislationFromClerk('', 119), null);
 });
+
+test('topicTags: Healthcare and Economy watchlists reach beyond the policy area', async () => {
+  const { topicTags } = await import('../netlify/lib/topics.js');
+  // A veterans' bill (other policy area) lands in Veterans' health, focused (title).
+  const va = topicTags({ policy_area: 'Armed Forces and National Security', subjects: ["Veterans' medical care"], title: "Veterans' Health Care Improvement Act" });
+  assert.ok(va.topics.includes('veterans-health') && !va.topics.includes('healthcare'));
+  assert.equal(va.topic_focus['veterans-health'], true);
+  // A big bill with many subjects is broad.
+  const big = topicTags({ policy_area: 'Economics and Public Finance', subjects: ['Medicare', ...Array.from({ length: 40 }, (_, i) => `s${i}`)], title: 'Consolidated Appropriations Act' });
+  assert.equal(big.topic_focus.coverage, false);
+  // Title patterns use word boundaries: "Trademark" isn't trade, "Taxi" isn't tax.
+  assert.ok(!topicTags({ title: 'Trademark Modernization Act' }).topics.includes('tariffs'));
+  assert.ok(!topicTags({ title: 'Taxi Safety Act' }).topics.includes('taxes'));
+  assert.ok(topicTags({ title: 'Reciprocal Trade Act' }).topics.includes('tariffs'));
+});

@@ -8,14 +8,56 @@ export const TOPICS = {
     label: 'Economy',
     intro: 'What the {congress} Congress has done on taxes, spending, the financial system, trade and jobs: what became law, what is moving, and how members voted.',
     policyAreas: ['Economics and Public Finance', 'Finance and Financial Sector', 'Taxation', 'Commerce', 'Labor and Employment'],
-    watchlists: {},
+    // Chosen 2026-11-12 from the CRS subjects on bills that reached the floor (see
+    // CLAUDE.md, Issues tab): each catches 16-33 measures, mostly focused ones.
+    watchlists: {
+      tariffs: {
+        label: 'Tariffs & trade',
+        subjects: ['Tariffs', 'Trade restrictions', 'Trade agreements and negotiations'],
+        titlePattern: '\\btariffs?\\b|\\btrade\\b',
+        intro: 'Measures CRS tagged Tariffs, Trade restrictions, or Trade agreements and negotiations, or with tariff or trade in the title.',
+      },
+      taxes: {
+        label: 'Taxes',
+        subjects: ['Income tax credits', 'Income tax deductions', 'Income tax rates', 'Income tax exclusion', 'Tax administration and collection, taxpayers'],
+        titlePattern: '\\btax(es|ation)?\\b',
+        intro: 'Measures CRS tagged with income tax credits, deductions, rates or exclusions, or Tax administration and collection, or with tax in the title.',
+      },
+      budget: {
+        label: 'Budget & debt',
+        subjects: ['Budget deficits and national debt', 'Budget process'],
+        titlePattern: 'debt limit|debt ceiling|\\bbudget\\b|\\bdeficit',
+        intro: 'Measures CRS tagged Budget deficits and national debt or Budget process, or with budget, deficit or debt limit in the title.',
+      },
+    },
     explainers: ['no-vote', 'resolutions'],
   },
   healthcare: {
     label: 'Healthcare',
     intro: 'What the {congress} Congress has done on health care, Medicare, Medicaid, public health and medical research: what became law, what is moving, and how members voted.',
     policyAreas: ['Health'],
-    watchlists: {},
+    // Health provisions often ride in bills with another policy area (veterans' care,
+    // budget and spending bills), so these watchlists reach beyond the 'Health' area.
+    watchlists: {
+      coverage: {
+        label: 'Coverage & costs',
+        subjects: ['Health care coverage and access', 'Health care costs and insurance', 'Medicare', 'Medicaid', 'Prescription drugs'],
+        titlePattern: 'medicare|medicaid|health insurance|affordable care|prescription drug|drug pric',
+        intro: 'Measures CRS tagged Health care coverage and access, Health care costs and insurance, Medicare, Medicaid or Prescription drugs, or naming one of these in the title.',
+      },
+      'veterans-health': {
+        label: "Veterans' health",
+        subjects: ["Veterans' medical care"],
+        titlePattern: "veterans'? (health|medical)",
+        intro: "Measures CRS tagged Veterans' medical care, or with veterans' health or medical care in the title.",
+      },
+      'mental-health': {
+        label: 'Mental health & substance use',
+        subjects: ['Mental health', 'Drug, alcohol, tobacco use'],
+        titlePattern: 'mental health|suicide|opioid|substance use|addiction',
+        intro: 'Measures CRS tagged Mental health or Drug, alcohol, tobacco use, or with mental health, suicide, opioids, substance use or addiction in the title.',
+      },
+    },
     explainers: ['no-vote', 'resolutions'],
   },
   'foreign-affairs': {

@@ -73,6 +73,7 @@ function glance(s) {
     <section>
       <h3 class="font-serif text-2xl font-bold text-gray-900">At a glance</h3>
       <p class="text-base sm:text-lg text-gray-800 mt-2 max-w-3xl">This Congress, <strong>${c.measures}</strong> ${esc(s.label.toLowerCase())} measures reached a floor vote or became law. <strong>${c.law}</strong> became law, <strong>${c.passed_both + c.passed_one}</strong> more passed at least one chamber, and <strong>${c.none}</strong> didn't pass either. Members cast <strong>${c.votes}</strong> recorded votes on them.</p>
+      ${c.beyond_policy_area ? `<p class="text-sm text-gray-600 mt-2 max-w-3xl">Those are bills whose official policy area is ${esc(s.label.toLowerCase())}. Another <strong>${c.beyond_policy_area}</strong> measures from other areas (such as budget, veterans' or defense bills) include ${esc(s.label.toLowerCase())} provisions: see the watchlists below.</p>` : ""}
       <div class="mt-5 bg-surface border border-gray-200 rounded-xl p-5">
         <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-3">How far they got</p>
         <div class="space-y-2.5">${steps.map(([lbl, n], i) => `
@@ -91,20 +92,28 @@ function timeline(focused) {
   const vs = focused.flatMap(b => (b.votes || []).map(v => ({ ...v, bill: b }))).sort((a, b) => a.date.localeCompare(b.date));
   if (!vs.length) return "";
   const t0 = new Date(vs[0].date).getTime(), span = Math.max(1, new Date(vs.at(-1).date).getTime() - t0);
-  const row = ch => `
+  // Yea–Nay labels sit at two heights; a label is drawn only where it has room (at least
+  // LABEL_GAP % from the previous one at that height). Crowded dots keep their tooltip.
+  const LABEL_GAP = 7;
+  const row = ch => {
+    const lastAt = [-Infinity, -Infinity];
+    return `
     <div class="flex items-center gap-3">
       <span class="w-14 text-xs text-gray-500">${ch}</span>
       <div class="relative flex-1 h-12 border-b border-gray-200">
-        ${vs.filter(v => v.chamber === ch).map((v, i) => {
+        ${vs.filter(v => v.chamber === ch).map(v => {
           const x = ((new Date(v.date).getTime() - t0) / span) * 100;
+          const level = [0, 1].find(l => x - lastAt[l] >= LABEL_GAP);
+          if (level !== undefined) lastAt[level] = x;
           const tip = `${day(v.date)} · ${ch} · ${v.bill.label}: ${v.result} ${v.yea}–${v.nay}`;
           return `<button type="button" data-open="vote" data-id="${esc(v.id)}" data-tip="${esc(tip)}" aria-label="${esc(tip)}" class="absolute bottom-0 -translate-x-1/2 flex flex-col items-center" style="left:${Math.min(98, Math.max(2, x))}%">
-            <span class="hidden sm:block text-[10px] tabular-nums text-gray-500 ${i % 2 ? "mb-4" : "mb-0.5"}">${v.yea}–${v.nay}</span>
+            <span class="hidden ${level === undefined ? "" : "sm:block"} text-[10px] tabular-nums text-gray-500 ${level === 1 ? "mb-4" : "mb-0.5"}">${v.yea}–${v.nay}</span>
             <span class="w-3 h-3 rounded-full ring-2 ring-surface" style="background:${v.passed ? C.succeeded : C.failed}"></span>
           </button>`;
         }).join("")}
       </div>
     </div>`;
+  };
   return `
     <div class="bg-surface border border-gray-200 rounded-xl p-5">
       <div class="flex flex-wrap justify-between gap-2">
@@ -114,7 +123,7 @@ function timeline(focused) {
           <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:${C.failed}"></span>Failed / rejected</span>
         </div>
       </div>
-      <p class="text-xs text-gray-500 mt-1">${vs.length} recorded votes, ${vs.filter(v => v.passed).length} passed. Numbers are Yea–Nay<span class="sm:hidden">; tap a dot for details</span>. Select a dot to see how every member voted.</p>
+      <p class="text-xs text-gray-500 mt-1">${vs.length} recorded votes, ${vs.filter(v => v.passed).length} passed. Numbers are Yea–Nay (where there's room; hover or tap any dot)<span class="sm:hidden">; tap a dot for details</span>. Select a dot to see how every member voted.</p>
       <div class="mt-4 space-y-3">${row("House")}${row("Senate")}</div>
       <div class="flex justify-between text-[10px] text-gray-400 mt-1 pl-[4.25rem]"><span>${day(vs[0].date)}</span><span>${day(vs.at(-1).date)}</span></div>
     </div>`;
@@ -153,7 +162,7 @@ function watchlists(s) {
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 class="font-serif text-2xl font-bold text-gray-900">Watchlists</h3>
-          <p class="text-sm text-gray-500">Narrower topics, defined by official CRS subject tags.</p>
+          <p class="text-sm text-gray-500">Narrower topics, defined by official CRS subject tags or the bill's title. They can include bills from other policy areas.</p>
         </div>
         <div class="flex flex-wrap gap-2" role="tablist" data-watch-tabs>
           ${keys.map((k, i) => `<button type="button" role="tab" data-watch="${k}" aria-selected="${i === 0}" class="px-3 py-1.5 text-xs font-semibold rounded-full ${i === 0 ? "bg-cta text-ink" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}">${esc(s.watchlists[k].label)} (${s.watchlists[k].focused.length + s.watchlists[k].broad.length})</button>`).join("")}
