@@ -1,7 +1,7 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { PARTY_NAMES, escapeHtml, formatVoteDate, ordinal, partyChip } from "./util.js";
+import { escapeHtml, formatVoteDate, ordinal, PARTY_NAMES, partyChip, safeHref } from "./util.js";
 import { billLabel } from "./bills.js";
 import { setChipGroup } from "./members.js";
 
@@ -18,7 +18,6 @@ export let votesLoaded = false;
 const VOTES_PAGE_SIZE = 10;
 const FALLBACK_PAGE_SIZE = 30;
 const votesMore = document.getElementById("votes-more");
- // every vote seen this session, by id
 let voteChamber = "";
 let voteIndexMissing = false;
 const votesState = { items: [], cursor: null, exhausted: false, loading: false, generation: 0 };
@@ -94,6 +93,8 @@ export function fetchVotes() {
   return loadVotes({ reset: true });
 }
 
+let votesMoreUsed = false;   // see renderLoadMore in bills.js
+
 function renderVotesMore() {
   const st = votesState;
   if (st.exhausted && !st.loading) {
@@ -109,7 +110,9 @@ function renderVotesMore() {
       ${st.loading ? "Loading…" : "Load older votes"}
     </button>
     ${oldest && !st.loading ? `<p class="text-xs text-gray-400 mt-2">Showing ${st.items.length} votes back to ${escapeHtml(new Date(oldest).toLocaleDateString(undefined, { dateStyle: "medium" }))}</p>` : ""}`;
-  document.getElementById("votes-load-more")?.addEventListener("click", () => loadVotes());
+  const btn = document.getElementById("votes-load-more");
+  btn?.addEventListener("click", () => { votesMoreUsed = true; loadVotes(); });
+  if (btn && votesMoreUsed && !st.loading) { votesMoreUsed = false; btn.focus(); }
 }
 
 const BILL_TYPE_SLUGS = {
@@ -221,7 +224,7 @@ export function setupVoteFilters() {
   setChipGroup("vote-chamber-filters", "chamber", voteChamber);
   document.getElementById("vote-chamber-filters")?.addEventListener("click", e => {
     const b = e.target.closest("[data-chamber]");
-    if (!b) return;
+    if (!b || b.dataset.chamber === voteChamber) return;   // already showing it
     voteChamber = b.dataset.chamber;
     setChipGroup("vote-chamber-filters", "chamber", voteChamber);
     fetchVotes();
@@ -263,7 +266,7 @@ function renderVotes(votes) {
           ${voteTalliesHtml(vote)}
           <div class="flex flex-wrap items-center gap-4 mt-3 text-xs">
             ${vote.member_count || vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-accent hover:underline">How each member voted →</button>` : ""}
-            ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(sourceLabel(vote))} →</a>` : ""}
+            ${safeHref(vote.source_url) ? `<a href="${safeHref(vote.source_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(sourceLabel(vote))} →</a>` : ""}
           </div>
         </div>`).join("")}
     </div>`).join("");

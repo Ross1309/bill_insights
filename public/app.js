@@ -105,7 +105,10 @@ function setupIssues() {
 }
 
 // --- Overview tab: one small precomputed doc (stats/overview) ------------------
+let overviewLoading = false;
 async function loadOverview() {
+  if (overviewLoading) return;   // clicking Overview during the first load
+  overviewLoading = true;
   const container = document.getElementById("overview-container");
   try {
     const snap = await getOverviewDoc();
@@ -125,10 +128,11 @@ async function loadOverview() {
     console.error("Error loading overview:", err);
     container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load the overview: ${escapeHtml(err.message)}</p>`;
   }
+  overviewLoading = false;
 }
+
 // --- Data freshness: stats/health, written by both nightly syncs ---------------
-const STALE_AFTER_MS = 36 * 3600 * 1000;
- // syncs run daily; allow one missed-by-hours run
+const STALE_AFTER_MS = 36 * 3600 * 1000;   // syncs run daily; allow one missed-by-hours run
 
 async function loadHealth() {
   try {
@@ -158,17 +162,20 @@ async function loadHealth() {
 }
 
 async function init() {
-  onTabOpen.overview = () => { if (!overviewLoaded) loadOverview(); };
+  onTabOpen.overview = () => { if (!overviewLoaded) loadOverview(); };   // loadOverview guards double calls
   onTabOpen.issues = () => { if (!issueLoaded) loadIssue(currentIssue); };
   onTabOpen.bills = startBills;
   onTabOpen.votes = () => { if (!votesLoaded) fetchVotes(); };
   onTabOpen.members = showDirectory;
   // URL arguments (see router.js): Issues topic, Legislators state / district.
   tabArg.issues = () => currentIssue;
+  // Before the first load starts, just choose the topic (the tab's loader loads it).
+  // After that, load whenever the URL's topic differs from the one shown or being
+  // loaded (currentIssue is set as soon as a load starts), e.g. Back during a load.
   onTabArg.issues = slug => {
     if (!ISSUE_TOPICS.includes(slug)) return;
-    if (issueLoaded && slug !== currentIssue) loadIssue(slug);
-    else currentIssue = slug;
+    if (!issueRequest) currentIssue = slug;
+    else if (slug !== currentIssue) loadIssue(slug);
   };
   tabArg.members = legislatorsArg;
   onTabArg.members = applyLegislatorsArg;

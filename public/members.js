@@ -224,6 +224,7 @@ async function showStateFallback() {
   const request = ++directoryFallbackRequest;
   const summary = document.getElementById("members-summary");
   if (!memberFilters.state) {
+    renderYourReps([]);
     membersContainer.innerHTML = `<p class="text-center text-gray-500 py-12">Nationwide search isn't available right now. Pick a state to browse its members.</p>`;
     summary.textContent = "";
     document.getElementById("members-more").innerHTML = "";
@@ -235,6 +236,7 @@ async function showStateFallback() {
     if (request !== directoryFallbackRequest) return;
     const members = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     members.forEach(m => memberById.set(m.id, m));
+    renderYourReps(members);   // the state's members are all the panel needs
     renderMemberList(members);
   } catch (err) {
     if (request !== directoryFallbackRequest) return;
@@ -246,7 +248,7 @@ async function showStateFallback() {
 export function setChipGroup(groupId, attr, value) {
   document.querySelectorAll(`#${groupId} [data-${attr}]`).forEach(b => {
     const active = b.dataset[attr] === value;
-    b.setAttribute("aria-pressed", String(active));
+    b.setAttribute(b.getAttribute("role") === "tab" ? "aria-selected" : "aria-pressed", String(active));
     b.className = `filter-chip px-3 py-1.5 text-xs font-semibold rounded-full transition ${active ? "bg-cta text-ink" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
   });
 }

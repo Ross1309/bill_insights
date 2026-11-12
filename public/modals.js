@@ -3,7 +3,7 @@
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
 import { fetchFunction, getBill, getFirestoreDoc, getMember, getVote, getVotesForBill } from "./data.js";
-import { PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, STATE_NAMES, errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, ordinal, spinner } from "./util.js";
+import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole } from "./members.js";
@@ -11,8 +11,7 @@ import { renderFinanceTab } from "./finance.js";
 import { backDetail, closeAllDetails, detailHash, pushDetail, setRouteHandlers } from "./router.js";
 
 const modalRoot = document.getElementById("modal-root");
-let modalStack = [];
- // entries: { kind, id, tab, data: {}, errors: {}, filter: {} }
+let modalStack = [];   // entries: { kind, id, tab, data: {}, errors: {}, filter: {} }
 let lastFocused = null;
 
 // Vote doc id for an action's recorded vote, matching ingest-votes.js.
@@ -120,7 +119,7 @@ const memberModal = {
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 ${item.kind === "bill" && item.bill_id
                   ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-accent hover:underline">${escapeHtml(item.label)}</button>`
-                  : item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="font-semibold text-accent hover:underline">${escapeHtml(item.label)}</a>`
+                  : safeHref(item.url) ? `<a href="${safeHref(item.url)}" target="_blank" rel="noopener" class="font-semibold text-accent hover:underline">${escapeHtml(item.label)}</a>`
                   : `<span class="font-semibold">${escapeHtml(item.label)}</span>`}
                 ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(item.introducedDate)}</span>` : ""}
                 ${item.policyArea ? `<span class="text-gray-500">· ${escapeHtml(item.policyArea)}</span>` : ""}
@@ -130,7 +129,7 @@ const memberModal = {
             </li>`).join("")}
         </ul>`;
     }],
-    ["money", "Campaign Finance", renderFinanceTab],
+    ["money", "Campaign Finance", e => renderFinanceTab(e, loadInto)],
   ],
 };
 
@@ -217,7 +216,7 @@ const billModal = {
                 const id = recordedVoteId(rv);
                 return `<span class="inline-flex flex-wrap gap-x-3 mr-3">
                   ${id ? `<button type="button" data-open="vote" data-id="${escapeHtml(id)}" class="text-xs font-semibold text-accent hover:underline">${escapeHtml(rv.chamber || "")} roll call #${escapeHtml(String(rv.rollNumber))}: how members voted →</button>` : ""}
-                  ${rv.url ? `<a href="${escapeHtml(rv.url)}" target="_blank" rel="noopener" class="text-xs text-gray-500 hover:underline">official record</a>` : ""}
+                  ${safeHref(rv.url) ? `<a href="${safeHref(rv.url)}" target="_blank" rel="noopener" class="text-xs text-gray-500 hover:underline">official record</a>` : ""}
                 </span>`;
               }).join("")}
             </li>`).join("")}
@@ -301,7 +300,7 @@ const voteModal = {
       const v = e.data.vote;
       if (e.errors.vote) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load vote: ${escapeHtml(e.errors.vote)}</p>`;
       if (v === undefined) return spinner("Loading vote…");
-      if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This roll call hasn't been synced yet. Only the most recent House and Senate votes are stored so far.</p>`;
+      if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This roll call isn't in our records yet. New votes are added nightly, and only the current Congress's votes are stored.</p>`;
       return `
         ${voteBillLine(v)}
         ${v.vote_type ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(v.vote_type)}</p>` : ""}

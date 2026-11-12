@@ -24,7 +24,13 @@ export function setRouteHandlers(h) { Object.assign(handlers, h); }
 
 // "#bill/hr1-119" -> { kind: "bill", id }, "#issues/economy" -> { tab, arg }.
 export function parseHash(hash = location.hash) {
-  const [head, ...rest] = decodeURIComponent(hash.replace(/^#\/?/, "")).split("/");
+  let path;
+  try {
+    path = decodeURIComponent(hash.replace(/^#\/?/, ""));
+  } catch {
+    return { tab: "overview", arg: "" };   // malformed link (e.g. "#bill/%"): show the Overview
+  }
+  const [head, ...rest] = path.split("/");
   const arg = rest.join("/");
   if (DETAIL_KINDS.has(head) && arg) return { kind: head, id: arg };
   return { tab: URL_TAB[head] || "overview", arg };

@@ -1,7 +1,6 @@
 // Campaign Finance tab of the member detail (OpenFEC via member-finance).
 import { fetchFunction } from "./data.js";
 import { STATE_NAMES, errorBlock, escapeHtml, externalLink, spinner } from "./util.js";
-import { loadInto } from "./modals.js";
 
 // --- campaign finance (FEC) helpers
 
@@ -33,7 +32,9 @@ function shareBars(rows, total) {
   }).join("");
 }
 
-export function renderFinanceTab(e) {
+// `loadInto` comes from modals.js (passed in rather than imported, so the two modules
+// don't import each other).
+export function renderFinanceTab(e, loadInto) {
   if (!e.financeRequested) {
     e.financeRequested = true; // only call the FEC when this tab is opened
     loadInto(e, "finance", fetchFunction("member-finance", e.id));

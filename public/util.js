@@ -70,14 +70,58 @@ export function memberLink(id, label) {
     : escapeHtml(label);
 }
 
+// Only web links make it into an href (never javascript: or data:), escaped.
+export function safeHref(url) {
+  return /^https?:\/\//i.test(String(url || "")) ? escapeHtml(url) : "";
+}
+
 export function externalLink(url, label) {
-  return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(label)} →</a>` : "";
+  return safeHref(url) ? `<a href="${safeHref(url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(label)} →</a>` : "";
 }
 
 export function escapeHtml(str) {
-  return String(str)
+  return String(str ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// --- Chart tooltips (Overview + Issues): any element with data-tip="…" inside `root`.
+// Mouse: follows the pointer. Touch: a tap shows it. One shared #chart-tooltip element;
+// pass an AbortSignal to remove the listeners when `root` is re-rendered.
+let tooltipEl = null;
+function tooltip() {
+  if (tooltipEl) return tooltipEl;
+  tooltipEl = Object.assign(document.createElement("div"), {
+    id: "chart-tooltip",
+    className: "fixed z-40 pointer-events-none hidden max-w-xs px-2.5 py-1.5 text-xs rounded-md bg-surface-deep text-gray-800 border border-gray-200 shadow-lg",
+  });
+  tooltipEl.setAttribute("role", "tooltip");
+  document.body.appendChild(tooltipEl);
+  window.addEventListener("scroll", () => tooltipEl.classList.add("hidden"), { passive: true });
+  return tooltipEl;
+}
+
+export function wireTooltip(root, { signal } = {}) {
+  const tip = tooltip();
+  const show = (target, x, y) => {
+    tip.textContent = target.dataset.tip;
+    tip.classList.remove("hidden");
+    const w = tip.offsetWidth;
+    tip.style.left = `${Math.min(window.innerWidth - w - 8, Math.max(8, x - w / 2))}px`;
+    tip.style.top = `${Math.max(8, y - tip.offsetHeight - 12)}px`;
+  };
+  root.addEventListener("pointermove", e => {
+    if (e.pointerType !== "mouse") return;
+    const t = e.target.closest("[data-tip]");
+    if (t && root.contains(t)) show(t, e.clientX, e.clientY);
+    else tip.classList.add("hidden");
+  }, { signal });
+  root.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse") return;
+    const t = e.target.closest("[data-tip]");
+    if (t && root.contains(t)) show(t, e.clientX, e.clientY);
+  }, { signal });
+  root.addEventListener("pointerleave", () => tip.classList.add("hidden"), { signal });
 }

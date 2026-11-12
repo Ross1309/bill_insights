@@ -22,10 +22,11 @@ export function getOverviewDoc() {
   overviewDocPromise ??= getDoc(doc(db, "stats", "overview")).catch(err => { overviewDocPromise = null; throw err; });
   return overviewDocPromise;
 }
+
+// Full vote docs by id (see getVote).
 export const voteCache = new Map();
 
 // Members seen this session, by id (directory entries or full member docs).
-
 export const memberById = new Map();
 const functionCache = new Map();
 // Rate-limited functions are served at their own paths (see each function's config).
@@ -64,11 +65,15 @@ export async function getBill(id) {
   return b;
 }
 
-export async function getVote(id) {
-  if (voteCache.has(id)) return voteCache.get(id);
-  const v = await getFirestoreDoc("votes", id);
-  if (v) voteCache.set(id, v);
-  return v;
+// Full vote docs (with member positions), cached as promises so concurrent callers
+// share one request. Misses and errors aren't cached.
+export function getVote(id) {
+  if (!voteCache.has(id)) {
+    voteCache.set(id, getFirestoreDoc("votes", id).then(
+      v => { if (!v) voteCache.delete(id); return v; },
+      err => { voteCache.delete(id); throw err; }));
+  }
+  return voteCache.get(id);
 }
 
 export async function getVotesForBill(billId) {

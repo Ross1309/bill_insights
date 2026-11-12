@@ -1,7 +1,7 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { escapeHtml } from "./util.js";
+import { escapeHtml, ordinal, safeHref } from "./util.js";
 
 // DOM Elements
 const billsContainer = document.getElementById("bills-container");
@@ -16,18 +16,13 @@ let activeCategory = "all";
 // --- Bills: server-side ordering + cursor pagination ---
 
 const BILLS_PAGE_SIZE = 12;
-let billsCursor = null;
-     // last doc of the most recent page
+let billsCursor = null;   // last doc of the most recent page
 let billsExhausted = false;
 let billsLoading = false;
-let billsGeneration = 0;
-    // bumps on category change so stale pages are dropped
-let billsStarted = false;
-   // first page is requested when the Bills tab opens
-let categoryIndexReady = true;
- // false once the (category, latest_action_date) index is found missing
-let billsError = null;
-      // message shown instead of bills until the next reset
+let billsGeneration = 0;   // bumps on category change so stale pages are dropped
+let billsStarted = false;   // first page is requested when the Bills tab opens
+let categoryIndexReady = true;   // false once the (category, latest_action_date) index is found missing
+let billsError = null;   // message shown instead of bills until the next reset
 
 // First page of bills, the first time the tab opens (Overview is the default tab).
 export function startBills() {
@@ -97,6 +92,10 @@ async function loadBills({ reset = false } = {}) {
   }
 }
 
+// The button is re-rendered (disabled while loading); if the visitor used it, focus the
+// new one so keyboard users stay in place.
+let billsMoreUsed = false;
+
 function renderLoadMore() {
   if (billsExhausted && !billsLoading) {
     billsMore.innerHTML = allBills.length
@@ -109,7 +108,9 @@ function renderLoadMore() {
       class="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 shadow-sm">
       ${billsLoading ? "Loading…" : "Load more bills"}
     </button>`;
-  document.getElementById("bills-load-more").addEventListener("click", () => loadBills());
+  const btn = document.getElementById("bills-load-more");
+  btn.addEventListener("click", () => { billsMoreUsed = true; loadBills(); });
+  if (billsMoreUsed && !billsLoading) { billsMoreUsed = false; btn.focus(); }
 }
 
 // --- Bill field helpers (schema written by netlify/functions/sync-bills.js) ---
@@ -122,7 +123,6 @@ export function billLabel(bill) {
 
 export const SUMMARY_SOURCE_LABELS = {
   crs_summary: 'AI summary of the official CRS summary',
-  title_only: 'AI summary from the title only — no official summary yet',
 };
 
 // Why a bill has no plain-language summary. Summaries are only written from the
@@ -164,7 +164,7 @@ function renderBills(bills, term = "") {
           <div>
             <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded uppercase">${escapeHtml(billLabel(bill))}</span>
-              <span>${escapeHtml(String(bill.congress || ''))}${bill.congress ? 'th Congress' : ''}</span>
+              <span>${bill.congress ? `${escapeHtml(ordinal(Number(bill.congress)))} Congress` : ''}</span>
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
             <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(bill.title || 'Untitled Bill')}</button></h3>
@@ -174,7 +174,7 @@ function renderBills(bills, term = "") {
             ${bill.latestAction?.text ? `<p><strong class="text-gray-700">Latest action${bill.latestAction.actionDate ? ` (${escapeHtml(bill.latestAction.actionDate)})` : ''}:</strong> ${escapeHtml(bill.latestAction.text)}</p>` : ''}
             <div class="flex flex-wrap gap-4 pt-1">
               <button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="font-semibold text-accent hover:underline">Details, actions &amp; votes →</button>
-              ${bill.congress_gov_url ? `<a href="${escapeHtml(bill.congress_gov_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">Congress.gov →</a>` : ''}
+              ${safeHref(bill.congress_gov_url) ? `<a href="${safeHref(bill.congress_gov_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">Congress.gov →</a>` : ''}
             </div>
           </div>
         </div>

@@ -3,17 +3,15 @@
 // netlify/lib/topic-stats.js and netlify/lib/topics.js for definitions).
 //
 // Bill labels open the bill modal (data-open="bill"), votes the vote modal, members
-// the profile; app.js's global data-open handler does the rest.
+// the profile; the global data-open handler in modals.js does the rest.
 
-import { STATES } from "./states.js";
+import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
+import { PARTY_NAMES as PARTY_NAME, STATE_NAMES, escapeHtml as esc, wireTooltip } from "./util.js";
 
 const C = { succeeded: "#6fa326", failed: "#c04637", accent: "#13a5b2" };
 const PARTY_CHIP = { D: "ring-party-d/70 text-party-d", R: "ring-party-r/70 text-party-r", I: "ring-party-i/60 text-party-i" };
-const PARTY_NAME = { D: "Democratic", R: "Republican", I: "Independent" };
-const STATE_NAMES = Object.fromEntries(STATES);
 const FOCUSED_MAX_SUBJECTS = 10; // keep in sync with netlify/lib/topics.js
 
-const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const day = iso => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 const billLink = b => `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="text-xs font-semibold text-accent hover:underline">${esc(b.label)}</button>`;
@@ -293,49 +291,40 @@ function definition(s) {
 function stateSelectHtml(current) {
   return `<label class="text-gray-500" for="issue-state">Show members from:</label>
     <select id="issue-state" class="px-2.5 py-1 rounded-lg bg-surface border border-gray-300 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-accent">
-      ${STATES.map(([code, name]) => `<option value="${code}"${code === current ? " selected" : ""}>${esc(name)}</option>`).join("")}
+      ${[...STATES, ...DELEGATE_JURISDICTIONS].map(([code, name]) => `<option value="${code}"${code === current ? " selected" : ""}>${esc(name)}</option>`).join("")}
     </select>`;
 }
 
+// Each call supersedes the previous one (fast state changes): late answers are dropped.
+let myVotesRequest = 0;
+
 async function fillMyVotes(root, state, getVote) {
+  const request = ++myVotesRequest;
   root.querySelectorAll("[data-my-label]").forEach(el => { el.textContent = `Members from ${STATE_NAMES[state] || state}`; });
   const posBadge = pos => /yea|aye/i.test(pos) ? "bg-green-100 text-green-800" : /nay|no/i.test(pos) ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-700";
   await Promise.all([...root.querySelectorAll("[data-my-votes]")].map(async el => {
     try {
       const vote = await getVote(el.dataset.myVotes);
+      if (request !== myVotesRequest) return;
       const mine = (vote?.individual_votes || []).filter(m => m.state === state);
       el.innerHTML = mine.length
         ? mine.map(m => `<button type="button" data-open="member" data-id="${esc(m.bioguideId || "")}" class="text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200 hover:border-accent/60"><span class="text-gray-800">${esc((m.name || "").split(",")[0])}</span> <span class="font-bold px-1 rounded ${posBadge(m.position || "")}">${esc(m.position || "—")}</span></button>`).join("")
         : `<span class="text-xs text-gray-500">No ${esc(el.dataset.chamber)} members from ${esc(STATE_NAMES[state] || state)} on this vote.</span>`;
     } catch {
-      el.innerHTML = `<span class="text-xs text-gray-500">Couldn't load member positions.</span>`;
+      if (request === myVotesRequest) el.innerHTML = `<span class="text-xs text-gray-500">Couldn't load member positions.</span>`;
     }
   }));
 }
 
-function wireTooltip(root) {
-  let tip = document.getElementById("chart-tooltip");
-  if (!tip) {
-    tip = Object.assign(document.createElement("div"), { id: "chart-tooltip", className: "fixed z-40 pointer-events-none hidden max-w-xs px-2.5 py-1.5 text-xs rounded-md bg-surface-deep text-gray-800 border border-gray-200 shadow-lg" });
-    document.body.appendChild(tip);
-  }
-  const show = (t, x, y) => {
-    tip.textContent = t.dataset.tip;
-    tip.classList.remove("hidden");
-    tip.style.left = `${Math.min(innerWidth - tip.offsetWidth - 8, Math.max(8, x - tip.offsetWidth / 2))}px`;
-    tip.style.top = `${Math.max(8, y - tip.offsetHeight - 12)}px`;
-  };
-  root.addEventListener("pointermove", e => {
-    if (e.pointerType !== "mouse") return;
-    const t = e.target.closest("[data-tip]");
-    if (t && root.contains(t)) show(t, e.clientX, e.clientY); else tip.classList.add("hidden");
-  });
-  root.addEventListener("pointerdown", e => {
-    if (e.pointerType === "mouse") return;
-    const t = e.target.closest("[data-tip]");
-    if (t && root.contains(t)) show(t, e.clientX, e.clientY);
-  });
-  root.addEventListener("pointerleave", () => tip.classList.add("hidden"));
+
+// Small dialog with one explainer. Escape, the backdrop or Close shut it and return
+// focus to what opened it; Tab stays on its Close button.
+let explainerReturnFocus = null;
+function closeExplainer(m) {
+  if (m.classList.contains("hidden")) return;
+  m.classList.add("hidden");
+  m.classList.remove("flex");
+  explainerReturnFocus?.focus?.();
 }
 
 function showExplainer(key) {
@@ -344,18 +333,30 @@ function showExplainer(key) {
   let m = document.getElementById("explain-modal");
   if (!m) {
     m = Object.assign(document.createElement("div"), { id: "explain-modal", className: "fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4" });
-    m.addEventListener("click", e => { if (e.target === m || e.target.closest("[data-close-explainer]")) { m.classList.add("hidden"); m.classList.remove("flex"); } });
-    document.addEventListener("keydown", e => { if (e.key === "Escape") { m.classList.add("hidden"); m.classList.remove("flex"); } });
+    m.addEventListener("click", e => { if (e.target === m || e.target.closest("[data-close-explainer]")) closeExplainer(m); });
+    document.addEventListener("keydown", e => {
+      if (m.classList.contains("hidden")) return;
+      if (e.key === "Escape") closeExplainer(m);
+      else if (e.key === "Tab") { e.preventDefault(); m.querySelector("[data-close-explainer]")?.focus(); }
+    });
     document.body.appendChild(m);
   }
-  m.innerHTML = `<div role="dialog" aria-modal="true" class="bg-surface rounded-2xl max-w-lg w-full p-6 border border-gray-200"><h3 class="font-serif text-xl font-bold text-gray-900">${esc(title)}</h3><p class="text-sm text-gray-700 mt-3 leading-relaxed">${esc(body)}</p><button type="button" class="mt-4 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cta text-ink" data-close-explainer>Close</button></div>`;
+  explainerReturnFocus = document.activeElement;
+  m.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="explain-title" class="bg-surface rounded-2xl max-w-lg w-full p-6 border border-gray-200"><h3 id="explain-title" class="font-serif text-xl font-bold text-gray-900">${esc(title)}</h3><p class="text-sm text-gray-700 mt-3 leading-relaxed">${esc(body)}</p><button type="button" class="mt-4 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cta text-ink" data-close-explainer>Close</button></div>`;
   m.classList.remove("hidden");
   m.classList.add("flex");
   m.querySelector("[data-close-explainer]").focus();
 }
 
 // Render one topic page. ctx: { state, onStateChange(code), getVote(id) }
+// The container stays; its content is replaced per topic. Listeners from the previous
+// render (which hold the previous topic's data) are removed via this controller.
+let wiring = null;
+
 export function renderIssue(container, s, ctx) {
+  wiring?.abort();
+  wiring = new AbortController();
+  const { signal } = wiring;
   container.innerHTML = `
     <div class="space-y-10">
       <div>
@@ -371,13 +372,13 @@ export function renderIssue(container, s, ctx) {
       ${definition(s)}
     </div>`;
 
-  wireTooltip(container);
+  wireTooltip(container, { signal });
   fillMyVotes(container, ctx.state, ctx.getVote);
 
   container.querySelector("#issue-state").addEventListener("change", e => {
     ctx.onStateChange(e.target.value);
     fillMyVotes(container, e.target.value, ctx.getVote);
-  });
+  }, { signal });
   container.addEventListener("click", e => {
     const tab = e.target.closest("[data-watch]");
     if (tab) {
@@ -395,5 +396,5 @@ export function renderIssue(container, s, ctx) {
       container.querySelectorAll("[data-law-card].hidden").forEach(el => el.classList.remove("hidden"));
       e.target.closest("[data-show-laws]").remove();
     }
-  });
+  }, { signal });
 }

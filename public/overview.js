@@ -7,7 +7,7 @@
 // a table view. Party fills are used only in the delegation map, never in a chart
 // that also shows Yea/Nay or outcomes.
 
-import { STATES, DELEGATE_JURISDICTIONS } from "./states.js";
+import { STATE_NAMES, escapeHtml as esc, ordinal as ordinalOf, wireTooltip } from "./util.js";
 
 const C = {
   activity: "#13a5b2",
@@ -20,7 +20,6 @@ const C = {
   I: "#3ba888",
   grid: "#444444",
 };
-const STATE_NAMES = Object.fromEntries([...STATES, ...DELEGATE_JURISDICTIONS]);
 const CHAMBERS = ["House", "Senate"];
 const CATEGORY_LABELS = {
   passage: "Passage of bills & resolutions",
@@ -31,9 +30,6 @@ const CATEGORY_LABELS = {
   other: "Other",
 };
 
-const ordinalOf = n => { const v = n % 100; return v >= 11 && v <= 13 ? `${n}th` : `${n}${{ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`; };
-const esc = s => String(s ?? "")
-  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 const fmtDay = ymd => new Date(`${ymd}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 const fmtMonth = ym => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
@@ -277,37 +273,6 @@ function delegationsChart(s) {
 }
 
 // --- tooltip (one shared element; hover on desktop, tap on touch)
-function wireTooltip(root) {
-  let tip = document.getElementById("chart-tooltip");
-  if (!tip) {
-    tip = Object.assign(document.createElement("div"), {
-      id: "chart-tooltip",
-      className: "fixed z-40 pointer-events-none hidden max-w-xs px-2.5 py-1.5 text-xs rounded-md bg-surface-deep text-gray-800 border border-gray-200 shadow-lg",
-    });
-    tip.setAttribute("role", "tooltip");
-    document.body.appendChild(tip);
-  }
-  const show = (target, x, y) => {
-    tip.textContent = target.dataset.tip;
-    tip.classList.remove("hidden");
-    const w = tip.offsetWidth;
-    tip.style.left = `${Math.min(window.innerWidth - w - 8, Math.max(8, x - w / 2))}px`;
-    tip.style.top = `${Math.max(8, y - tip.offsetHeight - 12)}px`;
-  };
-  root.addEventListener("pointermove", e => {
-    const t = e.target.closest("[data-tip]");
-    if (t && root.contains(t)) show(t, e.clientX, e.clientY);
-    else tip.classList.add("hidden");
-  });
-  root.addEventListener("pointerleave", () => tip.classList.add("hidden"));
-  // Touch: no hover, so a tap shows the tooltip for that mark.
-  root.addEventListener("pointerdown", e => {
-    if (e.pointerType === "mouse") return;
-    const t = e.target.closest("[data-tip]");
-    if (t && root.contains(t)) show(t, e.clientX, e.clientY);
-  });
-  window.addEventListener("scroll", () => tip.classList.add("hidden"), { passive: true });
-}
 
 export function renderOverview(container, stats, { onState } = {}) {
   const updated = stats.generated_at?.toDate?.();

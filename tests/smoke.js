@@ -78,6 +78,20 @@ try {
 
   await page.click('#nav-issues');
   await waitText('#view-issues', /What the \d+(st|nd|rd|th) Congress has done/, 'Issues tab renders');
+  // Back from the first tab switch returns to the Overview (it used to leave the site).
+  await page.goBack();
+  await page.waitForTimeout(500);
+  check(!(await page.isHidden('#view-overview')) && !page.url().includes('#issues'), 'Back from Issues returns to the Overview');
+  await page.goForward();
+  await waitText('#view-issues', /What the \d+(st|nd|rd|th) Congress has done/, 'Forward returns to Issues');
+  // Switching topics repeatedly mustn't stack listeners (they threw on watchlist clicks).
+  for (const t of ['foreign-affairs', 'economy', 'foreign-affairs']) {
+    await page.click(`#issue-topics [data-topic="${t}"]`);
+    await page.waitForTimeout(700);
+  }
+  const watch = await page.$('#issue-container [data-watch]');
+  if (watch) await watch.click();
+  await waitText('#issue-title', /Foreign Affairs/, 'Topic switching (errors would fail the console check)');
 
   await page.click('#nav-bills');
   await waitText('#bills-container', /Latest action \(\d{4}-\d{2}-\d{2}\)/, 'Bills tab lists bills');
@@ -146,6 +160,10 @@ try {
   }
   await page.click('footer a[href="#methodology"]');
   await waitText('#view-methodology', /How we count[\s\S]*Party agreement[\s\S]*Campaign finance/, 'Footer link opens How we count');
+
+  // A malformed link mustn't break startup.
+  await page.goto(`${url}?bad=1#bill/%`, { waitUntil: 'domcontentloaded' });
+  await waitText('#overview-container', /How busy has Congress been/, 'Malformed link still shows the Overview');
 
   // Shareable links: a pasted URL opens the right view; Back/Forward move through.
   await page.goto(`${url}#issues/healthcare`, { waitUntil: 'domcontentloaded' });

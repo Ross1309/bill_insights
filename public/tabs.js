@@ -38,8 +38,10 @@ export function switchTab(tabName, { push = true } = {}) {
     }
     view?.classList.toggle("hidden", !active);
   }
-  onTabOpen[tabName]?.();
+  // History first: a loader may update the URL in place (Issues writes its topic), and
+  // doing that before the push would overwrite the *previous* tab's history entry.
   if (push) pushTab(tabName);
+  onTabOpen[tabName]?.();
   // If the sticky tab bar is pinned (scrolled past the header), start the new tab
   // at its top instead of mid-way down.
   // (The bar sits right under the header, so the header's height is where it pins.)
