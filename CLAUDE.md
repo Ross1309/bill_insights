@@ -39,6 +39,10 @@ file is the working reference. Dated history lives in docs/HISTORY.md.
   to register: App Check -> Apps -> Manage debug tokens). Firestore's public REST API is
   blocked once enforced, hence `/api/health` for `check-health.js`. Enforce/unenforce:
   Firebase console -> App Check -> APIs -> Cloud Firestore (takes effect within minutes).
+  Status 2026-11-12: live, **monitoring (not enforced)**; verified on the live site: plain
+  browsers get tokens via reCAPTCHA Enterprise, the `smoke-tests` debug token works, CI green.
+  Next: after a day or two of mostly-verified Firestore traffic, Enforce, then re-run the
+  live smoke test.
 - The Firebase *web* config in `public/data.js` (`apiKey: "AIza…"`) is public by design.
   Netlify's secret scanner flags it, so `netlify.toml` exempts that one value via
   `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`. Never exempt or disable scanning for
@@ -143,6 +147,11 @@ npm run smoke                                     # browser smoke test on ./publ
 SMOKE_URL=https://congress-watcher.netlify.app npm run smoke   # same, against the live site
 npm run health                                    # did last night's syncs succeed? (reads /api/health)
 ```
+
+**Before every push: run `npm test`** (not just eslint/smoke). Tailwind scans every word
+in `public/` (comments too) for class names, so even a JS comment can make
+`public/styles.css` stale ("invisible" in a comment did, 2026-11-12); the stale-CSS check
+then fails the Netlify build and nothing deploys. Fix: `npm run build:css` and commit.
 
 **Checks and alerts.** ESLint runs in `npm test` (Netlify build) and catches undefined
 names; it would have blocked the Nov 12 regression (a refactor deleted `renderFinanceTab`).
