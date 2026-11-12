@@ -1,5 +1,6 @@
 // Firestore client, shared caches and data access (Firestore docs + Netlify functions).
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app-check.js";
 import { collection, doc, getDoc, getDocs, getFirestore, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -12,6 +13,18 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// App Check: Firestore only serves requests from this site (an invisible reCAPTCHA
+// Enterprise check; the site key is public). Server code (firebase-admin) isn't affected.
+// Local dev and the smoke test can't always pass reCAPTCHA, so on localhost the SDK uses a
+// debug token instead: it prints one in the console to register in Firebase (App Check ->
+// Apps -> Manage debug tokens), unless one was set already (the smoke test sets its own).
+const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LeWOB0uAAAAACv-bHJFResrg5gcpAYUJewzSlGx";
+if (["localhost", "127.0.0.1"].includes(location.hostname) && !self.FIREBASE_APPCHECK_DEBUG_TOKEN) {
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_ENTERPRISE_SITE_KEY), isTokenAutoRefreshEnabled: true });
+
 export const db = getFirestore(app);
 // Every bill seen this session, by id (used to label votes with bill titles).
 export const billCache = new Map();

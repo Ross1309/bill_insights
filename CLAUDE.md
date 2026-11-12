@@ -32,6 +32,13 @@ file is the working reference. Dated history lives in docs/HISTORY.md.
   `db.bulkWriter()`: Firestore's `close()` never rejects, so a failed write would go
   unnoticed (and e.g. votes get flagged applied anyway). Nightly steps must be safe to
   re-run after a crash at any point (see member_votes `applied`).
+- **App Check** (since 2026-11-12, reCAPTCHA Enterprise, site key in `public/data.js`,
+  public by design): Firestore accepts only requests from the site. firebase-admin (functions,
+  scripts) is unaffected. Local dev and smoke tests use registered **debug tokens**
+  (`APPCHECK_DEBUG_TOKEN` in `.env` and as a GitHub secret; on localhost the page prints one
+  to register: App Check -> Apps -> Manage debug tokens). Firestore's public REST API is
+  blocked once enforced, hence `/api/health` for `check-health.js`. Enforce/unenforce:
+  Firebase console -> App Check -> APIs -> Cloud Firestore (takes effect within minutes).
 - The Firebase *web* config in `public/data.js` (`apiKey: "AIza…"`) is public by design.
   Netlify's secret scanner flags it, so `netlify.toml` exempts that one value via
   `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`. Never exempt or disable scanning for
@@ -105,6 +112,7 @@ netlify/functions/member-profile.js  GET /api/member-profile?id={bioguideId}: Co
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
                                    donation-size buckets, itemized by state (api.data.gov key)
 netlify/functions/find-district.js POST /api/find-district {address}: Census geocoder -> { state, district }
+netlify/functions/health.js        GET /api/health: stats/health via admin (CDN 5 min), for check-health.js
 netlify/functions/bill-detail.js   GET /api/bill-detail?id={bill_id}: sponsor, cosponsor count, latest CRS
                                    summary, action history (works for bills not in `bills`)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
@@ -133,7 +141,7 @@ npm test                                          # ESLint + styles.css up to da
 npm run build:css                                 # rebuild public/styles.css after changing classes
 npm run smoke                                     # browser smoke test on ./public (needs: npx playwright install chromium)
 SMOKE_URL=https://congress-watcher.netlify.app npm run smoke   # same, against the live site
-npm run health                                    # did last night's syncs succeed?
+npm run health                                    # did last night's syncs succeed? (reads /api/health)
 ```
 
 **Checks and alerts.** ESLint runs in `npm test` (Netlify build) and catches undefined

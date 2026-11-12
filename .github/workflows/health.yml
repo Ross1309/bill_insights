@@ -29,3 +29,4 @@ jobs:
         run: npm run smoke
         env:
           SMOKE_URL: https://congress-watcher.netlify.app
+          APPCHECK_DEBUG_TOKEN: ${{ secrets.APPCHECK_DEBUG_TOKEN }}

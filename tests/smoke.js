@@ -2,13 +2,15 @@
 // member, bill and vote detail, and fails on any uncaught error or console error.
 //
 //   npm run smoke                                   # serves ./public locally
+//   (APPCHECK_DEBUG_TOKEN in .env / the environment: a registered App Check debug token)
 //   SMOKE_URL=https://congress-watcher.netlify.app npm run smoke   # the live site
 //
 // Local mode serves public/ only (no Netlify functions), so Campaign Finance and other
 // function calls are skipped there and their 404s are ignored. Both modes read the
 // real Firestore (~30 reads per run). Needs: npx playwright install chromium
 
-/* global document, location */ // used inside page.evaluate / waitForFunction callbacks (run in the browser)
+/* global document, location, self */ // used inside page.evaluate / waitForFunction callbacks (run in the browser)
+import 'dotenv/config';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -40,11 +42,25 @@ const server = LIVE ? null : await serve('public');
 const url = LIVE || `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch();
 const page = await browser.newPage();
+// App Check (public/data.js): a registered debug token lets this headless browser pass
+// without reCAPTCHA. From .env locally, a GitHub secret in CI. Without one, requests go
+// unverified (fine until App Check is enforced for Firestore).
+if (process.env.APPCHECK_DEBUG_TOKEN) {
+  await page.addInitScript(token => { self.FIREBASE_APPCHECK_DEBUG_TOKEN = token; }, process.env.APPCHECK_DEBUG_TOKEN);
+}
 const errors = [];
-page.on('pageerror', err => errors.push(`uncaught: ${err.message}`));
+// Google's reCAPTCHA script (App Check) is third-party: it throws on a malformed URL
+// itself and complains about storage access in headless browsers. Only its errors are
+// ignored; anything from our code still fails the run.
+const fromRecaptcha = text => /\/recaptcha\/|requestStorageAccess/.test(text);
+page.on('pageerror', err => { if (!fromRecaptcha(err.stack || '')) errors.push(`uncaught: ${err.message}`); });
 page.on('console', msg => {
   if (msg.type() !== 'error') return;
   const text = msg.text();
+  if (fromRecaptcha(text) || fromRecaptcha(msg.location()?.url || '')) return;
+  // App Check debug token not registered (yet): requests still work while App Check isn't
+  // enforced. Once enforced, Firestore reads fail instead, which the checks catch.
+  if (/exchangeDebugToken/.test(msg.location()?.url || '')) return;
   // Locally there are no Netlify functions: their 404s (and the modal's handled
   // fallback) are expected.
   if (!LIVE && /404|\/api\/|\.netlify\/functions|Failed to load resource/.test(text)) return;

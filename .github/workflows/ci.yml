@@ -25,3 +25,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Smoke test (local copy of public/)
         run: npm run smoke
+        env:
+          APPCHECK_DEBUG_TOKEN: ${{ secrets.APPCHECK_DEBUG_TOKEN }}
