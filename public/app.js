@@ -2,14 +2,16 @@
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { renderIssue } from "./issues.js";
 import { renderOverview } from "./overview.js";
-import { db, getOverviewDoc, getVote } from "./data.js";
+import { db, getFirestoreDoc, getOverviewDoc, getVote } from "./data.js";
 import { escapeHtml, store } from "./util.js";
 import { activeTab, navBills, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
 import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
-import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, loadHeadlineStats, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
+import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
-import { renderWeekCard, renderWeekPage } from "./week.js";
+import { renderWeekPage } from "./week.js";
+import { renderHome } from "./home.js";
+import { setupSearch } from "./search.js";
 import { onTabArg, setRouteHandlers, shareUrl, startRouter, tabArg, replaceTab } from "./router.js";
 
 let overviewLoaded = false;
@@ -111,13 +113,6 @@ let weeksPromise = null;
 const weekDocs = new Map();
 let weekRequest = 0;
 
-// Monday (Eastern time, like the digest) of the week containing `date`, "YYYY-MM-DD".
-function mondayOf(date) {
-  const ymd = date.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-  const d = new Date(`${ymd}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-  return d.toISOString().slice(0, 10);
-}
 
 async function loadWeek(monday) {
   const container = document.getElementById("week-container");
@@ -148,21 +143,86 @@ async function loadWeek(monday) {
 }
 
 // --- Overview tab: one small precomputed doc (stats/overview) ------------------
-let overviewLoading = false;
-async function loadOverview() {
-  if (overviewLoading) return;   // clicking Overview during the first load
-  overviewLoading = true;
-  const container = document.getElementById("overview-container");
+// --- Home (first tab) and Charts (#charts), both from stats/overview ------------------
+let homeLoading = false;
+async function loadHome() {
+  if (homeLoading) return;   // clicking Home during the first load
+  homeLoading = true;
+  const hero = document.getElementById("home-hero");
   try {
     const snap = await getOverviewDoc();
     if (!snap.exists()) {
-      container.innerHTML = `<p class="text-center text-gray-500 py-12">The overview hasn't been built yet.</p>`;
+      hero.innerHTML = `<p class="lg:col-span-3 text-center text-gray-500 py-12">The home page data hasn't been built yet.</p>`;
       return;
     }
     overviewLoaded = true;
-    const stats = snap.data();
-    renderWeekCard(document.getElementById("this-week"), stats.this_week, { isCurrentWeek: stats.this_week?.week === mondayOf(new Date()) });
-    renderOverview(container, stats, {
+    await showHome(snap.data());
+  } catch (err) {
+    console.error("Error loading home:", err);
+    hero.innerHTML = `<p class="lg:col-span-3 text-center text-red-500 py-12">Failed to load: ${escapeHtml(err.message)}</p>`;
+  } finally {
+    homeLoading = false;
+  }
+}
+
+// Render, then fill in how "your members" voted on the key votes (their member_votes
+// docs: one read each, only once an address was given).
+let positionsRequest = 0;
+async function showHome(stats) {
+  const reps = myReps();
+  renderHome(stats, { reps });
+  if (!reps?.members?.length || !stats.this_week?.key_votes?.length) return;
+  const request = ++positionsRequest;
+  const keyIds = new Set(stats.this_week.key_votes.map(v => v.id));
+  const positions = new Map();
+  await Promise.all(reps.members.map(async m => {
+    const rec = await getFirestoreDoc("member_votes", m.id).catch(() => null);
+    for (const e of rec?.recent || []) {
+      if (!keyIds.has(e.id)) continue;
+      if (!positions.has(e.id)) positions.set(e.id, []);
+      positions.get(e.id).push({ id: m.id, name: m.name, position: e.position || "Not recorded" });
+    }
+  }));
+  if (request === positionsRequest) renderHome(stats, { reps, positions });
+}
+
+// The home page's address form (find your members) and "Change address".
+function setupHome() {
+  const hero = document.getElementById("home-hero");
+  hero.addEventListener("submit", async ev => {
+    const form = ev.target.closest("[data-home-find]");
+    if (!form) return;
+    ev.preventDefault();
+    const address = form.querySelector("input").value.trim();
+    const status = hero.querySelector("[data-home-find-status]");
+    if (!address) return;
+    status.className = "text-sm mt-2 text-gray-500";
+    status.textContent = "Looking up your district…";
+    try {
+      const { state, district } = await lookupDistrict(address);
+      rememberMyReps(state, district, await repsFor(state, district));
+      await showHome((await getOverviewDoc()).data());
+    } catch (err) {
+      status.className = "text-sm mt-2 text-red-600";
+      status.textContent = err.message;
+    }
+  });
+  hero.addEventListener("click", ev => {
+    if (!ev.target.closest("[data-home-change]")) return;
+    const box = hero.querySelector("[data-home-change-form]");
+    box?.classList.toggle("hidden");
+    box?.querySelector("input")?.focus();
+  });
+}
+
+let chartsLoaded = false;
+async function loadCharts() {
+  const container = document.getElementById("overview-container");
+  try {
+    const snap = await getOverviewDoc();
+    if (!snap.exists()) { container.innerHTML = `<p class="text-center text-gray-500 py-12">The charts haven't been built yet.</p>`; return; }
+    chartsLoaded = true;
+    renderOverview(container, snap.data(), {
       // State tile -> that state's members in the directory.
       onState: code => {
         switchTab("members");
@@ -170,10 +230,9 @@ async function loadOverview() {
       },
     });
   } catch (err) {
-    console.error("Error loading overview:", err);
-    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load the overview: ${escapeHtml(err.message)}</p>`;
+    console.error("Error loading charts:", err);
+    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load the charts: ${escapeHtml(err.message)}</p>`;
   }
-  overviewLoading = false;
 }
 
 // --- Data freshness: stats/health, written by both nightly syncs ---------------
@@ -207,7 +266,8 @@ async function loadHealth() {
 }
 
 async function init() {
-  onTabOpen.overview = () => { if (!overviewLoaded) loadOverview(); };   // loadOverview guards double calls
+  onTabOpen.overview = () => { if (!overviewLoaded) loadHome(); };   // loadHome guards double calls
+  onTabOpen.charts = () => { if (!chartsLoaded) loadCharts(); };
   onTabOpen.issues = () => { if (!issueLoaded) loadIssue(currentIssue); };
   onTabOpen.bills = startBills;
   onTabOpen.votes = () => { if (!votesLoaded) fetchVotes(); };
@@ -241,9 +301,10 @@ async function init() {
   setupBillFilters();
   setupModals();
   setupIssues();
+  setupHome();
+  setupSearch();
   setupCopyLinks();
   setupReportError();
-  loadHeadlineStats();
   loadHealth();
   // Shows the tab / detail in the URL (Overview if none). Bills load when their tab
   // is first opened.

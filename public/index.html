@@ -15,46 +15,62 @@
 <body class="bg-gray-50 min-h-screen text-gray-800 font-sans antialiased flex flex-col">
 
   <header class="bg-surface-deep text-white">
-    <div class="max-w-7xl mx-auto px-4 pt-8 pb-6 sm:px-6 lg:px-8">
-      <div class="flex items-center gap-3">
-        <svg class="w-9 h-9 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
+    <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <a href="#" class="flex items-center gap-2.5 shrink-0" aria-label="Congress Watcher, home">
+        <svg class="w-8 h-8 shrink-0" viewBox="0 0 32 32" aria-hidden="true">
           <rect width="32" height="32" rx="7" fill="#3a3a3a" />
           <path d="M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z" fill="#b39cd0" />
         </svg>
-        <h1 class="font-serif text-3xl sm:text-4xl font-bold tracking-tight">Congress Watcher</h1>
+        <span class="font-serif text-xl sm:text-2xl font-bold tracking-tight">Congress Watcher</span>
+      </a>
+      <div id="site-search" class="relative order-3 sm:order-none w-full sm:w-auto sm:flex-1 max-w-xl">
+        <label for="site-search-input" class="sr-only">Search members, bills or topics</label>
+        <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-500 pointer-events-none" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3a5.5 5.5 0 104.37 8.84l3.4 3.4a.75.75 0 101.06-1.06l-3.4-3.4A5.5 5.5 0 008.5 3zm-4 5.5a4 4 0 118 0 4 4 0 01-8 0z" clip-rule="evenodd"/></svg>
+        <input id="site-search-input" type="search" autocomplete="off" placeholder="Search members, bills or topics"
+          role="combobox" aria-expanded="false" aria-controls="site-search-results" aria-autocomplete="list"
+          class="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-gray-300 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-accent" />
+        <div id="site-search-results" role="listbox" class="hidden absolute z-40 left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-xl shadow-xl overflow-hidden"></div>
       </div>
-      <p class="text-gray-600 mt-3 max-w-2xl text-sm sm:text-base">
-        What Congress is actually doing: bills in plain language, recorded House and Senate votes, and every
-        member, straight from official sources. Non-partisan, with every AI summary labeled.
-      </p>
-      <div id="headline-stats" class="grid grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 mt-6" aria-live="polite"></div>
     </div>
   </header>
 
   <nav class="sticky top-0 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar" role="tablist">
-      <button id="nav-overview" role="tab" class="nav-tab">Overview</button>
+      <button id="nav-overview" role="tab" class="nav-tab">Home</button>
       <button id="nav-issues" role="tab" class="nav-tab">Issues</button>
-      <button id="nav-bills" role="tab" class="nav-tab">Bills &amp; Summaries</button>
-      <button id="nav-votes" role="tab" class="nav-tab">Roll-Call Votes</button>
-      <button id="nav-members" role="tab" class="nav-tab">Legislators</button>
+      <button id="nav-bills" role="tab" class="nav-tab">Bills</button>
+      <button id="nav-votes" role="tab" class="nav-tab">Votes</button>
+      <button id="nav-members" role="tab" class="nav-tab">Members</button>
     </div>
   </nav>
 
   <main class="max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8 flex-1">
     <div id="data-stale" class="hidden mb-6 rounded-lg border border-yellow-100 bg-yellow-50 text-yellow-800 text-sm px-4 py-3" role="status"></div>
 
-    <!-- VIEW 0: OVERVIEW -->
-    <section id="view-overview" class="tab-view">
+    <!-- VIEW 0: HOME -->
+    <section id="view-overview" class="tab-view space-y-12">
+      <div>
+        <h1 class="font-serif text-3xl sm:text-4xl font-bold text-gray-900">What is Congress doing?</h1>
+        <p class="text-gray-600 mt-2 max-w-2xl">Plain language from the official record. Non-partisan, with every AI summary labeled.</p>
+        <div id="home-hero" class="grid gap-4 lg:grid-cols-3 mt-6">
+          <div class="lg:col-span-3 text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
+        </div>
+      </div>
+      <section id="home-keyvotes" class="empty:hidden"></section>
+      <section id="home-laws" class="empty:hidden"></section>
+      <section id="home-numbers" class="empty:hidden"></section>
+    </section>
+
+    <!-- VIEW 0a: CHARTS (#charts; linked from Home, no tab-bar button) -->
+    <section id="view-charts" class="tab-view hidden">
       <div class="mb-6">
-        <h2 class="font-serif text-2xl font-bold text-gray-900">The big picture</h2>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">This Congress in charts</h2>
         <p class="text-sm text-gray-500">What the official record shows about this Congress at a glance. Every number links back to roll-call votes and member records you can browse.</p>
       </div>
-      <div id="this-week" class="mb-6 empty:hidden"></div>
       <div id="overview-container" class="min-h-[300px]">
         <div class="text-center py-12">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
-          <p class="text-gray-500">Loading overview...</p>
+          <p class="text-gray-500">Loading charts...</p>
         </div>
       </div>
     </section>
@@ -136,7 +152,7 @@
     <!-- VIEW 3: LEGISLATORS -->
     <section id="view-members" class="tab-view hidden">
       <div class="mb-6">
-        <h2 class="font-serif text-2xl font-bold text-gray-900">Congressional Directory</h2>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Members of Congress</h2>
         <p class="text-sm text-gray-500">Every current senator, representative and delegate, from Congress.gov.</p>
       </div>
       <form id="find-reps" class="mb-6 bg-surface border border-gray-200 rounded-xl p-4 sm:p-5">
@@ -274,6 +290,8 @@
               <li>Weeks run Monday to Sunday, Eastern time. The Overview shows the latest week with any roll-call vote or new law; each week has its own page and link.</li>
               <li><strong>Became law:</strong> bills whose "Became Public Law" action is dated that week. <strong>Passed / failed:</strong> roll-call votes on passage of a bill or resolution, by the official result. Bills that pass by voice vote or unanimous consent have no roll call, so they show up when they become law.</li>
               <li><strong>Closest votes:</strong> the three smallest Yea–Nay margins among passage, cloture, nomination and amendment votes; procedural motions are left out. <strong>Nominations:</strong> every Senate vote on a nomination, with the nominee as named in the vote record.</li>
+              <li><strong>Key votes on the home page:</strong> the latest final votes on bills, resolutions and nominations in the latest week with votes. House "rules" (votes that set the terms of debate for another bill) and other procedural votes are left out; they're on the week page.</li>
+              <li><strong>Your members</strong> come from the address you enter (looked up as described below) and are remembered only in your browser; their positions on key votes come from the official roll calls.</li>
               <li>Nothing is picked by hand or by AI: every item follows these rules.</li>
             </ul>
           </section>

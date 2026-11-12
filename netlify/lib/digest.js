@@ -140,15 +140,43 @@ export function weekSummary(w) {
 }
 
 // The Overview card: the latest week with any activity, with a few named items.
+// A House "rule" (H.Res. "Providing for consideration of the bill (H.R. X)...") sets the
+// terms of debate for another bill: a procedural step, not a measure of its own.
+export const isRuleVote = v => /^Providing for consideration of/i.test(v.bill?.title || '');
+
+const KEY_VOTES_N = 4;
+
+// The Overview/home card: the latest week with activity, with a few named items.
+// key_votes: the latest final votes on bills/resolutions (rules left out) and
+// nominations, newest first, with the party split (for plain-language cards).
 export function thisWeek(w) {
   if (!w) return null;
+  const finals = [...w.passage.filter(p => !isRuleVote(p)), ...w.nominations]
+    .sort((a, b) => b.date.localeCompare(a.date));
   return {
     ...weekSummary(w),
     laws: w.laws.slice(0, 3).map(l => ({ id: l.id, label: l.label, title: l.title })),
     law_count: w.counts.laws,
-    passed_items: w.passage.filter(p => p.outcome === 'succeeded').slice(-3).reverse()
-      .map(p => ({ id: p.id, chamber: p.chamber, bill: p.bill, yea: p.yea, nay: p.nay })),
+    passed_items: w.passage.filter(p => p.outcome === 'succeeded' && !isRuleVote(p)).slice(-3).reverse()
+      .map(p => ({ id: p.id, chamber: p.chamber, bill: p.bill, yea: p.yea, nay: p.nay, parties: p.parties, alignment: p.alignment })),
+    key_votes: finals.slice(0, KEY_VOTES_N).map(v => ({
+      id: v.id, chamber: v.chamber, date: v.date, question: v.question, result: v.result, outcome: v.outcome,
+      yea: v.yea, nay: v.nay, parties: v.parties, alignment: v.alignment, bill: v.bill,
+      document_title: v.document_title, legislation: v.legislation,
+    })),
+    final_votes: finals.length,
   };
+}
+
+// The latest `n` laws of the Congress (by signing date), for the home page.
+export function recentLaws(laws, n = 4) {
+  return laws.map(b => ({ b, signed: lawSigning(b) })).filter(x => x.signed)
+    .sort((a, b) => b.signed.localeCompare(a.signed) || (b.b.law_number || '').localeCompare(a.b.law_number || '', undefined, { numeric: true }))
+    .slice(0, n)
+    .map(({ b, signed }) => ({
+      id: b.id, label: b.bill_number || null, title: b.title || null, law_number: b.law_number || null, signed,
+      summary: b.ai_summary?.source === 'crs_summary' ? (b.ai_summary.bullet_points || [])[0] || null : null,
+    }));
 }
 
 export const isActiveWeek = active;

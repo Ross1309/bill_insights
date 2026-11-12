@@ -1,9 +1,9 @@
 // Legislators tab (directory doc + filters) and the header count cards.
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
-import { collection, doc, getCountFromServer, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { db, getOverviewDoc, memberById } from "./data.js";
-import { PARTY_ABBR, PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, ordinal, store } from "./util.js";
-import { activeTab, switchTab } from "./tabs.js";
+import { collection, doc, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { db, memberById } from "./data.js";
+import { PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, ordinal, store } from "./util.js";
+import { activeTab } from "./tabs.js";
 import { replaceTab } from "./router.js";
 
 const membersContainer = document.getElementById("members-container");
@@ -66,7 +66,7 @@ let membersShown = MEMBERS_PAGE;
 let directoryPromise = null;
 let directoryFallbackRequest = 0;
 
-function loadDirectory() {
+export function loadDirectory() {
   directoryPromise ??= getDoc(doc(db, "directory", "members")).then(snap => {
     if (!snap.exists()) throw new Error("Directory has not been built yet.");
     const data = snap.data();
@@ -200,19 +200,47 @@ function renderYourReps(members) {
     </div>`;
 }
 
+// Address -> { state, district } (POST keeps the address out of URLs and logs).
+export async function lookupDistrict(address) {
+  const res = await fetch("/api/find-district", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Lookup failed (HTTP ${res.status}).`);
+  return body;
+}
+
+// The members for a district: two senators (none for DC/territories) + the House
+// member, from the directory doc. district: 0 = at-large.
+export async function repsFor(state, district) {
+  const { members } = await loadDirectory();
+  return [
+    ...members.filter(m => m.state === state && m.chamber === "Senate").sort(compareMembers),
+    ...members.filter(m => m.state === state && m.chamber === "House" && (Number(m.district) || 0) === district),
+  ];
+}
+
+// "Your members", remembered in this browser (localStorage, never sent anywhere): the
+// home page shows how they voted on key votes. { code: "WA-7", members: [...] } or null.
+export function myReps() {
+  try { return JSON.parse(store.get("cw-reps", "null")); } catch { return null; }
+}
+export function rememberMyReps(state, district, members) {
+  store.set("cw-state", state);   // Issues tab: "Members from <state>"
+  store.set("cw-reps", JSON.stringify({ code: districtCode(state, district), state, district,
+    members: members.map(m => ({ id: m.id, name: m.name, chamber: m.chamber, district: m.district ?? null, party: m.party, state: m.state, imageUrl: m.imageUrl || null })) }));
+}
+export function forgetMyReps() { store.set("cw-reps", "null"); }
+
 async function findRepresentatives(address) {
   const out = document.getElementById("find-reps-result");
   out.innerHTML = `<p class="text-sm text-gray-500">Looking up your district…</p>`;
   try {
-    const res = await fetch("/api/find-district", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || `Lookup failed (HTTP ${res.status}).`);
-    store.set("cw-state", body.state);   // Issues tab: "Members from <state>"
-    setMemberFilters({ state: body.state, district: body.district, text: "", party: "", chamber: "" });
+    const { state, district } = await lookupDistrict(address);
+    rememberMyReps(state, district, await repsFor(state, district));
+    setMemberFilters({ state, district, text: "", party: "", chamber: "" });
   } catch (err) {
     out.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(err.message)}</p>`;
   }
@@ -316,60 +344,3 @@ export function setupMemberFilters() {
   });
 }
 
-// --- Headline counts (all computed from stored data) --------------------------
-
-export async function loadHeadlineStats() {
-  const el = document.getElementById("headline-stats");
-  if (!el) return;
-  // Normally all from stats/overview `headline` (rebuilt nightly; already read for the
-  // Overview tab). Older stats docs without it: directory doc + count queries.
-  const h = await getOverviewDoc().then(s => s.data()?.headline).catch(() => null);
-  const [dir, bills, votes] = h
-    ? [{ status: "rejected" }, { status: "rejected" }, { status: "rejected" }]
-    : await Promise.allSettled([
-        loadDirectory(),
-        getCountFromServer(collection(db, "bills")),
-        getCountFromServer(collection(db, "votes")),
-      ]);
-
-  const split = counts => Object.entries(counts || {}).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${n} ${PARTY_ABBR[p] || p}`).join(" · ");
-  const seat = list => ({ count: list.length, parties: list.reduce((c, m) => ({ ...c, [m.party || "?"]: (c[m.party || "?"] || 0) + 1 }), {}) });
-  let seats = h;
-  if (!h && dir.status === "fulfilled") {
-    const all = dir.value.members;
-    seats = {
-      senate: seat(all.filter(m => m.chamber === "Senate")),
-      house: seat(all.filter(m => m.chamber === "House" && !isDelegate(m))),
-      delegates: seat(all.filter(m => m.chamber === "House" && isDelegate(m))),
-    };
-  }
-  const billCount = h ? h.bills : bills.status === "fulfilled" ? bills.value.data().count : null;
-  const voteCount = h ? h.votes : votes.status === "fulfilled" ? votes.value.data().count : null;
-  const card = (value, label, detail, action) => `
-    <${action ? `button type="button" data-headline="${action}"` : "div"}
-      class="flex flex-col items-start justify-start text-left bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3${action ? " hover:bg-white/10 hover:border-pink/60 focus:outline-none focus:ring-2 focus:ring-pink transition" : ""}">
-      <p class="font-serif text-xl sm:text-3xl font-bold text-white tabular-nums">${escapeHtml(String(value))}</p>
-      <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-pink leading-tight">${escapeHtml(label)}</p>
-      ${detail ? `<p class="hidden sm:block text-xs text-gray-600 mt-1">${escapeHtml(detail)}</p>` : ""}
-    </${action ? "button" : "div"}>`;
-
-  const cards = [];
-  if (seats) {
-    const { senate, house, delegates } = seats;
-    cards.push(card(senate.count, "Senators", split(senate.parties), "Senate"));
-    cards.push(card(house.count, "Representatives", `${house.count < 435 ? `${435 - house.count} of 435 seats vacant · ` : ""}${split(house.parties)}`, "House"));
-    cards.push(card(delegates.count, "Delegates", "Non-voting: DC, PR and territories", "Delegates"));
-  }
-  if (billCount != null) cards.push(card(billCount, "Bills covered", "Every law and voted-on bill, plus recent ones"));
-  if (voteCount != null) cards.push(card(voteCount, "Roll-call votes", "House + Senate, synced"));
-  el.innerHTML = cards.join("");
-  if (!el.dataset.wired) {
-    el.dataset.wired = "1";
-    el.addEventListener("click", e => {
-      const action = e.target.closest("[data-headline]")?.dataset.headline;
-      if (!action) return;
-      switchTab("members");
-      setMemberFilters({ state: "", chamber: action, party: "", text: "" });
-    });
-  }
-}

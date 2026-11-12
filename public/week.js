@@ -21,37 +21,6 @@ const partyLine = p => ["D", "R", "I"].filter(k => p?.[k]).map(k =>
 const ALIGN = { same: "Most Democrats and most Republicans voted the same way", opposed: "Most Democrats and most Republicans voted opposite ways" };
 const alignNote = a => ALIGN[a] ? `<span class="text-gray-500">${ALIGN[a]}.</span>` : "";
 
-// --- Overview card --------------------------------------------------------------
-export function renderWeekCard(el, tw, { isCurrentWeek } = {}) {
-  if (!tw) { el.innerHTML = ""; return; }
-  const votes = tw.votes.House + tw.votes.Senate;
-  const tile = (n, label, detail) => `
-    <div class="bg-gray-50/60 border border-gray-200 rounded-lg px-3 py-2.5">
-      <p class="font-serif text-2xl font-bold text-gray-900 tabular-nums">${n}</p>
-      <p class="text-xs text-gray-600">${label}</p>
-      ${detail ? `<p class="text-[11px] text-gray-500 mt-0.5">${detail}</p>` : ""}
-    </div>`;
-  const items = [
-    ...tw.laws.map(l => `<li><span class="text-xs font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-800 mr-1.5">Became law</span>${billLink(l)} <span class="text-gray-700">${esc(l.title || "")}</span></li>`),
-    ...tw.passed_items.map(p => `<li><span class="text-xs font-semibold px-1.5 py-0.5 rounded bg-accent/10 text-accent mr-1.5">Passed the ${esc(p.chamber)}</span>${p.bill ? `${billLink(p.bill)} <span class="text-gray-700">${esc(p.bill.title || "")}</span>` : ""} <span class="text-gray-500 tabular-nums">${p.yea}–${p.nay}</span></li>`),
-  ].slice(0, 4);
-  el.innerHTML = `
-    <section class="bg-surface border border-gray-200 rounded-xl p-5" aria-labelledby="week-card-title">
-      <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="week-card-title" class="font-serif text-xl font-bold text-gray-900">${isCurrentWeek ? "This week" : "Latest week"} in Congress <span class="text-gray-500 font-sans text-base font-normal">· ${esc(weekRange(tw))}</span></h3>
-        <a href="#week/${esc(tw.week)}" class="text-sm font-semibold text-accent hover:underline">See the full week →</a>
-      </div>
-      ${isCurrentWeek ? "" : `<p class="text-xs text-gray-500 mt-1">No roll-call votes or new laws so far this week (Congress may be in recess).</p>`}
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-        ${tile(votes, "roll-call votes", `House ${tw.votes.House} · Senate ${tw.votes.Senate}`)}
-        ${tile(tw.passed, "passed by roll call", tw.failed ? `${tw.failed} failed` : "")}
-        ${tile(tw.law_count, "became law", "")}
-        ${tile(tw.confirmed, "nominees confirmed", tw.nominations > tw.confirmed ? `${tw.nominations - tw.confirmed} not confirmed` : "")}
-      </div>
-      ${items.length ? `<ul class="mt-4 space-y-1.5 text-sm">${items.join("")}</ul>` : ""}
-    </section>`;
-}
-
 // --- #week page -----------------------------------------------------------------
 function voteRow(v, { showMargin = false } = {}) {
   const subject = v.bill

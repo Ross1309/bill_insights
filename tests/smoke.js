@@ -88,13 +88,27 @@ try {
   console.log(`Smoke test: ${url}`);
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
-  await waitText('#overview-container', /How busy has Congress been/, 'Overview charts render');
-  await waitText('#headline-stats', /SENATORS[\s\S]*BILLS COVERED[\s\S]*ROLL-CALL VOTES/i, 'Header cards render');
+  // Home: three ways in, key votes in plain language, recent laws, numbers.
+  await waitText('#home-hero', /Who represents me\?[\s\S]*This week in Congress[\s\S]*Issues/i, 'Home: the three starting cards');
+  await waitText('#home-keyvotes', /Key votes[\s\S]*(Yea|Nay)/, 'Home: key votes with party Yea/Nay');
+  await waitText('#home-laws', /Recently became law[\s\S]*Signed/, 'Home: recent laws');
+  await waitText('#home-numbers', /by the numbers[\s\S]*roll-call votes/, 'Home: by the numbers');
   await waitText('footer', /Data last updated/, 'Footer shows data freshness');
+  await page.click('#home-numbers a[href="#charts"]');
+  await waitText('#overview-container', /How busy has Congress been/, 'Charts page renders');
+  await page.click('#nav-overview');
 
-  // Weekly digest: the Overview card, its full week page, and stepping back a week.
-  await waitText('#this-week', /in Congress[\s\S]*roll-call votes/i, 'Weekly digest card on the Overview');
-  await page.click('#this-week a[href^="#week/"]');
+  // Header search: a member by name, a bill by number (Enter opens it).
+  await page.fill('#site-search-input', 'jayap');
+  await waitText('#site-search-results', /Jayapal/, 'Search finds a member');
+  await page.fill('#site-search-input', 'HR 2102');
+  await waitText('#site-search-results', /H\.R\. 2102/, 'Search finds a bill by number');
+  await page.keyboard.press('Enter');
+  await waitText('#modal-root', /H\.?R\.? ?2102/, 'Enter opens the bill');
+  await closeModal();
+
+  // Weekly digest: from the home card to the full week page, and stepping back a week.
+  await page.click('#home-hero a[href^="#week/"]');
   await waitText('#week-container', /What Congress did[\s\S]*roll-call votes/, 'Week page opens from the card');
   const firstWeek = await page.evaluate(() => location.hash);
   const earlier = await page.$('#week-container a[href^="#week/"]');
@@ -144,6 +158,13 @@ try {
   await waitText('#members-container', /Cornyn/, 'State filter shows Texas members');
   check(page.url().endsWith('#legislators/TX'), `URL follows the state filter (${page.url().split('#')[1]})`);
   if (LIVE) {
+    // Home address box: your members, then how they voted on the key votes.
+    await page.click('#nav-overview');
+    await page.fill('#home-address', '400 Broad St, Seattle, WA 98109');
+    await page.click('[data-home-find] button[type=submit]');
+    await waitText('#home-hero', /Your members for WA-7[\s\S]*Jayapal/, 'Home: find your members by address');
+    await waitText('#home-keyvotes', /Your members \(WA-7\)[\s\S]*(Yea|Nay|Not Voting|None of your members)/, 'Home: how your members voted');
+    await page.click('#nav-members');
     await page.fill('#find-reps-address', '400 Broad St, Seattle, WA 98109');
     await page.click('#find-reps button[type=submit]');
     await waitText('#find-reps-result', /Your representatives: WA-7[\s\S]*Jayapal/, 'Find your representatives (address -> WA-7)');
@@ -201,7 +222,7 @@ try {
 
   // A malformed link mustn't break startup.
   await page.goto(`${url}?bad=1#bill/%`, { waitUntil: 'domcontentloaded' });
-  await waitText('#overview-container', /How busy has Congress been/, 'Malformed link still shows the Overview');
+  await waitText('#home-hero', /Who represents me\?/i, 'Malformed link still shows the home page');
 
   // Shareable links: a pasted URL opens the right view; Back/Forward move through.
   await page.goto(`${url}#issues/healthcare`, { waitUntil: 'domcontentloaded' });

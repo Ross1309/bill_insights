@@ -76,7 +76,10 @@ public/bills.js, votes.js,         One module per tab (state stays inside its mo
 public/modals.js, finance.js       Detail modals (member/bill/vote) and the Campaign Finance tab
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
 public/overview.js                 Overview tab charts (plain SVG/HTML) from stats/overview
-public/week.js                     Weekly digest: Overview card + #week/<Monday> page (rendering only)
+public/week.js                     Weekly digest: #week/<Monday> page (rendering only)
+public/home.js                     Home tab: your members, this week, issues, key votes, laws, numbers
+public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
+public/search.js                   Header search: members, bill numbers, topics, Bills-tab fallback
 netlify/lib/digest.js              computeWeeks(): stats/week-<Monday> docs, stats/weeks, this_week
 public/issues.js                   Issues tab topic pages from stats/topic-<slug> (+ explainers, glossary)
 netlify/lib/topics.js              Topic + watchlist definitions (CRS policy areas / subjects)
@@ -255,6 +258,9 @@ items + margin], nominations [vote items], generated_at
 vote item: { id, chamber, date, question, result, outcome, yea, nay, parties { D|R|I:
 { yea, nay } }, alignment, bill { id, label, title } | null, legislation, document_title }
 ```
+stats/overview also carries `this_week.key_votes` / `final_votes`, `recent_laws` (4 latest:
+id, label, title, law_number, signed, first summary bullet), `laws_total` and
+`topics_summary` [{ slug, label, law, measures, watchlists }] for the home page.
 **`stats/weeks`**: `{ congress, weeks: [weekSummary per active week], generated_at }` (for
 the page's Earlier/Later links). `stats/overview.this_week` = the latest active week's
 summary + up to 3 laws and 3 passed bills (the Overview card; no extra read). Rules: laws by
@@ -483,7 +489,20 @@ Plain-language topic pages, built from the approved mockup (`mockups/foreign-aff
   `crs_summary_available: null`); `sync-bills` enriches its 10 recent bills (keeps "became
   law" current) and summarizes never-checked (null) bills first within its 3-summary budget.
 
-## Overview tab (frontend, default tab)
+## Home (default tab) and Charts (#charts)
+
+Redesigned 2026-11-12 from the approved mockup (`mockups/home.html`, real data snapshot):
+- Header: logo + **search** (search.js). Tabs: Home, Issues, Bills, Votes, Members. The old
+  header count cards are gone (their numbers are in "by the numbers").
+- Home (home.js), one read of `stats/overview`: three cards: **Who represents me?** (address
+  -> `lookupDistrict` + `repsFor` -> remembered in localStorage `cw-reps`), **This week**
+  (`this_week`), **Issues** (`topics_summary`); **Key votes** (`this_week.key_votes`: latest 4
+  final votes on bills/resolutions + nominations, House rules left out) with plain headlines
+  (plain.js), what the vote type means (`explainQuestion`), D/R Yea/Nay bars and, once an
+  address is known, **your members' positions** (their `member_votes` docs: 3 reads);
+  **Recently became law** (`recent_laws`); **by the numbers** (totals, `laws_total`,
+  party-split %). Official terms Yea/Nay are kept (user's choice).
+- Charts page `#charts` (no tab button): the four charts below, rendered on first open.
 
 Four charts in `public/overview.js`, plain SVG/HTML, one Firestore read (`stats/overview`):
 1. **Activity:** roll-call votes per week, House and Senate rows on a shared y scale.
@@ -545,11 +564,8 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   "WY-AL"), state dropdown (default WA, or "All states and territories"), party chips,
   chamber chips (Senate / House = voting reps / Delegates). 48 cards per page + "Show more".
   Scoped search with no hits offers "Search all states instead".
-- Headline cards under the page title: senators and representatives with party split and
-  House vacancies (out of 435), delegates, "Bills covered" (every law and voted-on bill
-  plus recent ones; not all ~20k introduced) and votes synced, all from
-  `stats/overview.headline` (falls back to the directory doc + `getCountFromServer` if
-  the stats doc predates it). Member cards are clickable and set the directory filters.
+- (The header count cards were removed in the 2026-11-12 home redesign; `stats/overview.headline`
+  is still written.) Member cards are clickable and set the directory filters.
 
 ## Shareable links (router.js)
 

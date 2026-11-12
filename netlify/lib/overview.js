@@ -11,7 +11,7 @@ import { computeTopicStats } from './topic-stats.js';
 import { TOPICS } from './topics.js';
 import { MIN_VOTES_TO_DISPLAY } from './congress.js';
 import { loadVoteIndex } from './vote-index.js';
-import { computeWeeks, weekSummary, thisWeek, isActiveWeek } from './digest.js';
+import { computeWeeks, weekSummary, thisWeek, isActiveWeek, recentLaws } from './digest.js';
 import { easternDate, weekStart, addDays } from './vote-stats.js';
 
 // Nightly rebuilds recompute only the weeks that can still change (new votes, new laws).
@@ -43,7 +43,7 @@ export async function writeOverviewStats(db, admin, { congress, allWeeks = false
   overview.headline.votes = voteCount;
   const now = admin.firestore.FieldValue.serverTimestamp();
   const digest = await writeDigest(db, now, votes, congress, allWeeks);
-  await db.collection('stats').doc('overview').set({ ...overview, this_week: digest.thisWeek, votes_without_party_breakdown: missing, generated_at: now });
+  const overviewDoc = { ...overview, this_week: digest.thisWeek, recent_laws: digest.recentLaws, laws_total: digest.lawsTotal, votes_without_party_breakdown: missing, generated_at: now };
 
   // Issue tracker: bills tagged with any topic or watchlist slug.
   const slugs = Object.entries(TOPICS).flatMap(([slug, t]) => [slug, ...Object.keys(t.watchlists)]);
@@ -58,11 +58,16 @@ export async function writeOverviewStats(db, admin, { congress, allWeeks = false
   }
 
   const topics = {};
+  const topicsSummary = [];
   for (const slug of Object.keys(TOPICS)) {
     const stats = computeTopicStats(slug, bills, votesByBill, overview.alignment_totals, { congress });
     await db.collection('stats').doc(`topic-${slug}`).set({ ...stats, congress: congress ?? null, generated_at: now });
     topics[slug] = stats.counts.measures;
+    topicsSummary.push({ slug, label: stats.label, law: stats.counts.law, measures: stats.counts.measures,
+      watchlists: stats.watchlist_order.map(k => stats.watchlists[k].label) });
   }
+  // Home page tiles (written after the topics so the counts match their pages).
+  await db.collection('stats').doc('overview').set({ ...overviewDoc, topics_summary: topicsSummary });
 
   return { congress, votes: votes.length, missing, weeks: overview.weekly.length, months: overview.monthly.length, topicBills: bills.length, topics, digestWeeks: digest.written };
 }
@@ -101,5 +106,5 @@ async function writeDigest(db, now, votes, congress, allWeeks) {
   const latest = list.at(-1);
   let latestDoc = latest ? weeks.get(latest.week) : null;
   if (latest && !latestDoc) latestDoc = (await db.collection('stats').doc(`week-${latest.week}`).get()).data() || null;
-  return { written: weeks.size, thisWeek: thisWeek(latestDoc) };
+  return { written: weeks.size, thisWeek: thisWeek(latestDoc), recentLaws: recentLaws(laws), lawsTotal: laws.length };
 }

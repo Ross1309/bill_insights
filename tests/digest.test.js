@@ -60,3 +60,25 @@ test('computeWeeks: onlyWeeks limits the work; lawSigning; thisWeek', () => {
   assert.equal(card.law_count, 1);
   assert.deepEqual(card.passed_items.map(p => p.id), ['h4', 'h1']);
 });
+
+test('thisWeek key_votes: final votes and nominations, rules left out; recentLaws', async () => {
+  const { recentLaws, isRuleVote } = await import('../netlify/lib/digest.js');
+  const extra = [
+    ...votes,
+    v('h6', '2026-11-12T15:00:00Z', 'House', 'On Agreeing to the Resolution', 'Agreed to', 215, 209, { bill_id: 'hres9-119' }),
+  ];
+  const t2 = new Map([...titles, ['hres9-119', { bill_number: 'HRES 9', title: 'Providing for consideration of the bill (H.R. 1) to do things' }]]);
+  const card = thisWeek(computeWeeks(extra, laws, t2).get('2026-11-09'));
+  assert.ok(isRuleVote({ bill: { title: 'Providing for consideration of the bill (H.R. 1)' } }));
+  assert.ok(!card.key_votes.some(k => k.id === 'h6'));                 // the rule is procedural
+  assert.ok(card.key_votes.some(k => k.id === 's1'));                  // nominations are included
+  assert.equal(card.key_votes[0].id, 'h4');                             // newest first
+  assert.ok(card.key_votes.every(k => k.parties));
+  const recent = recentLaws([
+    { id: 'a', bill_number: 'HR 1', law_number: '119-2', latestAction: { actionDate: '2026-01-05', text: 'Became Public Law No: 119-2.' }, ai_summary: { source: 'crs_summary', bullet_points: ['First.', 'Second.'] } },
+    { id: 'b', bill_number: 'S 2', law_number: '119-3', law_date: '2026-02-01', latestAction: { actionDate: '2026-02-09', text: 'Report filed.' } },
+    { id: 'c', bill_number: 'HR 3', latestAction: { actionDate: '2026-03-01', text: 'Referred.' } },
+  ]);
+  assert.deepEqual(recent.map(l => l.id), ['b', 'a']);
+  assert.equal(recent[1].summary, 'First.');
+});

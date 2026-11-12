@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Congress Watcher: home page redesign (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Same theme as tailwind.config.js (mockup only; the site uses the built styles.css).
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], serif: ['"Source Serif 4"', 'ui-serif', 'Georgia', 'serif'] },
+      colors: {
+        gray: { 50: '#2c2c2c', 100: '#333333', 200: '#444444', 300: '#555555', 400: '#a0a0a0', 500: '#b0b0b0', 600: '#c4c4c4', 700: '#d4d4d4', 800: '#e4e4e4', 900: '#f3f3f3' },
+        surface: { DEFAULT: '#363636', deep: '#232323' }, ink: '#2c2c2c',
+        accent: { DEFAULT: '#a8dadc', light: '#cdebec' }, pink: { DEFAULT: '#ffc1cc' }, cta: { DEFAULT: '#b39cd0', light: '#c8b6df' },
+        green: { 50: '#26331c', 100: '#30451f', 200: '#456230', 700: '#b5e48c', 800: '#c9eda8' },
+        red: { 50: '#3a2a22', 100: '#523226', 200: '#6e4130', 500: '#f4a07a', 600: '#f6ad8d', 700: '#f4a07a', 800: '#f8b89c' },
+        yellow: { 50: '#373220', 100: '#4a4126', 800: '#f0db8c' },
+        party: { r: '#f59a9a', d: '#a3b4f7', i: '#c4c4c4' },
+      } } } };
+  </script>
+  <style>.no-scrollbar{scrollbar-width:none}.no-scrollbar::-webkit-scrollbar{display:none}</style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 font-sans antialiased">
+  <!-- Mockup banner (not part of the design) -->
+  <div class="bg-cta text-ink text-xs font-semibold text-center py-1.5">MOCKUP · home page redesign · real data from <span id="m-asof"></span> · not live</div>
+
+  <header class="bg-surface-deep">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <a href="#" class="flex items-center gap-2.5 shrink-0">
+        <svg class="w-8 h-8" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3a3a3a"/><path d="M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z" fill="#b39cd0"/></svg>
+        <span class="font-serif text-xl font-bold text-white">Congress Watcher</span>
+      </a>
+      <label class="order-3 sm:order-none w-full sm:w-auto sm:flex-1 max-w-xl relative">
+        <span class="sr-only">Search</span>
+        <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3a5.5 5.5 0 104.37 8.84l3.4 3.4a.75.75 0 101.06-1.06l-3.4-3.4A5.5 5.5 0 008.5 3zm-4 5.5a4 4 0 118 0 4 4 0 01-8 0z" clip-rule="evenodd"/></svg>
+        <input type="search" placeholder="Search members, bills (e.g. HR 2102) or topics" class="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+      </label>
+    </div>
+    <nav class="border-t border-white/5">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 flex gap-6 overflow-x-auto no-scrollbar text-sm font-semibold">
+        <a href="#" class="py-3 border-b-2 border-pink text-gray-900">Home</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Issues</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Bills</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Votes</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Members</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-12">
+    <!-- 1. Hero: three ways in -->
+    <section>
+      <h1 class="font-serif text-3xl sm:text-4xl font-bold text-gray-900">What is Congress doing?</h1>
+      <p class="text-gray-600 mt-2 max-w-2xl">Plain language from the official record. Non-partisan, with every AI summary labeled.</p>
+      <div class="grid gap-4 lg:grid-cols-3 mt-6" id="m-hero"></div>
+    </section>
+
+    <!-- 2. Key votes, plain language, with your members -->
+    <section>
+      <div class="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 class="font-serif text-2xl font-bold text-gray-900">Key votes this week</h2>
+          <p class="text-sm text-gray-500" id="m-keyvotes-note"></p>
+        </div>
+        <a href="#" class="text-sm font-semibold text-accent">All votes this week →</a>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2 mt-4" id="m-keyvotes"></div>
+    </section>
+
+    <!-- 3. Recently became law -->
+    <section>
+      <div class="flex flex-wrap items-end justify-between gap-2">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Recently became law</h2>
+        <a href="#" class="text-sm font-semibold text-accent">All laws this Congress →</a>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2 mt-4" id="m-laws"></div>
+    </section>
+
+    <!-- 4. By the numbers (the charts move to their own page) -->
+    <section>
+      <div class="flex flex-wrap items-end justify-between gap-2">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">This Congress by the numbers</h2>
+        <a href="#" class="text-sm font-semibold text-accent">See the charts →</a>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4" id="m-numbers"></div>
+    </section>
+  </main>
+
+  <footer class="bg-surface-deep text-gray-600 text-sm mt-12">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap gap-x-8 gap-y-2">
+      <span class="font-serif text-white font-bold">Congress Watcher</span>
+      <span>Non-partisan. No scores, rankings or judgments of members.</span>
+      <a href="#" class="underline decoration-accent/50">How we count</a>
+      <a href="#" class="underline decoration-accent/50">Data sources</a>
+      <a href="#" class="underline decoration-accent/50">Report an error</a>
+    </div>
+  </footer>
+
+  <script>
+    const D = /*DATA*/null;
+    const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const day = (ymd, o = { month: "short", day: "numeric" }) => new Date(ymd + "T12:00:00").toLocaleDateString(undefined, o);
+    const range = w => `${day(w.week)} – ${day(w.week_end)}`;
+    const n = x => Number(x).toLocaleString();
+    document.getElementById("m-asof").textContent = new Date(D.generated).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+    // Plain-language headline for a vote (rules: H.Res "Providing for consideration of
+    // the bill (H.R. X)…" sets the terms of debate for another bill).
+    function headline(v) {
+      const title = v.bill?.title || "";
+      const rule = /^Providing for consideration of the bills? \(([^)]+)\)/i.exec(title);
+      const passed = v.outcome === "succeeded";
+      if (rule) return { text: `${v.chamber} ${passed ? "agreed to" : "rejected"} the terms of debate for ${rule[1]}`, procedural: true };
+      const verb = /RES/.test(v.bill?.label || "") ? (passed ? "adopted" : "rejected") : (passed ? "passed" : "rejected");
+      return { text: `${v.chamber} ${verb} the ${title.replace(/ of \d{4}$/, "")}`, procedural: false };
+    }
+    // How each party lined up, in words.
+    function partyWords(p) {
+      const side = c => !c || c.yea === c.nay ? null : (c.yea > c.nay ? "Yes" : "No");
+      const d = side(p.D), r = side(p.R);
+      if (d && r && d === r) return `Most Democrats and most Republicans voted ${d}`;
+      if (d && r) return `Most Democrats voted ${d}; most Republicans voted ${r}`;
+      return "";
+    }
+    const bar = (label, c, cls) => {
+      const tot = (c?.yea || 0) + (c?.nay || 0) || 1;
+      return `<div class="flex items-center gap-2 text-xs">
+        <span class="w-24 shrink-0"><span class="inline-block px-1.5 py-0.5 rounded ring-1 ring-inset ${cls} font-semibold">${label}</span></span>
+        <div class="flex-1 flex h-2.5 rounded-full overflow-hidden bg-gray-100">
+          <div style="width:${(c?.yea || 0) / tot * 100}%;background:#b5e48c"></div><div style="width:${(c?.nay || 0) / tot * 100}%;background:#f4a07a"></div>
+        </div>
+        <span class="w-28 shrink-0 text-right tabular-nums text-gray-700 whitespace-nowrap">${c?.yea ?? 0} Yes · ${c?.nay ?? 0} No</span>
+      </div>`;
+    };
+    const posBadge = p => /yea|aye/i.test(p) ? "bg-green-100 text-green-800" : /nay|no/i.test(p) ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-700";
+    const mine = id => (D.waPositions[id] || []).map(m => `<span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200"><span class="text-gray-800">${esc(m.name.split(",")[0])}</span><span class="font-bold px-1 rounded ${posBadge(m.position)}">${esc(m.position === "Yea" ? "Yes" : m.position === "Nay" ? "No" : m.position)}</span></span>`).join(" ");
+
+    // --- Hero cards ---------------------------------------------------------------
+    const tw = D.this_week;
+    const rep = r => `<div class="flex items-center gap-2.5">
+        <img src="${esc(r.imageUrl)}" alt="" class="w-10 h-12 rounded object-cover bg-gray-200" />
+        <div class="min-w-0"><p class="text-sm font-semibold text-gray-900 truncate">${esc(r.name.split(", ").reverse().join(" "))}</p>
+        <p class="text-xs text-gray-500">${r.chamber === "Senate" ? "Senator" : `Representative, District ${r.district}`} · <span class="text-party-d">D</span></p></div></div>`;
+    const topVotes = D.week.passage.filter(v => v.outcome === "succeeded" && !headline(v).procedural).slice(-3).reverse();
+    document.getElementById("m-hero").innerHTML = `
+      <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col">
+        <p class="text-xs font-semibold uppercase tracking-wide text-pink">Who represents me?</p>
+        <p class="text-sm text-gray-600 mt-1">Your two senators and your representative, from your address.</p>
+        <div class="mt-3 flex gap-2">
+          <input value="400 Broad St, Seattle, WA" class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm" />
+          <button class="px-3 py-2 rounded-lg bg-cta text-ink text-sm font-semibold">Find</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-3">Washington's 7th district:</p>
+        <div class="mt-2 space-y-2.5">${D.reps.map(rep).join("")}</div>
+        <a href="#" class="mt-auto pt-4 text-sm font-semibold text-accent">How they voted this week →</a>
+      </article>
+
+      <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col">
+        <p class="text-xs font-semibold uppercase tracking-wide text-pink">This week in Congress · ${esc(range(tw))}</p>
+        <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+          <div class="bg-gray-50/60 rounded-lg py-2"><p class="font-serif text-2xl font-bold text-gray-900">${tw.votes.House + tw.votes.Senate}</p><p class="text-[11px] text-gray-600">votes</p></div>
+          <div class="bg-gray-50/60 rounded-lg py-2"><p class="font-serif text-2xl font-bold text-gray-900">${tw.passed}</p><p class="text-[11px] text-gray-600">passed</p></div>
+          <div class="bg-gray-50/60 rounded-lg py-2"><p class="font-serif text-2xl font-bold text-gray-900">${tw.confirmed}</p><p class="text-[11px] text-gray-600">confirmed</p></div>
+        </div>
+        <ul class="mt-4 space-y-2.5 text-sm">${topVotes.map(v => `<li><span class="text-gray-900">${esc(headline(v).text)}</span><span class="block text-xs text-gray-500">${v.yea}–${v.nay} · ${esc(partyWords(v.parties))}</span></li>`).join("")}</ul>
+        <a href="#" class="mt-auto pt-4 text-sm font-semibold text-accent">The full week →</a>
+      </article>
+
+      <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col">
+        <p class="text-xs font-semibold uppercase tracking-wide text-pink">Issues</p>
+        <p class="text-sm text-gray-600 mt-1">What this Congress has done, topic by topic.</p>
+        <div class="mt-3 space-y-2.5">${Object.values(D.topics).map(t => `
+          <a href="#" class="block rounded-xl border border-gray-200 bg-gray-50/40 px-3.5 py-3 hover:border-accent/60">
+            <div class="flex items-baseline justify-between gap-2"><span class="font-serif text-lg font-bold text-gray-900">${esc(t.label)}</span><span class="text-xs text-gray-500">${t.counts.law} laws · ${t.counts.measures} measures voted on</span></div>
+            <p class="text-xs text-gray-500 mt-1">${t.watchlists.map(esc).join(" · ")}</p>
+          </a>`).join("")}</div>
+      </article>`;
+
+    // --- Key votes ----------------------------------------------------------------
+    const key = [...D.week.passage.filter(v => !headline(v).procedural).slice(-3).reverse(), ...D.week.nominations];
+    const hidden = D.week.counts.votes.House + D.week.counts.votes.Senate - key.length;
+    document.getElementById("m-keyvotes-note").textContent = `Final votes on bills and nominations, ${range(D.week)}. ${hidden} procedural and other votes not shown here.`;
+    document.getElementById("m-keyvotes").innerHTML = key.map(v => {
+      const nom = !v.bill;
+      const h = nom ? { text: `Senate ${v.outcome === "succeeded" ? "confirmed" : "rejected"} ${v.document_title.split(",")[0]}` } : headline(v);
+      return `<article class="bg-surface border border-gray-200 rounded-2xl p-5">
+        <div class="flex items-start justify-between gap-3">
+          <h3 class="font-serif text-lg font-bold text-gray-900 leading-snug">${esc(h.text)}</h3>
+          <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${v.outcome === "succeeded" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">${v.outcome === "succeeded" ? (nom ? "Confirmed" : "Passed") : (nom ? "Rejected" : "Failed")} ${v.yea}–${v.nay}</span>
+        </div>
+        <p class="text-sm text-gray-600 mt-1">${nom ? esc(v.document_title) : `${esc(v.bill.label.replace(/^HR /, "H.R. ").replace(/^HRES /, "H.Res. "))}. ${esc(v.explain || "")}`}</p>
+        <div class="mt-3 space-y-1.5">${bar("Democrats", v.parties.D, "ring-party-d/60 text-party-d")}${bar("Republicans", v.parties.R, "ring-party-r/60 text-party-r")}</div>
+        <p class="text-xs text-gray-500 mt-2">${esc(partyWords(v.parties))}.</p>
+        ${mine(v.id) ? `<div class="mt-3 pt-3 border-t border-gray-200"><p class="text-xs text-gray-500 mb-1.5">Your members (WA-7)</p><div class="flex flex-wrap gap-1.5">${mine(v.id)}</div></div>` : ""}
+      </article>`;
+    }).join("");
+
+    // --- Laws ---------------------------------------------------------------------
+    document.getElementById("m-laws").innerHTML = D.laws.map(l => `
+      <article class="bg-surface border border-gray-200 rounded-2xl p-5">
+        <p class="text-xs text-gray-500">Signed ${esc(day(l.signed, { month: "short", day: "numeric", year: "numeric" }))} · Public Law ${esc(l.law_number)}</p>
+        <h3 class="font-serif text-lg font-bold text-gray-900 mt-1 leading-snug">${esc(l.title)}</h3>
+        ${l.summary?.length ? `<p class="text-sm text-gray-700 mt-2">${esc(l.summary[0])}</p><p class="text-[11px] text-gray-500 mt-1">AI summary of the official CRS summary · <a href="#" class="text-accent">Read more</a></p>` : `<p class="text-sm text-gray-500 mt-2">No official summary yet.</p>`}
+      </article>`).join("");
+
+    // --- Numbers ------------------------------------------------------------------
+    const al = D.alignment, pct = (a, b) => Math.round(a / (a + b) * 100);
+    const card = (big, label, sub) => `<div class="bg-surface border border-gray-200 rounded-xl p-4"><p class="font-serif text-3xl font-bold text-gray-900 tabular-nums">${big}</p><p class="text-sm text-gray-700 mt-1">${label}</p><p class="text-xs text-gray-500 mt-0.5">${sub}</p></div>`;
+    document.getElementById("m-numbers").innerHTML = [
+      card(n(D.totals.House + D.totals.Senate), "roll-call votes", `House ${n(D.totals.House)} · Senate ${n(D.totals.Senate)}`),
+      card(n(D.lawsTotal), "bills became law", "this Congress"),
+      card(`${pct(al.House.opposed, al.House.same)}%`, "House votes split by party", "most Democrats and most Republicans on opposite sides"),
+      card(`${pct(al.Senate.opposed, al.Senate.same)}%`, "Senate votes split by party", "same measure"),
+    ].join("");
+  </script>
+</body>
+</html>
