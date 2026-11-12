@@ -9,6 +9,7 @@ import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
 import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, loadHeadlineStats, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
+import { renderWeekCard, renderWeekPage } from "./week.js";
 import { onTabArg, setRouteHandlers, shareUrl, startRouter, tabArg, replaceTab } from "./router.js";
 
 let overviewLoaded = false;
@@ -104,6 +105,48 @@ function setupIssues() {
   });
 }
 
+// --- Weekly digest: #week/<Monday> (stats/weeks + stats/week-<Monday>) ----------
+let currentWeek = "";            // "" = the latest week with activity
+let weeksPromise = null;
+const weekDocs = new Map();
+let weekRequest = 0;
+
+// Monday (Eastern time, like the digest) of the week containing `date`, "YYYY-MM-DD".
+function mondayOf(date) {
+  const ymd = date.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+async function loadWeek(monday) {
+  const container = document.getElementById("week-container");
+  const request = ++weekRequest;
+  container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading the week…</p></div>`;
+  try {
+    weeksPromise ??= getDoc(doc(db, "stats", "weeks")).then(s => s.data()?.weeks || []).catch(err => { weeksPromise = null; throw err; });
+    const list = await weeksPromise;
+    if (!list.length) throw new Error("The weekly digest hasn't been built yet.");
+    const target = monday || list.at(-1).week;
+    if (!weekDocs.has(target)) {
+      const snap = await getDoc(doc(db, "stats", `week-${target}`));
+      weekDocs.set(target, snap.exists() ? snap.data() : null);
+    }
+    if (request !== weekRequest) return;
+    const w = weekDocs.get(target);
+    if (!w) {
+      container.innerHTML = `<p class="text-center text-gray-500 py-12">No roll-call votes or new laws are recorded for the week of ${escapeHtml(target)}. <a href="#week/latest" class="text-accent hover:underline">Go to the latest week</a></p>`;
+      return;
+    }
+    if (!monday) { currentWeek = target; replaceTab("week"); }   // #week -> #week/<that Monday>
+    renderWeekPage(container, w, list);
+  } catch (err) {
+    if (request !== weekRequest) return;
+    console.error("Error loading the week:", err);
+    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load this week: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
 // --- Overview tab: one small precomputed doc (stats/overview) ------------------
 let overviewLoading = false;
 async function loadOverview() {
@@ -117,7 +160,9 @@ async function loadOverview() {
       return;
     }
     overviewLoaded = true;
-    renderOverview(container, snap.data(), {
+    const stats = snap.data();
+    renderWeekCard(document.getElementById("this-week"), stats.this_week, { isCurrentWeek: stats.this_week?.week === mondayOf(new Date()) });
+    renderOverview(container, stats, {
       // State tile -> that state's members in the directory.
       onState: code => {
         switchTab("members");
@@ -179,6 +224,15 @@ async function init() {
   };
   tabArg.members = legislatorsArg;
   onTabArg.members = applyLegislatorsArg;
+  onTabOpen.week = () => loadWeek(currentWeek);
+  tabArg.week = () => currentWeek;
+  onTabArg.week = arg => {
+    if (arg === "latest") arg = "";
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(arg)) return;
+    const changed = arg !== currentWeek;
+    currentWeek = arg;
+    if (changed && activeTab() === "week") loadWeek(arg);   // Earlier/Later links on the page
+  };
   setRouteHandlers({ showTab: tab => switchTab(tab, { push: false }) });
   populateStateSelect();
   setupTabs();

@@ -50,6 +50,7 @@
         <h2 class="font-serif text-2xl font-bold text-gray-900">The big picture</h2>
         <p class="text-sm text-gray-500">What the official record shows about this Congress at a glance. Every number links back to roll-call votes and member records you can browse.</p>
       </div>
+      <div id="this-week" class="mb-6 empty:hidden"></div>
       <div id="overview-container" class="min-h-[300px]">
         <div class="text-center py-12">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
@@ -185,6 +186,10 @@
     </section>
 
 
+    <section id="view-week" class="tab-view hidden">
+      <div id="week-container" class="min-h-[300px]"></div>
+    </section>
+
     <section id="view-methodology" class="tab-view hidden">
       <div class="max-w-3xl">
         <h2 class="font-serif text-2xl font-bold text-gray-900">How we count</h2>
@@ -260,6 +265,16 @@
             <ul>
               <li>Totals as reported to the FEC by the member's own campaign committee for their next election period (the full 2-year House or 6-year Senate cycle), or the previous one if nothing is reported yet.</li>
               <li>Not included: outside spending such as super PACs. A donor's state is only known for itemized gifts (over $200). We don't list employers or "top donors", because an individual's employer isn't the one giving.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>What Congress did each week</h3>
+            <ul>
+              <li>Weeks run Monday to Sunday, Eastern time. The Overview shows the latest week with any roll-call vote or new law; each week has its own page and link.</li>
+              <li><strong>Became law:</strong> bills whose "Became Public Law" action is dated that week. <strong>Passed / failed:</strong> roll-call votes on passage of a bill or resolution, by the official result. Bills that pass by voice vote or unanimous consent have no roll call, so they show up when they become law.</li>
+              <li><strong>Closest votes:</strong> the three smallest Yea–Nay margins among passage, cloture, nomination and amendment votes; procedural motions are left out. <strong>Nominations:</strong> every Senate vote on a nomination, with the nominee as named in the vote record.</li>
+              <li>Nothing is picked by hand or by AI: every item follows these rules.</li>
             </ul>
           </section>
 

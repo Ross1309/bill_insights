@@ -76,6 +76,19 @@ try {
   await waitText('#headline-stats', /SENATORS[\s\S]*BILLS COVERED[\s\S]*ROLL-CALL VOTES/i, 'Header cards render');
   await waitText('footer', /Data last updated/, 'Footer shows data freshness');
 
+  // Weekly digest: the Overview card, its full week page, and stepping back a week.
+  await waitText('#this-week', /in Congress[\s\S]*roll-call votes/i, 'Weekly digest card on the Overview');
+  await page.click('#this-week a[href^="#week/"]');
+  await waitText('#week-container', /What Congress did[\s\S]*roll-call votes/, 'Week page opens from the card');
+  const firstWeek = await page.evaluate(() => location.hash);
+  const earlier = await page.$('#week-container a[href^="#week/"]');
+  if (earlier) {
+    await earlier.click();
+    await page.waitForFunction(h => location.hash !== h, firstWeek, { timeout: 10000 }).catch(() => {});
+    await waitText('#week-container', /What Congress did/, 'Earlier week loads');
+  }
+  await page.click('#nav-overview');
+
   await page.click('#nav-issues');
   await waitText('#view-issues', /What the \d+(st|nd|rd|th) Congress has done/, 'Issues tab renders');
   // Back from the first tab switch returns to the Overview (it used to leave the site).

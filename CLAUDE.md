@@ -65,6 +65,8 @@ public/bills.js, votes.js,         One module per tab (state stays inside its mo
 public/modals.js, finance.js       Detail modals (member/bill/vote) and the Campaign Finance tab
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
 public/overview.js                 Overview tab charts (plain SVG/HTML) from stats/overview
+public/week.js                     Weekly digest: Overview card + #week/<Monday> page (rendering only)
+netlify/lib/digest.js              computeWeeks(): stats/week-<Monday> docs, stats/weeks, this_week
 public/issues.js                   Issues tab topic pages from stats/topic-<slug> (+ explainers, glossary)
 netlify/lib/topics.js              Topic + watchlist definitions (CRS policy areas / subjects)
 netlify/lib/topic-stats.js         computeTopicStats(): one stats/topic-<slug> doc per topic
@@ -224,6 +226,23 @@ votes_without_party_breakdown, generated_at
 ```
 Built from `select()`ed small vote fields (needs `party_breakdown` on every vote).
 
+**`stats/week-<Monday>`** — weekly digest (digest.js), Monday-Sunday Eastern
+```
+week, week_end, congress, counts { votes { House, Senate }, passed, failed, laws,
+confirmed, nominations, same, opposed }, laws [{ id, label, title, law_number, signed,
+summary (CRS-based AI bullets or null), sponsor }], passage [vote items], closest [3 vote
+items + margin], nominations [vote items], generated_at
+vote item: { id, chamber, date, question, result, outcome, yea, nay, parties { D|R|I:
+{ yea, nay } }, alignment, bill { id, label, title } | null, legislation, document_title }
+```
+**`stats/weeks`**: `{ congress, weeks: [weekSummary per active week], generated_at }` (for
+the page's Earlier/Later links). `stats/overview.this_week` = the latest active week's
+summary + up to 3 laws and 3 passed bills (the Overview card; no extra read). Rules: laws by
+the "Became Public Law" action date (`lawSigning`); passed/failed = voteCategory 'passage'
+by result; closest = 3 smallest margins among passage/cloture/nomination/amendment. Nightly
+rebuilds recompute the last 3 weeks (merging into stats/weeks); `build-stats.js` does all.
+Vote index entries carry `legislation` + `document_title` for this (nominee names).
+
 **`stats/topic-<slug>`** — one per topic in `topics.js` (economy, healthcare,
 foreign-affairs), rebuilt with stats/overview (same `writeOverviewStats` call)
 ```
@@ -362,8 +381,16 @@ browser Back and leaking listeners; a malformed link crashing startup; races in 
 Back/Forward and the state picker; health check fooled by manual runs. The smoke test
 now covers Back from Issues, repeated topic switches and malformed links.
 
+### Weekly digest (2026-11-12)
+Built and committed locally (backend 450e357 + UI), **not pushed**: Firestore's free reads
+ran out on 2026-11-12 before its data could be built. After the reset (midnight Pacific):
+`node scripts/build-member-votes.js --write` (index gets the new fields), then
+`node scripts/build-stats.js` (all weeks), check `stats/weeks` + a week doc, run the smoke
+test (it now covers the card, the week page and Earlier week), then push. Dev work used up
+the free tier twice (Nov 11, Nov 12): keep script runs that read every vote to a minimum.
+
 ### Open work (as of 2026-11-12)
-- "What Congress did this week" digest; more topics (Immigration, Defense: add to topics.js
+- More topics (Immigration, Defense: add to topics.js
   + a chip in index.html + ISSUE_TOPICS in app.js, then retag-topics + build-stats).
 
 ## Issues tab (frontend)
