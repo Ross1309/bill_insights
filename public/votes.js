@@ -1,6 +1,6 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { billCache, db, voteCache } from "./data.js";
+import { billCache, db } from "./data.js";
 import { PARTY_NAMES, escapeHtml, formatVoteDate, ordinal, partyChip } from "./util.js";
 import { billLabel } from "./bills.js";
 import { setChipGroup } from "./members.js";
@@ -23,9 +23,6 @@ let voteChamber = "";
 let voteIndexMissing = false;
 const votesState = { items: [], cursor: null, exhausted: false, loading: false, generation: 0 };
 
-function rememberVotes(list) {
-  for (const v of list) voteCache.set(v.id, v);
-}
 
 async function queryVotes({ chamber = "", cursor = null, size }) {
   const useIndex = chamber && !voteIndexMissing;
@@ -35,9 +32,9 @@ async function queryVotes({ chamber = "", cursor = null, size }) {
   if (cursor) constraints.push(startAfter(cursor));
   constraints.push(limit(useIndex || !chamber ? size : FALLBACK_PAGE_SIZE));
   try {
-    const snap = await getDocs(query(collection(db, "votes"), ...constraints));
+    // Summaries: the vote without its ~435 member positions (~1 KB vs ~30 KB each).
+    const snap = await getDocs(query(collection(db, "vote_summaries"), ...constraints));
     const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    rememberVotes(docs);
     return {
       votes: chamber && !useIndex ? docs.filter(v => v.chamber === chamber) : docs,
       cursor: snap.docs.at(-1) || cursor,
@@ -152,6 +149,8 @@ function partyBreakdown(individualVotes = []) {
     Object.values(b[1]).reduce((x, y) => x + y, 0) - Object.values(a[1]).reduce((x, y) => x + y, 0));
 }
 
+const sum = counts => Object.values(counts).reduce((x, y) => x + y, 0);
+
 export function resultBadgeClass(result) {
   const r = (result || "").toLowerCase();
   // Check the negative forms first: "Not Agreed to" also contains "agreed".
@@ -162,7 +161,10 @@ export function resultBadgeClass(result) {
 
 export function voteTalliesHtml(vote) {
   const t = vote.tallies || {};
-  const parties = partyBreakdown(vote.individual_votes);
+  // Stored per party at ingest (summaries have no member list); else count members.
+  const parties = vote.party_breakdown
+    ? Object.entries(vote.party_breakdown).sort((a, b) => sum(b[1]) - sum(a[1]))
+    : partyBreakdown(vote.individual_votes);
   const tally = (label, value, cls) => `
     <div class="${cls} p-3 rounded-lg border text-center">
       <p class="text-xs font-semibold uppercase">${label}</p>
@@ -260,7 +262,7 @@ function renderVotes(votes) {
           </div>
           ${voteTalliesHtml(vote)}
           <div class="flex flex-wrap items-center gap-4 mt-3 text-xs">
-            ${vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-accent hover:underline">How each member voted →</button>` : ""}
+            ${vote.member_count || vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-accent hover:underline">How each member voted →</button>` : ""}
             ${vote.source_url ? `<a href="${escapeHtml(vote.source_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(sourceLabel(vote))} →</a>` : ""}
           </div>
         </div>`).join("")}

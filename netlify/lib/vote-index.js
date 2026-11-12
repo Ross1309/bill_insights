@@ -55,6 +55,21 @@ export function indexVotes(doc) {
   }));
 }
 
+// --- vote_summaries/{vote id}: public, a vote doc without the ~435 member positions
+// (~1 KB instead of ~30 KB). The Votes tab and a bill's Votes tab page through these;
+// "How each member voted" still loads the full `votes` doc.
+export function voteSummary(vote) {
+  const { individual_votes: members, members_applied, updatedAt, id, ...rest } = vote;
+  return { ...rest, member_count: Array.isArray(members) ? members.length : 0 };
+}
+
+export async function writeVoteSummaries(db, votes) {
+  const writer = db.bulkWriter();
+  for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v));
+  await writer.close();
+  return votes.length;
+}
+
 // Add full vote docs to their index docs. `replace` = start each doc from scratch.
 export async function updateVoteIndex(db, admin, votes, { replace = false } = {}) {
   const groups = entriesByIndexDoc(votes);

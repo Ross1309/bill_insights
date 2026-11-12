@@ -10,7 +10,7 @@
 // (false when ingested, true once counted here), so a failed run is picked up by the
 // next one and no vote is counted twice in normal operation.
 
-import { updateVoteIndex } from './vote-index.js';
+import { updateVoteIndex, writeVoteSummaries } from './vote-index.js';
 
 const POSITION = { yea: 'yea', aye: 'yea', nay: 'nay', no: 'nay', present: 'present', 'not voting': 'not_voting' };
 export const RECENT_MAX = 50;
@@ -93,7 +93,7 @@ export function mergeMemberDoc(existing, bioguideId, congress, { entries, info }
 }
 
 // Apply every vote of `congress` not yet counted (members_applied == false) to the
-// member docs and the vote index (vote-index.js), then flag them applied.
+// member docs, the vote index and vote_summaries (vote-index.js), then flag them applied.
 // Returns { votes, members }.
 export async function applyNewMemberVotes(db, admin, congress) {
   const snap = await db.collection('votes').where('congress', '==', congress).where('members_applied', '==', false).get();
@@ -114,6 +114,7 @@ export async function applyNewMemberVotes(db, admin, congress) {
   });
   await writer.close();
   await updateVoteIndex(db, admin, votes);
+  await writeVoteSummaries(db, votes);
 
   const flag = db.bulkWriter();
   for (const d of snap.docs) flag.update(d.ref, { members_applied: true });

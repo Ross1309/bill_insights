@@ -72,7 +72,8 @@ export async function getVote(id) {
 }
 
 export async function getVotesForBill(billId) {
-  const snap = await getDocs(query(collection(db, "votes"), where("bill_id", "==", billId), limit(50)));
+  // Summaries are enough for the bill's Votes tab (tallies + party table).
+  const snap = await getDocs(query(collection(db, "vote_summaries"), where("bill_id", "==", billId), limit(50)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }

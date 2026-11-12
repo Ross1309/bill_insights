@@ -31,3 +31,16 @@ test('indexVotes: restores the fields stats code reads', () => {
   assert.equal(out.roll_call_number, 12);
   assert.equal(out.congress, 119);
 });
+
+test('voteSummary: drops member positions and bookkeeping, keeps the rest', async () => {
+  const { voteSummary } = await import('../netlify/lib/vote-index.js');
+  const s = voteSummary({
+    id: 'v', vote_id: 'v', chamber: 'Senate', question: 'On the Nomination', tallies: { yea: 51, nay: 49 },
+    party_breakdown: { R: { yea: 51, nay: 0 } }, individual_votes: Array(100).fill({}), members_applied: true, updatedAt: 1,
+  });
+  assert.equal(s.member_count, 100);
+  assert.equal(s.individual_votes, undefined);
+  assert.equal(s.members_applied, undefined);
+  assert.equal(s.vote_id, 'v');
+  assert.deepEqual(s.tallies, { yea: 51, nay: 49 });
+});
