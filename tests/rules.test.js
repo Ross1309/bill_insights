@@ -122,3 +122,15 @@ test('headlineCounts: seat types and party split', async () => {
   assert.deepEqual(h.house, { count: 1, parties: { Democratic: 1 } });
   assert.equal(h.delegates.count, 1);
 });
+
+test('legislationFromClerk: House Clerk <legis-num> -> bill id', async () => {
+  const { legislationFromClerk } = await import('../netlify/lib/house-votes.js');
+  const x = n => `<rollcall-vote><vote-metadata><legis-num>${n}</legis-num></vote-metadata></rollcall-vote>`;
+  assert.deepEqual(legislationFromClerk(x('H R 2102'), 119), { legislation: 'HR 2102', bill_id: 'hr2102-119' });
+  assert.deepEqual(legislationFromClerk(x('H RES 566'), 119), { legislation: 'HRES 566', bill_id: 'hres566-119' });
+  assert.deepEqual(legislationFromClerk(x('H J RES 7'), 119), { legislation: 'HJRES 7', bill_id: 'hjres7-119' });
+  assert.deepEqual(legislationFromClerk(x('S 1234'), 119), { legislation: 'S 1234', bill_id: 's1234-119' });
+  assert.equal(legislationFromClerk(x('QUORUM'), 119), null);
+  assert.equal(legislationFromClerk(x('ADJOURN'), 119), null);
+  assert.equal(legislationFromClerk('', 119), null);
+});

@@ -20,6 +20,10 @@ export default [
     rules: {
       'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none', ignoreRestSiblings: true }],
       'no-empty': ['error', { allowEmptyCatch: true }],
+      // A name used before its declaration in the same scope (e.g. a variable shadowed by a
+      // later const) is a runtime error; this caught nothing until import-topic-bills
+      // failed with "Cannot access 'done' before initialization" on 2026-11-12.
+      'no-use-before-define': ['error', { functions: false, classes: false, variables: false, allowNamedExports: true }],
     },
   },
 ];

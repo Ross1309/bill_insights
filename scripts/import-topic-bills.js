@@ -65,8 +65,8 @@ async function main() {
       console.error(`  ✗ ${id}: ${err.message}`);
       counts.failed++;
     }
-    const done = counts.written + counts.failed;
-    if (done % 100 === 0) console.log(`  ${done}/${todo.length}`);
+    const n = counts.written + counts.failed;
+    if (n % 100 === 0) console.log(`  ${n}/${todo.length}`);
   });
   await writer.close();
   for (let i = 0; i < done.length; i += 500) await markTracked(db, admin, done.slice(i, i + 500));

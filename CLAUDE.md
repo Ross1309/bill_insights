@@ -89,6 +89,7 @@ netlify/lib/http.js                fetchWithRetry/getJson/getText (timeouts, ret
 scripts/build-member-votes.js      Rebuild member_votes + vote_index from full votes [--write] [--congress N]
 scripts/build-stats.js             Rebuild stats/overview [--backfill party_breakdown]
 scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
+scripts/repair-house-legislation.js Link House votes without a measure via the Clerk XML [--write]
 scripts/import-bills.js            Backfill the N most recently updated bills (resumable)
 scripts/summarize-bills.js         CRS-based AI summaries for stored bills (resumable)
 netlify/functions/member-profile.js  GET /api/member-profile?id={bioguideId}: Congress.gov member detail +
@@ -182,10 +183,12 @@ individual_votes[].lis_member_id
 - House and Senate syncs run in parallel and independently (`Promise.allSettled`). A full
   ingest takes ~3–15 s locally (Congress.gov's House list is the slow part); scheduled
   functions get 30 s.
-- **Known gap:** House votes take `legislation`/`bill_id` from Congress.gov, which can lag
-  the House Clerk by hours (e.g. roll 323 on 2026-11-12 "On Passage" had no bill on
-  Congress.gov; the Clerk XML says H.R. 2102). Stored votes are never re-fetched, so such a
-  vote stays unlinked. Fix idea: fall back to the Clerk XML (`source_url`, `<legis-num>`).
+- House `legislation`/`bill_id` come from Congress.gov, else from the House Clerk's vote XML
+  (`<legis-num>`, `legislationFromClerk` in house-votes.js; then `legislation_source:
+  "House Clerk"`). Congress.gov never fills in the bill for amendment votes and fills new
+  votes in hours late; 96 of 685 House votes were unlinked until 2026-11-12, when
+  `scripts/repair-house-legislation.js --write` fixed them (7 left: quorum calls,
+  adjournment, Speaker election, which have no measure). Stored votes aren't re-fetched.
 - Congress.gov bill action histories lag senate.gov by about a day, so a brand-new Senate
   vote may not be linked from the bill's Actions tab yet.
 
@@ -319,7 +322,6 @@ cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting
   11 measures because health provisions ride in budget bills).
 - "What Congress did this week" digest; more topics (Immigration, Defense: add to topics.js
   + a chip in index.html, after the coverage fix).
-- House vote legislation gap (see `votes` schema notes).
 - Waiting bills are re-checked 5 per sync run; with ~1,000 waiting, run
   `summarize-bills.js --write` occasionally (or schedule it) to catch new CRS summaries.
 - Senate votes: the nightly ingest maps senators with the *current* congress-legislators

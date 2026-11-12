@@ -3,11 +3,29 @@
 // (whole-congress backfill).
 
 import { partyBreakdown } from './vote-stats.js';
-import { getJson } from './http.js';
+import { getJson, getText } from './http.js';
 
 const API = 'https://api.congress.gov/v3';
 const BILL_TYPES = new Set(['HR', 'S', 'HRES', 'SRES', 'HJRES', 'SJRES', 'HCONRES', 'SCONRES']);
 const TALLY_KEYS = { yea: 'yea', aye: 'yea', nay: 'nay', no: 'nay', present: 'present', 'not voting': 'not_voting' };
+
+// The House Clerk's vote record names the measure in <legis-num>, e.g. "H R 2102",
+// "H RES 566", "H J RES 7", "S 1234". Congress.gov leaves `legislationType` empty for
+// amendment votes (it lists the amendment instead) and fills it in hours late for new
+// votes, so the Clerk's record is the fallback. QUORUM / ADJOURN / JOURNAL etc. -> null.
+const CLERK_TYPES = { 'H R': 'HR', 'H RES': 'HRES', 'H J RES': 'HJRES', 'H CON RES': 'HCONRES', S: 'S', 'S RES': 'SRES', 'S J RES': 'SJRES', 'S CON RES': 'SCONRES' };
+
+export function legislationFromClerk(xml, congress) {
+  const m = /<legis-num>\s*([A-Z ]+?)\s+(\d+)\s*<\/legis-num>/.exec(xml || '');
+  const type = m && CLERK_TYPES[m[1].replace(/\s+/g, ' ')];
+  if (!type) return null;
+  return { legislation: `${type} ${m[2]}`, bill_id: `${type.toLowerCase()}${m[2]}-${congress}` };
+}
+
+export async function fetchClerkLegislation(sourceUrl, congress) {
+  if (!/^https:\/\/clerk\.house\.gov\//.test(sourceUrl || '')) return null;
+  return legislationFromClerk(await getText(sourceUrl, { timeoutMs: 10000, retries: 1 }), congress);
+}
 
 export function houseVoteId(congress, session, rollCall) {
   return `${congress}-${session}-house-vote-${rollCall}`;
@@ -55,11 +73,14 @@ export async function buildHouseVoteDoc(voteItem, congress, apiKey) {
   const legType = (voteItem.legislationType || '').toUpperCase();
   const isBill = BILL_TYPES.has(legType) && voteItem.legislationNumber;
   const id = houseVoteId(congress, session, voteNumber);
+  // No measure from Congress.gov (amendment votes, or not filled in yet): ask the Clerk.
+  const clerk = legType ? null : await fetchClerkLegislation(voteItem.sourceDataURL, congress).catch(() => null);
 
   return {
     vote_id: id,
-    bill_id: isBill ? `${legType.toLowerCase()}${voteItem.legislationNumber}-${congress}` : null,
-    legislation: legType && voteItem.legislationNumber ? `${legType} ${voteItem.legislationNumber}` : null,
+    bill_id: isBill ? `${legType.toLowerCase()}${voteItem.legislationNumber}-${congress}` : clerk?.bill_id || null,
+    legislation: legType && voteItem.legislationNumber ? `${legType} ${voteItem.legislationNumber}` : clerk?.legislation || null,
+    ...(clerk ? { legislation_source: 'House Clerk' } : {}),
     chamber: 'House',
     congress,
     session,
