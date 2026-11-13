@@ -145,7 +145,11 @@ try {
   await page.fill('#search-input', '');
 
   await page.click('#nav-votes');
-  await waitText('#votes-container', /Roll call|roll call/, 'Votes tab lists votes');
+  await waitText('#votes-container', /(passed|adopted|confirmed|rejected|failed)[\s\S]*roll call/i, 'Votes tab: key votes with plain headlines');
+  check(await page.$eval('#view-votes [data-scope="key"]', el => el.getAttribute('aria-pressed') === 'true' || el.classList.contains('active') || /bg-cta/.test(el.className)), 'Key votes is the default');
+  await page.click('#view-votes [data-scope="all"]');
+  await waitText('#vote-scope-note', /Every roll call/, 'All roll calls filter');
+  await page.click('#view-votes [data-scope="key"]');
   await page.click('#view-votes [data-chamber="Senate"]');
   await waitText('#votes-container', /Senate roll call/, 'Senate chamber filter');
   const houseShown = await page.$eval('#votes-container', el => /House roll call/i.test(el.innerText));
@@ -234,7 +238,7 @@ try {
   await closeModal();
   check(!(await page.evaluate(() => location.hash)), 'Closing a linked detail leaves a clean URL');
   await page.click('#nav-votes');
-  await waitText('#votes-container', /Roll call/, 'Votes tab (for history test)');
+  await waitText('#votes-container', /roll call/i, 'Votes tab (for history test)');
   await page.locator('#votes-container [data-open="vote"]').first().click();
   await waitText('#modal-root', /Yea|Nay|Aye/, 'Vote opens');
   check(/#vote\//.test(page.url()), 'Opening a vote puts it in the URL');

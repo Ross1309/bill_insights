@@ -1,7 +1,7 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { escapeHtml, ordinal, safeHref } from "./util.js";
+import { escapeHtml, officialLabel, ordinal, safeHref } from "./util.js";
 
 // DOM Elements
 const billsContainer = document.getElementById("bills-container");
@@ -116,8 +116,8 @@ function renderLoadMore() {
 // --- Bill field helpers (schema written by netlify/functions/sync-bills.js) ---
 
 export function billLabel(bill) {
-  if (bill.bill_number) return bill.bill_number;
-  if (bill.type || bill.number) return `${bill.type || ''} ${bill.number || ''}`.trim();
+  if (bill.bill_number) return officialLabel(bill.bill_number);
+  if (bill.type || bill.number) return officialLabel(`${bill.type || ''} ${bill.number || ''}`);
   return 'BILL';
 }
 

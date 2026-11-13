@@ -132,14 +132,21 @@
     <!-- VIEW 2: ROLL-CALL VOTES -->
     <section id="view-votes" class="tab-view hidden">
       <div class="mb-6">
-        <h2 class="font-serif text-2xl font-bold text-gray-900">Recent Roll-Call Votes</h2>
-        <p class="text-sm text-gray-500">Official results from the House Clerk (via Congress.gov) and the Senate (senate.gov), with a breakdown by party.</p>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Votes</h2>
+        <p class="text-sm text-gray-500">Every recorded House and Senate vote, from the House Clerk and senate.gov, with how each party voted.</p>
       </div>
-      <div id="vote-chamber-filters" class="flex flex-wrap gap-2 mb-6" role="group" aria-label="Chamber">
-        <button type="button" data-chamber="" class="filter-chip">Both chambers</button>
-        <button type="button" data-chamber="House" class="filter-chip">House</button>
-        <button type="button" data-chamber="Senate" class="filter-chip">Senate</button>
+      <div class="flex flex-wrap gap-x-6 gap-y-2 mb-2">
+        <div id="vote-scope-filters" class="flex flex-wrap gap-2" role="group" aria-label="Which votes">
+          <button type="button" data-scope="key" class="filter-chip">Key votes</button>
+          <button type="button" data-scope="all" class="filter-chip">All roll calls</button>
+        </div>
+        <div id="vote-chamber-filters" class="flex flex-wrap gap-2" role="group" aria-label="Chamber">
+          <button type="button" data-chamber="" class="filter-chip">Both chambers</button>
+          <button type="button" data-chamber="House" class="filter-chip">House</button>
+          <button type="button" data-chamber="Senate" class="filter-chip">Senate</button>
+        </div>
       </div>
+      <p id="vote-scope-note" class="text-xs text-gray-500 mb-6"></p>
       <div id="votes-container" class="min-h-[300px]">
         <div class="text-center py-12">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
@@ -246,6 +253,8 @@
               <li>Every recorded House and Senate vote of the current Congress. "Aye" and "No" (used on some House votes) are counted as Yea and Nay.</li>
               <li>Times are converted from Eastern time. Senate nomination votes show the nominee but have no bill.</li>
               <li><strong>Vote types</strong> are grouped from the official question text: cloture (ending debate), nominations, passage (bills and resolutions, including suspension votes, concurring in the other chamber's changes and veto overrides), amendments, procedural motions, and other.</li>
+              <li><strong>Key votes</strong> (the Votes tab's default, and the home page): final votes on passing a bill or resolution and on nominations. House "rules" (resolutions that only set the terms of debate for another bill) are left out even though they are resolutions; they, cloture, amendments and procedural motions are under All roll calls.</li>
+              <li><strong>Headlines</strong> such as "House passed the … Act" are written from the official question, result and bill title by fixed rules; the official question and record are always shown with them. Bills are labeled the way Congress writes them (H.R. 2102, H.Res. 1247, S. 5).</li>
               <li><strong>Outcomes:</strong> "succeeded" means the official result says passed, agreed to, confirmed, adopted or sustained. A failed procedural motion can still be a win for the side that opposed it.</li>
             </ul>
           </section>

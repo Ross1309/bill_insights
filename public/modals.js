@@ -3,8 +3,9 @@
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
 import { fetchFunction, getBill, getFirestoreDoc, getMember, getVote, getVotesForBill } from "./data.js";
-import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
+import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
+import { voteCardHtml } from "./vote-card.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
@@ -95,7 +96,7 @@ const memberModal = {
                 <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
                 <p class="text-xs text-gray-500 mt-0.5">
                   Roll call #${escapeHtml(String(v.roll ?? "?"))} · ${escapeHtml(formatVoteDate(v.date))}
-                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(v.bill_id)}" class="text-accent hover:underline">${escapeHtml(bill.label)}</button>` : v.legislation ? ` · ${escapeHtml(v.legislation)}` : ""}
+                  ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(v.bill_id)}" class="text-accent hover:underline">${escapeHtml(officialLabel(bill.label))}</button>` : v.legislation ? ` · ${escapeHtml(officialLabel(v.legislation))}` : ""}
                   · ${escapeHtml(v.result || "Result pending")}
                 </p>
                 ${v.party_majority && v.group !== v.party_majority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
@@ -227,16 +228,7 @@ const billModal = {
       if (!e.data.votes) return spinner("Loading votes…");
       if (!e.data.votes.length) return noRollCallHtml(e);
       return `
-        <ul class="divide-y divide-gray-100">
-          ${e.data.votes.map(v => `
-            <li class="py-3 flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
-                <p class="text-xs text-gray-500 mt-0.5">Roll call #${escapeHtml(String(v.roll_call_number ?? "?"))} · ${escapeHtml(formatVoteDate(v.date))} · Yea ${v.tallies?.yea ?? "—"}, Nay ${v.tallies?.nay ?? "—"}</p>
-              </div>
-              <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
-            </li>`).join("")}
-        </ul>`;
+        <div class="space-y-3">${e.data.votes.map(v => voteCardHtml(v)).join("")}</div>`;
     }],
   ],
 };

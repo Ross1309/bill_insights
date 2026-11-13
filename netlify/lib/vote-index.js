@@ -11,6 +11,7 @@
 // Firestore rules give browsers no access (only firebase-admin uses it).
 
 import { bulkWriter } from './firebase.js';
+import { voteCategory } from './vote-stats.js';
 
 export const indexDocId = (congress, session, chamber) => `${congress}-${session}-${String(chamber).toLowerCase()}`;
 
@@ -62,14 +63,30 @@ export function indexVotes(doc) {
 // --- vote_summaries/{vote id}: public, a vote doc without the ~435 member positions
 // (~1 KB instead of ~30 KB). The Votes tab and a bill's Votes tab page through these;
 // "How each member voted" still loads the full `votes` doc.
-export function voteSummary(vote) {
-  const { individual_votes: members, members_applied, updatedAt, id, ...rest } = vote;
-  return { ...rest, member_count: Array.isArray(members) ? members.length : 0 };
+// kind: 'passage' (final vote on a bill/resolution), 'nomination', 'rule' (a House rule:
+// sets the terms of debate for another bill), 'cloture', 'amendment', 'procedural', 'other'.
+// The Votes tab's "Key votes" = passage + nomination.
+export function voteKind(question, billTitle) {
+  const cat = voteCategory(question || '');
+  if (cat === 'passage' && /^Providing for consideration of/i.test(billTitle || '')) return 'rule';
+  return cat;
 }
 
+export function voteSummary(vote, billTitle = null) {
+  const { individual_votes: members, members_applied, updatedAt, id, ...rest } = vote;
+  return { ...rest, bill_title: billTitle, kind: voteKind(vote.question, billTitle), member_count: Array.isArray(members) ? members.length : 0 };
+}
+
+// Bill titles come from the bills collection (one small read per distinct bill).
 export async function writeVoteSummaries(db, votes) {
+  const ids = [...new Set(votes.map(v => v.bill_id).filter(Boolean))];
+  const titles = new Map();
+  for (let i = 0; i < ids.length; i += 300) {
+    const snaps = await db.getAll(...ids.slice(i, i + 300).map(id => db.collection('bills').doc(id)), { fieldMask: ['title'] });
+    snaps.forEach(s => { if (s.exists) titles.set(s.id, s.data().title || null); });
+  }
   const writer = bulkWriter(db);
-  for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v));
+  for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v, titles.get(v.bill_id) ?? null));
   await writer.close();
   return votes.length;
 }

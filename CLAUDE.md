@@ -663,6 +663,19 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   of their party's Yea/Nay on that roll call (ties and Independents excluded).
 - Deep links: see Shareable links. Keyboard focus: see How we count, Report an error, keyboard focus.
 
+## Vote cards, Key votes, official labels (2026-11-12)
+
+- `public/vote-card.js` `voteCardHtml()` is the one vote card used by Home key votes, the
+  Votes tab, week pages and a bill's Votes tab (plain headline from plain.js, result badge,
+  official label, question + `explainQuestion`, D/R Yea/Nay bars, member list + official
+  record links). It accepts a vote_summaries doc or a digest vote item (`asVote`).
+- `vote_summaries.kind` (`voteKind` in vote-index.js: `rule` for House rules, else
+  `voteCategory`) and `bill_title` (read from `bills` when summaries are written).
+  **Key votes** = kind passage | nomination; the Votes tab defaults to them (filtered in
+  the browser from pages of 25, no extra index) with "All roll calls" one click away.
+- `officialLabel()` (util.js) turns "HR 2102"/"hres1247-119"/"PN 1181" into "H.R. 2102",
+  "H.Res. 1247", "Nomination PN 1181"; use it wherever a bill number is shown.
+
 ## Votes paging (frontend)
 
 - `loadVotes` pages `vote_summaries` (not `votes`): `orderBy('date','desc')`, 10 per page,

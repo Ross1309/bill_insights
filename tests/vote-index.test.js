@@ -44,3 +44,15 @@ test('voteSummary: drops member positions and bookkeeping, keeps the rest', asyn
   assert.equal(s.vote_id, 'v');
   assert.deepEqual(s.tallies, { yea: 51, nay: 49 });
 });
+
+test('voteKind / voteSummary: final votes, nominations, rules, procedural', async () => {
+  const { voteKind, voteSummary } = await import('../netlify/lib/vote-index.js');
+  assert.equal(voteKind('On Passage', 'Major Richard Star Act'), 'passage');
+  assert.equal(voteKind('On Agreeing to the Resolution', 'Providing for consideration of the bill (H.R. 1013)'), 'rule');
+  assert.equal(voteKind('On the Nomination', null), 'nomination');
+  assert.equal(voteKind('On Ordering the Previous Question', null), 'procedural');
+  assert.equal(voteKind('On the Cloture Motion', null), 'cloture');
+  const s = voteSummary({ id: 'v', question: 'On Passage', individual_votes: [{}] }, 'Some Act');
+  assert.equal(s.bill_title, 'Some Act');
+  assert.equal(s.kind, 'passage');
+});

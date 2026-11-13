@@ -125,3 +125,16 @@ export function wireTooltip(root, { signal } = {}) {
   }, { signal });
   root.addEventListener("pointerleave", () => tip.classList.add("hidden"), { signal });
 }
+
+// --- Bill and nomination labels in the official style -----------------------------------
+// Accepts "HR 2102", "hr2102-119", "H.R. 2102", "HRES 1247", "PN 1181-1", "PN1181-7";
+// returns "H.R. 2102", "H.Res. 1247", "Nomination PN 1181". Unknown input comes back as is.
+const OFFICIAL = { HR: "H.R.", S: "S.", HRES: "H.Res.", SRES: "S.Res.", HJRES: "H.J.Res.", SJRES: "S.J.Res.", HCONRES: "H.Con.Res.", SCONRES: "S.Con.Res." };
+export function officialLabel(raw) {
+  const s = String(raw ?? "").trim();
+  const pn = /^PN\s*(\d+)/i.exec(s);
+  if (pn) return `Nomination PN ${pn[1]}`;
+  const m = /^([a-z.\s]+?)\s*(\d+)(?:-\d+)?$/i.exec(s);
+  const type = m && m[1].replace(/[.\s]/g, "").toUpperCase();
+  return type && OFFICIAL[type] ? `${OFFICIAL[type]} ${m[2]}` : s;
+}

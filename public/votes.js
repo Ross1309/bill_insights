@@ -1,7 +1,8 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { escapeHtml, formatVoteDate, ordinal, PARTY_NAMES, partyChip, safeHref } from "./util.js";
+import { escapeHtml, ordinal, PARTY_NAMES, partyChip } from "./util.js";
+import { voteCardHtml, isKeyVote } from "./vote-card.js";
 import { billLabel } from "./bills.js";
 import { setChipGroup } from "./members.js";
 
@@ -19,6 +20,13 @@ const VOTES_PAGE_SIZE = 10;
 const FALLBACK_PAGE_SIZE = 30;
 const votesMore = document.getElementById("votes-more");
 let voteChamber = "";
+// "key": final votes on bills, resolutions and nominations (vote_summaries.kind; filtered
+// in the browser, so no extra index); "all": every roll call.
+let voteScope = "key";
+const SCOPE_NOTE = {
+  key: "Key votes: final votes on bills, resolutions and nominations. Procedural motions, cloture, amendments and House rules are under All roll calls.",
+  all: "Every roll call, including procedural motions, cloture votes, amendments and House rules.",
+};
 let voteIndexMissing = false;
 const votesState = { items: [], cursor: null, exhausted: false, loading: false, generation: 0 };
 
@@ -69,9 +77,10 @@ async function loadVotes({ reset = false } = {}) {
   try {
     const page = [];
     while (page.length < VOTES_PAGE_SIZE && !st.exhausted) {
-      const res = await queryVotes({ chamber: voteChamber, cursor: st.cursor, size: VOTES_PAGE_SIZE });
+      // Key votes are ~40% of roll calls: fetch bigger pages to fill one.
+      const res = await queryVotes({ chamber: voteChamber, cursor: st.cursor, size: voteScope === "key" ? 25 : VOTES_PAGE_SIZE });
       if (generation !== st.generation) return;
-      page.push(...res.votes);
+      page.push(...(voteScope === "key" ? res.votes.filter(isKeyVote) : res.votes));
       st.cursor = res.cursor;
       st.exhausted = res.done;
     }
@@ -222,6 +231,17 @@ export function voteHeadingBadge(vote) {
 
 export function setupVoteFilters() {
   setChipGroup("vote-chamber-filters", "chamber", voteChamber);
+  setChipGroup("vote-scope-filters", "scope", voteScope);
+  const note = document.getElementById("vote-scope-note");
+  if (note) note.textContent = SCOPE_NOTE[voteScope];
+  document.getElementById("vote-scope-filters")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-scope]");
+    if (!b || b.dataset.scope === voteScope) return;
+    voteScope = b.dataset.scope;
+    setChipGroup("vote-scope-filters", "scope", voteScope);
+    if (note) note.textContent = SCOPE_NOTE[voteScope];
+    fetchVotes();
+  });
   document.getElementById("vote-chamber-filters")?.addEventListener("click", e => {
     const b = e.target.closest("[data-chamber]");
     if (!b || b.dataset.chamber === voteChamber) return;   // already showing it
@@ -233,11 +253,10 @@ export function setupVoteFilters() {
 
 function renderVotes(votes) {
   if (votes.length === 0) {
-    votesContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No ${voteChamber ? `${voteChamber} ` : ""}roll-call votes have been synced yet.</p>`;
+    votesContainer.innerHTML = `<p class="text-center text-gray-500 py-12">No ${voteScope === "key" ? "key " : ""}${voteChamber ? `${voteChamber} ` : ""}votes found.</p>`;
     return;
   }
-
-  // Group under month headings so it's clear how far back the list goes.
+  // Month headings make it clear how far back the list goes.
   const monthOf = v => (v.date ? new Date(v.date).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "Date not available");
   const groups = [];
   for (const v of votes) {
@@ -245,29 +264,7 @@ function renderVotes(votes) {
     if (groups.at(-1)?.label !== label) groups.push({ label, votes: [] });
     groups.at(-1).votes.push(v);
   }
-
   votesContainer.innerHTML = groups.map(g => `
     <h3 class="text-xs font-bold uppercase tracking-wide text-gray-500 mt-8 mb-3 first:mt-0">${escapeHtml(g.label)}</h3>
-    <div class="space-y-6">
-      ${g.votes.map(vote => `
-        <div class="bg-surface border border-gray-200 rounded-xl p-6 shadow-sm">
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-gray-100">
-            <div>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-accent/10 text-accent ring-1 ring-accent/30 uppercase">${voteHeadingBadge(vote)}</span>
-              <h3 class="font-serif font-bold text-gray-900 text-xl mt-2">${escapeHtml(vote.question || "Question not available")}</h3>
-              ${voteBillLine(vote)}
-              ${vote.vote_type ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(vote.vote_type)}</p>` : ""}
-            </div>
-            <div class="sm:text-right shrink-0">
-              <span class="inline-block px-3 py-1 text-xs font-bold rounded ${resultBadgeClass(vote.result)}">${escapeHtml(vote.result || "Result pending")}</span>
-              <p class="text-xs text-gray-400 mt-1">${escapeHtml(formatVoteDate(vote.date))}</p>
-            </div>
-          </div>
-          ${voteTalliesHtml(vote)}
-          <div class="flex flex-wrap items-center gap-4 mt-3 text-xs">
-            ${vote.member_count || vote.individual_votes?.length ? `<button type="button" data-open="vote" data-id="${escapeHtml(vote.id)}" class="font-semibold text-accent hover:underline">How each member voted →</button>` : ""}
-            ${safeHref(vote.source_url) ? `<a href="${safeHref(vote.source_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escapeHtml(sourceLabel(vote))} →</a>` : ""}
-          </div>
-        </div>`).join("")}
-    </div>`).join("");
+    <div class="grid gap-4 md:grid-cols-2">${g.votes.map(v => voteCardHtml(v)).join("")}</div>`).join("");
 }

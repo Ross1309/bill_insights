@@ -2,8 +2,8 @@
 // from precomputed stats docs (netlify/lib/digest.js; the rules are printed on the page).
 // Pure rendering: app.js loads the data.
 
-import { escapeHtml as esc, ordinal, PARTY_TEXT } from "./util.js";
-import { resultBadgeClass } from "./votes.js";
+import { escapeHtml as esc, officialLabel, ordinal } from "./util.js";
+import { voteCardHtml } from "./vote-card.js";
 
 // "2026-11-09" -> "Nov 9" (calendar days; parsed at noon so no time zone shifts the day).
 const day = (ymd, opts = { month: "short", day: "numeric" }) => new Date(`${ymd}T12:00:00`).toLocaleDateString(undefined, opts);
@@ -11,34 +11,15 @@ export const weekRange = w => {
   const sameMonth = w.week.slice(0, 7) === w.week_end.slice(0, 7);
   return `${day(w.week)} – ${sameMonth ? new Date(`${w.week_end}T12:00:00`).getDate() : day(w.week_end)}, ${w.week_end.slice(0, 4)}`;
 };
-const when = iso => new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const billLink = b => b?.id
-  ? `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="font-semibold text-accent hover:underline">${esc(b.label || b.id)}</button>`
+  ? `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="font-semibold text-accent hover:underline">${esc(officialLabel(b.label || b.id))}</button>`
   : "";
-const partyLine = p => ["D", "R", "I"].filter(k => p?.[k]).map(k =>
-  `<span class="${PARTY_TEXT[k]} font-semibold">${k}</span> <span class="tabular-nums">${p[k].yea}–${p[k].nay}</span>`).join(" · ");
-const ALIGN = { same: "Most Democrats and most Republicans voted the same way", opposed: "Most Democrats and most Republicans voted opposite ways" };
-const alignNote = a => ALIGN[a] ? `<span class="text-gray-500">${ALIGN[a]}.</span>` : "";
 
 // --- #week page -----------------------------------------------------------------
-function voteRow(v, { showMargin = false } = {}) {
-  const subject = v.bill
-    ? `${billLink(v.bill)} <span class="text-gray-800">${esc(v.bill.title || "")}</span>`
-    : `<span class="text-gray-800">${esc(v.document_title || v.legislation || "")}</span>`;
-  return `
-    <li class="py-3">
-      <div class="flex flex-wrap items-start justify-between gap-2">
-        <div class="min-w-0 text-sm">${subject}</div>
-        <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${resultBadgeClass(v.result)}">${esc(v.result || "")}</span>
-      </div>
-      <p class="text-xs text-gray-600 mt-1">
-        <button type="button" data-open="vote" data-id="${esc(v.id)}" class="text-accent hover:underline">${esc(v.chamber)} · ${esc(v.question || "")}</button>
-        · ${esc(when(v.date))} · <span class="tabular-nums text-gray-800">Yea ${v.yea ?? "—"}, Nay ${v.nay ?? "—"}</span>${showMargin && Number.isFinite(v.margin) ? ` · <strong class="text-gray-800">margin ${v.margin}</strong>` : ""}
-      </p>
-      <p class="text-xs mt-0.5">${partyLine(v.parties)} ${alignNote(v.alignment)}</p>
-    </li>`;
-}
+// The shared vote card (vote-card.js), two per row on wide screens.
+const voteGrid = (list, opts = {}) => `<div class="grid gap-4 md:grid-cols-2">${list.map(v =>
+  voteCardHtml(v, { margin: opts.showMargin && Number.isFinite(v.margin) ? v.margin : null })).join("")}</div>`;
 
 const section = (title, note, body) => `
   <section>
@@ -92,12 +73,12 @@ export function renderWeekPage(el, w, list) {
 
       ${section("Became law", "Bills signed into law this week (Public Law date).", w.laws.length ? `<div class="grid gap-3 md:grid-cols-2">${lawCards}</div>` : empty("No bills became law this week."))}
       ${section("Passed by roll call", "Passage votes that succeeded, in order. Bills passed by voice vote or unanimous consent have no roll call; they appear here when they become law.",
-        passed.length ? `<ul class="divide-y divide-gray-200">${passed.map(v => voteRow(v)).join("")}</ul>` : empty("No bills or resolutions passed a chamber by roll call this week."))}
-      ${failed.length ? section("Failed", "Passage votes that failed.", `<ul class="divide-y divide-gray-200">${failed.map(v => voteRow(v)).join("")}</ul>`) : ""}
+        passed.length ? voteGrid(passed) : empty("No bills or resolutions passed a chamber by roll call this week."))}
+      ${failed.length ? section("Failed", "Passage votes that failed.", voteGrid(failed)) : ""}
       ${section("Closest votes", "The smallest Yea–Nay margins among passage, cloture, nomination and amendment votes (procedural motions left out).",
-        w.closest.length ? `<ul class="divide-y divide-gray-200">${w.closest.map(v => voteRow(v, { showMargin: true })).join("")}</ul>` : empty("No such votes this week."))}
+        w.closest.length ? voteGrid(w.closest, { showMargin: true }) : empty("No such votes this week."))}
       ${c.nominations ? section("Nominations", "Senate votes on nominations (nominee as named in the vote record).",
-        `<ul class="divide-y divide-gray-200">${w.nominations.map(v => voteRow(v)).join("")}</ul>`) : ""}
+        voteGrid(w.nominations)) : ""}
 
       <p class="text-xs text-gray-500 border-t border-gray-200 pt-4">Weeks run Monday to Sunday, Eastern time. Built from roll-call votes (House Clerk, senate.gov) and Congress.gov bill records. Party numbers are Yea–Nay. <a href="#methodology" class="text-accent hover:underline">How we count</a></p>
     </div>`;

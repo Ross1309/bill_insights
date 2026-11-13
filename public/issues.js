@@ -6,7 +6,7 @@
 // the profile; the global data-open handler in modals.js does the rest.
 
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
-import { PARTY_NAMES as PARTY_NAME, STATE_NAMES, escapeHtml as esc, wireTooltip } from "./util.js";
+import { PARTY_NAMES as PARTY_NAME, STATE_NAMES, escapeHtml as esc, officialLabel, wireTooltip } from "./util.js";
 
 const C = { succeeded: "#6fa326", failed: "#c04637", accent: "#13a5b2" };
 const PARTY_CHIP = { D: "ring-party-d/70 text-party-d", R: "ring-party-r/70 text-party-r", I: "ring-party-i/60 text-party-i" };
@@ -14,7 +14,7 @@ const FOCUSED_MAX_SUBJECTS = 10; // keep in sync with netlify/lib/topics.js
 
 const day = iso => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
-const billLink = b => `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="text-xs font-semibold text-accent hover:underline">${esc(b.label)}</button>`;
+const billLink = b => `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="text-xs font-semibold text-accent hover:underline">${esc(officialLabel(b.label))}</button>`;
 
 // Plain-English meaning of each kind of floor question.
 export function explainQuestion(question = "") {
