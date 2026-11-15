@@ -104,6 +104,8 @@
           <button type="button" role="tab" data-topic="economy" class="filter-chip">Economy</button>
           <button type="button" role="tab" data-topic="healthcare" class="filter-chip">Healthcare</button>
           <button type="button" role="tab" data-topic="foreign-affairs" class="filter-chip">Foreign Affairs</button>
+          <button type="button" role="tab" data-topic="immigration" class="filter-chip">Immigration</button>
+          <button type="button" role="tab" data-topic="defense" class="filter-chip">Defense</button>
         </div>
         <button type="button" data-copy-link="" class="self-start px-2.5 py-1 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
       </div>
@@ -141,6 +143,8 @@
           <button data-category="Economy" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Economy</button>
           <button data-category="Healthcare" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Healthcare</button>
           <button data-category="Foreign Affairs" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Foreign Affairs</button>
+          <button data-category="Immigration" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Immigration</button>
+          <button data-category="Defense" class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Defense</button>
         </div>
       </div>
       <div id="bills-container" class="min-h-[300px]">
@@ -340,7 +344,7 @@
             <ul>
               <li>Not all of the ~20,000 bills introduced each Congress. We store every bill that <strong>became law</strong> or got a <strong>recorded floor vote</strong>, plus recently active bills: the 10 most recently updated on Congress.gov each night, and the ~2,000 most recently updated when the site launched.</li>
               <li>The Bills tab lists them by the date of their <strong>latest action</strong>, newest first.</li>
-              <li>Categories (Economy, Healthcare, Foreign Affairs) come from the bill's <strong>policy area</strong>, which the Congressional Research Service (CRS) assigns.</li>
+              <li>Categories (Economy, Healthcare, Foreign Affairs, Immigration, Defense, the same as the Issues topics) come from the bill's <strong>policy area</strong>, which the Congressional Research Service (CRS) assigns.</li>
               <li><strong>Stage</strong> comes from the official action history: a chamber counts as passing a bill only when an action <em>starts</em> with "Passed/agreed to in House/Senate". "Became law" requires a law number or a "Became Public Law" action.</li>
               <li><strong>Stage tracker</strong> (bill cards and bill pages): Introduced, Committee, each chamber, the President, Law. Simple resolutions (H.Res., S.Res.) need only their own chamber; concurrent resolutions both chambers; neither goes to the President. Constitutional amendments go to the states after both chambers, not the President (ratification isn't tracked). "Failed" and "Vetoed" are shown only when an official action says so. Bills we haven't stored get their stage from the same rule applied to their action history; with no stage data, no tracker is shown.</li>
               <li><strong>Moving or passed</strong> (the Bills tab's default): bills and resolutions that passed at least one chamber, sent to the President or became law. House rules, which only set the terms of debate for another bill, are left out. "All bills" shows everything we store.</li>
@@ -404,7 +408,7 @@
             <ul>
               <li><strong>Month by month</strong>: recorded votes on the topic's measures by the month they were held (Eastern time), and laws by the month they were signed.</li>
               <li>A topic's <strong>measures</strong> are bills with that CRS policy area that became law or got a recorded floor vote this Congress. Bills that never reached the floor aren't counted: most bills are never taken up, which isn't the same as being rejected.</li>
-              <li><strong>Watchlists</strong> (Economy: tariffs &amp; trade, taxes, budget &amp; debt; Healthcare: coverage &amp; costs, veterans' health, mental health &amp; substance use; Foreign Affairs: Iran, Israel, foreign aid) include a bill if CRS tagged it with a matching subject or its title names the topic, so they can include bills from other policy areas, such as defense, veterans' and spending bills. Each watchlist prints its exact rule.</li>
+              <li><strong>Watchlists</strong> (Economy: tariffs &amp; trade, taxes, budget &amp; debt; Healthcare: coverage &amp; costs, veterans' health, mental health &amp; substance use; Foreign Affairs: Iran, Israel, foreign aid; Immigration: border security, legal status, visas &amp; citizenship, asylum &amp; refugees; Defense: troops &amp; military families, veterans' benefits, defense budget &amp; weapons, intelligence &amp; surveillance) include a bill if CRS tagged it with a matching subject or its title names the topic, so they can include bills from other policy areas, such as defense, veterans' and spending bills. Each watchlist prints its exact rule.</li>
               <li>A watchlist bill is <strong>focused</strong> if its title names the topic or CRS gave it 10 or fewer subjects; otherwise it's a <strong>broad</strong> bill (like an annual spending or defense bill) that includes the topic among many others.</li>
             </ul>
           </section>

@@ -1,5 +1,6 @@
 // Recompute every enriched bill's topic + watchlist tags (`topics`, `topic_focus`) from
-// its stored policy area, CRS subjects and title, using the current netlify/lib/topics.js.
+// its stored policy area, CRS subjects and title, using the current netlify/lib/topics.js,
+// and every bill's Bills-tab `category` (categoryFor, derived from the topics' policy areas).
 // Run after adding or changing a topic or watchlist; no Congress.gov calls needed.
 //
 //   node scripts/retag-topics.js            # dry run: what would change
@@ -9,6 +10,7 @@
 import 'dotenv/config';
 import { getDb, bulkWriter } from '../netlify/lib/firebase.js';
 import { topicTags } from '../netlify/lib/topics.js';
+import { categoryFor } from '../netlify/lib/bills.js';
 
 const WRITE = process.argv.includes('--write');
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -16,25 +18,35 @@ const sortedKeys = o => Object.fromEntries(Object.entries(o || {}).sort(([a], [b
 
 async function main() {
   const db = getDb();
-  const snap = await db.collection('bills').select('enriched_at', 'policy_area', 'subjects', 'title', 'topics', 'topic_focus').get();
+  const snap = await db.collection('bills').select('enriched_at', 'policy_area', 'subjects', 'title', 'topics', 'topic_focus', 'category').get();
   const changes = [];
   const added = new Map();
+  const recategorized = new Map();
   for (const d of snap.docs) {
     const b = d.data();
+    const category = categoryFor(b.policy_area || null);
+    if (b.category !== category) {
+      changes.push([d.ref, { category }]);
+      recategorized.set(category, (recategorized.get(category) || 0) + 1);
+    }
     if (!b.enriched_at) continue;
     const tags = topicTags({ policy_area: b.policy_area, subjects: b.subjects || [], title: b.title || '' });
     if (same([...(b.topics || [])].sort(), [...tags.topics].sort()) && same(sortedKeys(b.topic_focus), sortedKeys(tags.topic_focus))) continue;
     changes.push([d.ref, tags]);
     for (const t of tags.topics) if (!(b.topics || []).includes(t)) added.set(t, (added.get(t) || 0) + 1);
   }
-  console.log(`${WRITE ? 'WRITING' : 'DRY RUN'}: ${changes.length} of ${snap.size} bills get new tags`);
+  console.log(`${WRITE ? 'WRITING' : 'DRY RUN'}: ${changes.length} updates to ${snap.size} bills (new tags or category)`);
   for (const [t, n] of [...added].sort()) console.log(`  +${n} ${t}`);
+  for (const [c, n] of [...recategorized].sort()) console.log(`  category -> ${c}: ${n}`);
   if (!WRITE) return console.log('Nothing was written. Re-run with --write, then node scripts/build-stats.js.');
 
+  // One update per bill (tags and category merged).
+  const byDoc = new Map();
+  for (const [ref, data] of changes) byDoc.set(ref.path, { ref, data: { ...byDoc.get(ref.path)?.data, ...data } });
   const writer = bulkWriter(db);
-  for (const [ref, tags] of changes) writer.update(ref, tags);
+  for (const { ref, data } of byDoc.values()) writer.update(ref, data);
   await writer.close();
-  console.log(`Updated ${changes.length} bills. Now run: node scripts/build-stats.js`);
+  console.log(`Updated ${byDoc.size} bills. Now run: node scripts/build-stats.js`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

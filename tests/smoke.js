@@ -132,6 +132,10 @@ try {
   await page.click('#nav-issues');
   await waitText('#view-issues', /What the \d+(st|nd|rd|th) Congress has done/, 'Issues tab renders');
   await waitText('#view-issues', /Month by month[\s\S]*busiest month/, 'Issues: month by month');
+  await page.click('#issue-topics [data-topic="defense"]');
+  await waitText('#view-issues', /Defense[\s\S]*Troops & military families[\s\S]*Intelligence & surveillance/, 'Issues: Defense topic');
+  await page.click('#issue-topics [data-topic="immigration"]');
+  await waitText('#view-issues', /Immigration[\s\S]*Border security[\s\S]*Asylum & refugees/, 'Issues: Immigration topic');
   // Back from the first tab switch returns to the Overview (it used to leave the site).
   await page.goBack();
   await page.waitForTimeout(500);

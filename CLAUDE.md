@@ -470,9 +470,11 @@ incomplete Senate records like House ones; vote 262 re-fetched).
 set). The free tier ran out on Nov 11 and Nov 12 from dev scripts. After upgrading,
 requests failed intermittently with RESOURCE_EXHAUSTED for ~15 minutes while it applied.
 
-### Open work (as of 2026-11-12)
-- More topics (Immigration, Defense: add to topics.js
-  + a chip in index.html + ISSUE_TOPICS in app.js, then retag-topics + build-stats).
+### Adding a topic
+topics.js (policy areas + watchlists chosen from the CRS subjects on floor/law bills), a
+chip in index.html (#issue-topics and #category-filters) + ISSUE_TOPICS in app.js, then
+`node scripts/retag-topics.js --write` (tags and the Bills `category`, which now derives
+from the topics' policy areas) and `node scripts/build-stats.js`. Keep slugs unique, <= 30.
 
 ## Issues tab (frontend)
 
@@ -484,6 +486,11 @@ Plain-language topic pages, built from the approved mockup (`mockups/foreign-aff
   - Healthcare: Coverage & costs (incl. Medicare, Medicaid, prescription drugs), Veterans'
     health, Mental health & substance use
   - Foreign Affairs: Iran, Israel, Foreign aid
+  - Immigration (policy area Immigration; added 2026-11-15): Border security, Legal status,
+    visas & citizenship, Asylum & refugees
+  - Defense (Armed Forces and National Security; added 2026-11-15): Troops & military
+    families, Veterans' benefits (veterans' *health* stays in Healthcare), Defense budget &
+    weapons, Intelligence & surveillance
   Healthcare/Economy ones were chosen 2026-11-12 from the CRS subjects on floor/law bills:
   health provisions mostly ride in bills from other policy areas (Healthcare's own area has
   11 measures; its watchlists add 39). Prescription drugs (only 3 focused) was merged into

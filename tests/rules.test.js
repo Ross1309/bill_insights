@@ -293,3 +293,19 @@ test('member trends: shown only when the history covers every vote; words match 
   assert.equal(memberTrendsHtml({ totals: { votes: 61, not_voting: 11 }, monthly }), '');   // incomplete history
   assert.equal(memberTrendsHtml({ totals: { votes: 20 }, monthly: { '2025-01': [20, 0, 0, 0] } }), '');   // too short
 });
+
+test('topics: Immigration and Defense tags; categories follow the topics; slugs unique and within the query limit', async () => {
+  const { TOPICS } = await import('../netlify/lib/topics.js');
+  const { categoryFor } = await import('../netlify/lib/bills.js');
+  assert.deepEqual(topicTags({ policy_area: 'Immigration', subjects: ['Border security and unlawful immigration'], title: 'Secure the Border Act' }).topics, ['immigration', 'border']);
+  assert.ok(!topicTags({ policy_area: 'Commerce', subjects: [], title: 'Borderline Cases Act' }).topics.includes('border'));   // word boundary
+  assert.ok(topicTags({ policy_area: 'Armed Forces and National Security', subjects: [], title: 'National Defense Authorization Act for Fiscal Year 2026' }).topics.includes('defense-budget'));
+  assert.ok(topicTags({ policy_area: 'Intelligence', subjects: [], title: 'FISA Reauthorization Act' }).topics.includes('intelligence'));
+  assert.equal(categoryFor('Immigration'), 'Immigration');
+  assert.equal(categoryFor('Armed Forces and National Security'), 'Defense');
+  assert.equal(categoryFor('Taxation'), 'Economy');
+  assert.equal(categoryFor('Crime and Law Enforcement'), 'Other');
+  const slugs = Object.entries(TOPICS).flatMap(([s, t]) => [s, ...Object.keys(t.watchlists)]);
+  assert.equal(new Set(slugs).size, slugs.length);
+  assert.ok(slugs.length <= 30);   // stats query uses array-contains-any (max 30)
+});

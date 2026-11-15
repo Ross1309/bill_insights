@@ -86,6 +86,68 @@ export const TOPICS = {
     },
     explainers: ['war-powers', 'resolutions', 'no-vote'],
   },
+  // Immigration and Defense: chosen 2026-11-15 from the CRS subjects on the 119th's
+  // floor/law bills (border security on 33, immigration status 28, citizenship 13,
+  // visas 12, asylum 6; intelligence 23, military personnel 19, veterans' pensions 17,
+  // defense spending 12). Veterans' *health* stays in Healthcare's watchlist.
+  immigration: {
+    label: 'Immigration',
+    intro: 'What the {congress} Congress has done on immigration: border security, legal status, visas and citizenship, and asylum: what became law, what is moving, and how members voted.',
+    policyAreas: ['Immigration'],
+    watchlists: {
+      border: {
+        label: 'Border security',
+        subjects: ['Border security and unlawful immigration'],
+        titlePattern: '\\bborders?\\b|unlawful immigra|illegal immigra',
+        intro: 'Measures CRS tagged Border security and unlawful immigration, or with border or unlawful immigration in the title.',
+      },
+      'legal-status': {
+        label: 'Legal status, visas & citizenship',
+        subjects: ['Immigration status and procedures', 'Visas and passports', 'Citizenship and naturalization'],
+        titlePattern: '\\bvisas?\\b|citizenship|naturaliz|green card',
+        intro: 'Measures CRS tagged Immigration status and procedures, Visas and passports, or Citizenship and naturalization, or with visa, citizenship, naturalization or green card in the title.',
+      },
+      asylum: {
+        label: 'Asylum & refugees',
+        subjects: ['Refugees, asylum, displaced persons'],
+        titlePattern: '\\basylum\\b|\\brefugees?\\b',
+        intro: 'Measures CRS tagged Refugees, asylum, displaced persons, or with asylum or refugee in the title.',
+      },
+    },
+    explainers: ['no-vote', 'resolutions'],
+  },
+  defense: {
+    label: 'Defense',
+    intro: 'What the {congress} Congress has done on the military, veterans, defense spending and intelligence: what became law, what is moving, and how members voted.',
+    policyAreas: ['Armed Forces and National Security'],
+    watchlists: {
+      troops: {
+        label: 'Troops & military families',
+        subjects: ['Military personnel and dependents', 'National Guard and reserves', 'Military medicine', 'Military education and training'],
+        titlePattern: 'service ?members?|military (families|spouses|personnel)|national guard|\\btroops\\b',
+        intro: 'Measures CRS tagged Military personnel and dependents, National Guard and reserves, Military medicine, or Military education and training, or naming service members, military families, the National Guard or troops in the title.',
+      },
+      'veterans-benefits': {
+        label: "Veterans' benefits",
+        subjects: ["Veterans' pensions and compensation", "Veterans' education, employment, rehabilitation", "Veterans' loans, housing, homeless programs"],
+        titlePattern: "\\bveterans?'? (benefits|compensation|pensions?|housing|education|employment)",
+        intro: "Measures CRS tagged Veterans' pensions and compensation, Veterans' education, employment, rehabilitation, or Veterans' loans, housing, homeless programs, or naming veterans' benefits, compensation, pensions, housing, education or employment in the title. Veterans' health care is in Healthcare.",
+      },
+      'defense-budget': {
+        label: 'Defense budget & weapons',
+        subjects: ['Defense spending', 'Military procurement, research, weapons development'],
+        titlePattern: 'national defense authorization|defense appropriations|\\bNDAA\\b',
+        intro: 'Measures CRS tagged Defense spending or Military procurement, research, weapons development, or naming the National Defense Authorization Act or defense appropriations in the title.',
+      },
+      intelligence: {
+        label: 'Intelligence & surveillance',
+        subjects: ['Intelligence activities, surveillance, classified information'],
+        titlePattern: '\\bintelligence\\b|surveillance|\\bFISA\\b',
+        intro: 'Measures CRS tagged Intelligence activities, surveillance, classified information, or with intelligence, surveillance or FISA in the title.',
+      },
+    },
+    explainers: ['war-powers', 'no-vote', 'resolutions'],
+  },
 };
 
 // A watchlist measure is "focused" if CRS gave it few subjects or its title names

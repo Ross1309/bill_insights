@@ -3,25 +3,18 @@
 
 import { getJson, fetchWithRetry } from './http.js';
 import { ordinal } from './congress.js';
-import { topicTags } from './topics.js';
+import { topicTags, TOPICS } from './topics.js';
 import { stageFromActions } from '../../public/stage.js';
 
 export { stageFromActions };
 
 const API = 'https://api.congress.gov/v3';
 
-// Congress.gov policy areas -> the app's filter buckets.
-// Anything not listed is "Other"; bills CRS hasn't tagged yet are "Uncategorized".
-const CATEGORY_MAP = {
-  'Health': 'Healthcare',
-  'International Affairs': 'Foreign Affairs',
-  'Foreign Trade and International Finance': 'Foreign Affairs',
-  'Economics and Public Finance': 'Economy',
-  'Finance and Financial Sector': 'Economy',
-  'Taxation': 'Economy',
-  'Commerce': 'Economy',
-  'Labor and Employment': 'Economy',
-};
+// Congress.gov policy areas -> the Bills tab's category chips: the Issues topics'
+// policy areas (topics.js), so the two never drift apart. Anything else is "Other"; bills
+// CRS hasn't tagged yet are "Uncategorized". Changing topics? Run retag-topics.js --write,
+// which also updates stored categories.
+const CATEGORY_MAP = Object.fromEntries(Object.values(TOPICS).flatMap(t => t.policyAreas.map(a => [a, t.label])));
 
 export function categoryFor(policyArea) {
   if (!policyArea) return 'Uncategorized';

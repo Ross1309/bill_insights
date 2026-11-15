@@ -19,7 +19,7 @@ import { onTabArg, setRouteHandlers, shareUrl, startRouter, tabArg, replaceTab }
 let overviewLoaded = false;
 
 // --- Issues tab: one precomputed doc per topic (stats/topic-<slug>) -------------
-const ISSUE_TOPICS = ["economy", "healthcare", "foreign-affairs"];
+const ISSUE_TOPICS = ["economy", "healthcare", "foreign-affairs", "immigration", "defense"];
 let currentIssue = ISSUE_TOPICS.includes(store.get("cw-issue", "")) ? store.get("cw-issue", "") : "economy";
 let issueLoaded = false;
 let issueRequest = 0;

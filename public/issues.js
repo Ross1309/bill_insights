@@ -1,4 +1,4 @@
-// Issues tab: plain-language topic pages (Economy, Healthcare, Foreign Affairs +
+// Issues tab: plain-language topic pages (Economy, Healthcare, Foreign Affairs, Immigration, Defense +
 // watchlists) rendered from precomputed `stats/topic-<slug>` docs (see
 // netlify/lib/topic-stats.js and netlify/lib/topics.js for definitions).
 //
@@ -69,7 +69,7 @@ function glance(s) {
     <section>
       <h3 class="font-serif text-2xl font-bold text-gray-900">At a glance</h3>
       <p class="text-base sm:text-lg text-gray-800 mt-2 max-w-3xl">This Congress, <strong>${c.measures}</strong> ${esc(s.label.toLowerCase())} measures reached a floor vote or became law. <strong>${c.law}</strong> became law, <strong>${c.passed_both + c.passed_one}</strong> more passed at least one chamber, and <strong>${c.none}</strong> didn't pass either. Members cast <strong>${c.votes}</strong> recorded votes on them.</p>
-      ${c.beyond_policy_area ? `<p class="text-sm text-gray-600 mt-2 max-w-3xl">Those are bills whose official policy area is ${esc(s.label.toLowerCase())}. Another <strong>${c.beyond_policy_area}</strong> measures from other areas (such as budget, veterans' or defense bills) include ${esc(s.label.toLowerCase())} provisions: see the watchlists below.</p>` : ""}
+      ${c.beyond_policy_area ? `<p class="text-sm text-gray-600 mt-2 max-w-3xl">Those are bills whose official policy area is ${s.policy_areas?.length === 1 ? `&ldquo;${esc(s.policy_areas[0])}&rdquo;` : `one of ${esc(s.label.toLowerCase())}'s (listed under Definitions below)`}. Another <strong>${c.beyond_policy_area}</strong> measures from other policy areas (spending bills, for example) include ${esc(s.label.toLowerCase())} provisions: see the watchlists below.</p>` : ""}
       <div class="mt-5 bg-surface border border-gray-200 rounded-xl p-5">
         <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-3">How far they got</p>
         <div class="space-y-2.5">${steps.map(([lbl, n], i) => `
