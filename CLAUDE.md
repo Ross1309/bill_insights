@@ -39,10 +39,10 @@ file is the working reference. Dated history lives in docs/HISTORY.md.
   to register: App Check -> Apps -> Manage debug tokens). Firestore's public REST API is
   blocked once enforced, hence `/api/health` for `check-health.js`. Enforce/unenforce:
   Firebase console -> App Check -> APIs -> Cloud Firestore (takes effect within minutes).
-  Status 2026-11-12: live, **monitoring (not enforced)**; verified on the live site: plain
-  browsers get tokens via reCAPTCHA Enterprise, the `smoke-tests` debug token works, CI green.
-  Next: after a day or two of mostly-verified Firestore traffic, Enforce, then re-run the
-  live smoke test.
+  Status: **enforced since 2026-11-14** (before that 2 days of monitoring: 87% verified,
+  13% invalid = unregistered localhost debug tokens, 0 unknown origin). Verified after
+  enforcing: live smoke test (debug token) and a plain browser both load data.
+  A fresh localhost browser can't read Firestore until its printed debug token is registered.
 - The Firebase *web* config in `public/data.js` (`apiKey: "AIza…"`) is public by design.
   Netlify's secret scanner flags it, so `netlify.toml` exempts that one value via
   `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`. Never exempt or disable scanning for
