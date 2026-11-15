@@ -8,6 +8,7 @@ import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { voteCardHtml } from "./vote-card.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
+import { voteHeadline, outcomeOf } from "./plain.js";
 import { explainQuestion } from "./issues.js";
 import { missedLong } from "./participation.js";
 import { memberTrendsHtml } from "./member-trends.js";
@@ -43,7 +44,7 @@ const memberModal = {
       ${memberPhoto(shown)}
       <div class="min-w-0 flex-1">
         ${shown.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[shown.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(shown.party)}</span>` : ""}
-        <h2 id="modal-title" class="font-serif text-2xl font-bold text-gray-900 mt-1">${escapeHtml(name)}</h2>
+        <h2 id="modal-title" class="font-serif text-xl sm:text-2xl font-bold text-gray-900 mt-1">${escapeHtml(name)}</h2>
         ${m ? `<p class="text-sm text-gray-500">${escapeHtml(memberRole(m))} · ${escapeHtml(STATE_NAMES[m.state] || m.state || "")}</p>` : ""}
       </div>`;
   },
@@ -295,8 +296,10 @@ const voteModal = {
     }
     return `
       <div class="min-w-0 flex-1">
-        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-accent/10 text-accent ring-1 ring-accent/30 uppercase">${voteHeadingBadge(v)}</span>
-        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${v.question ? termize(escapeHtml(v.question)) : "Question not available"}</h2>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-accent/10 text-accent ring-1 ring-accent/30">${voteHeadingBadge(v)}</span>
+        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(voteHeadline({ chamber: v.chamber, question: v.question, outcome: outcomeOf(v.result), document_title: v.document_title,
+          bill: v.bill_id ? { id: v.bill_id, label: voteBillInfo(v)?.label || v.legislation || v.bill_id, title: voteBillInfo(v)?.title || null } : null }))}</h2>
+        ${v.question ? `<p class="text-sm text-gray-600 mt-0.5">${termize(escapeHtml(v.question))}</p>` : ""}
         <p class="text-sm text-gray-500 mt-0.5">
           <span class="inline-block px-2 py-0.5 text-xs font-bold rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
           ${escapeHtml(formatVoteDate(v.date))}
@@ -425,6 +428,11 @@ function backModal() {
   modalRoot.querySelector("[data-close]")?.focus();
 }
 
+// Shorter tab names on phones, so every tab fits on one line.
+const SHORT_TAB = { "Voting Record": "Votes", Legislation: "Bills", "Campaign Finance": "Finance", "How members voted": "Members" };
+const tabLabel = label => (SHORT_TAB[label]
+  ? `<span class="sm:hidden">${SHORT_TAB[label]}</span><span class="hidden sm:inline">${label}</span>` : label);
+
 function renderModal() {
   const e = modalStack.at(-1);
   if (!e) return;
@@ -440,19 +448,22 @@ function renderModal() {
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 p-0 sm:p-6" data-backdrop>
       <div role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"
-        class="bg-surface w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-xl flex flex-col">
-        <div class="shrink-0 flex items-start gap-4 p-5 border-b border-gray-200">
-          ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">←</button>` : ""}
-          ${def.header(e)}
-          <button type="button" data-copy-link="${escapeHtml(detailHash(e.kind, e.id))}" class="shrink-0 mt-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
-          <button type="button" data-close aria-label="Close" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">✕</button>
+        class="bg-surface w-full sm:max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl shadow-xl flex flex-col">
+        <!-- Phones: Back / Copy link / Close on a row of their own, the title full width
+             below. Wider screens: one row. (Flex order, so each control exists once.) -->
+        <div class="shrink-0 flex flex-wrap items-start gap-x-4 gap-y-1 px-4 pt-2 pb-4 sm:p-5 border-b border-gray-200">
+          ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="order-1 min-w-11 min-h-11 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">←</button>` : ""}
+          <span class="order-2 flex-1 sm:hidden"></span>
+          <div class="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 min-w-0 flex items-start gap-3 sm:gap-4">${def.header(e)}</div>
+          <button type="button" data-copy-link="${escapeHtml(detailHash(e.kind, e.id))}" class="order-2 sm:order-3 shrink-0 self-center sm:self-start sm:mt-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
+          <button type="button" data-close aria-label="Close" class="order-2 sm:order-4 min-w-11 min-h-11 -mr-2 sm:mr-0 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">✕</button>
         </div>
-        <div role="tablist" class="shrink-0 flex gap-4 px-5 border-b border-gray-200 overflow-x-auto">
+        <div role="tablist" class="shrink-0 flex gap-5 sm:gap-4 px-4 sm:px-5 border-b border-gray-200 overflow-x-auto">
           ${def.tabs.map(([key, label]) => `
             <button type="button" role="tab" data-tab="${key}" aria-selected="${key === e.tab}"
-              class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-gray-900 border-pink" : "text-gray-500 border-transparent hover:text-gray-700"}">${label}</button>`).join("")}
+              class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-gray-900 border-pink" : "text-gray-500 border-transparent hover:text-gray-700"}">${tabLabel(label)}</button>`).join("")}
         </div>
-        <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" class="p-5 overflow-y-auto flex-1">${renderTab(e)}
+        <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" class="p-4 sm:p-5 overflow-y-auto flex-1">${renderTab(e)}
           <p class="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-500">Something wrong here? <a href="#" data-report-error="${escapeHtml(detailHash(e.kind, e.id))}" class="text-accent hover:underline">Report an error</a> · <a href="#methodology" class="text-accent hover:underline">How we count</a></p></div>
       </div>
     </div>`;

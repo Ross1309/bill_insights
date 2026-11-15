@@ -136,6 +136,6 @@ export function stageTrackerHtml(bill, { compact = false } = {}) {
             <span class="block text-[11px] leading-tight mt-1 ${x.state === "todo" ? "text-gray-400" : x.state === "failed" ? "text-red-600 font-semibold" : "text-gray-700"}">${termize(esc(x.label))}<span class="sr-only">${x.state === "todo" ? " (not yet)" : x.state === "failed" ? "" : " (done)"}</span></span>
           </li>`).join("")}
       </ol>
-      <p class="text-[11px] text-gray-500 mt-2">From the official action history. <a href="#methodology" class="text-accent hover:underline">How we count</a></p>
+      <p class="text-[11px] text-gray-500 mt-2">From the official action history. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a> · <a href="#methodology" class="text-accent hover:underline">How we count</a></p>
     </section>`;
 }

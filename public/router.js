@@ -6,6 +6,7 @@
 //   #legislators/<WA|WA-7|all> Legislators for a state, "your representatives" for a
 //                              district, or every state
 //   #methodology               "How we count" (a page with no tab-bar button)
+//   #how-laws-are-made         "How a bill becomes law" (no tab-bar button)
 //   #congress                  This Congress so far + the charts (old #charts links work too)
 //   #week/<Monday>             "What Congress did" that week (no tab-bar button; the
 //                              Overview card links to it); #week/latest = newest week
@@ -15,7 +16,7 @@
 // changes inside a tab (topic, state) replace the current one. Modules register how
 // to show a tab argument (onTabArg) and what their current argument is (tabArg).
 
-const TAB_URL = { overview: "overview", issues: "issues", bills: "bills", votes: "votes", members: "legislators", methodology: "methodology", week: "week", charts: "congress" };
+const TAB_URL = { overview: "overview", issues: "issues", bills: "bills", votes: "votes", members: "legislators", methodology: "methodology", process: "how-laws-are-made", week: "week", charts: "congress" };
 const URL_TAB = { ...Object.fromEntries(Object.entries(TAB_URL).map(([tab, url]) => [url, tab])), charts: "charts" };
 const DETAIL_KINDS = new Set(["bill", "member", "vote"]);
 

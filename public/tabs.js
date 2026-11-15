@@ -15,6 +15,7 @@ const viewBills = document.getElementById("view-bills");
 const viewVotes = document.getElementById("view-votes");
 const viewMembers = document.getElementById("view-members");
 const viewMethodology = document.getElementById("view-methodology");   // no tab-bar button
+const viewProcess = document.getElementById("view-process");           // no tab-bar button (#how-laws-are-made)
 const viewWeek = document.getElementById("view-week");                 // no tab-bar button (#week/<Monday>)
 const viewCharts = document.getElementById("view-charts");             // "This Congress" (#congress)
 
@@ -22,7 +23,7 @@ const viewCharts = document.getElementById("view-charts");             // "This 
 export const onTabOpen = {};
 
 // Which tab is showing (for modules that only update the URL while they're visible).
-export const activeTab = () => Object.entries({ overview: viewOverview, issues: viewIssues, bills: viewBills, votes: viewVotes, members: viewMembers, methodology: viewMethodology, week: viewWeek, charts: viewCharts })
+export const activeTab = () => Object.entries({ overview: viewOverview, issues: viewIssues, bills: viewBills, votes: viewVotes, members: viewMembers, methodology: viewMethodology, process: viewProcess, week: viewWeek, charts: viewCharts })
   .find(([, v]) => v && !v.classList.contains("hidden"))?.[0] || "overview";
 
 const TAB_BASE = "nav-tab py-3.5 text-sm sm:text-base font-semibold whitespace-nowrap border-b-2 focus:outline-none focus-visible:text-gray-900";
@@ -32,7 +33,7 @@ const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-8
 // `push`: record it in browser history / the URL (false when the router is applying
 // a URL, e.g. Back/Forward or a pasted link).
 export function switchTab(tabName, { push = true } = {}) {
-  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers], methodology: [null, viewMethodology], week: [null, viewWeek], charts: [navCongress, viewCharts] };
+  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers], methodology: [null, viewMethodology], process: [null, viewProcess], week: [null, viewWeek], charts: [navCongress, viewCharts] };
   for (const [name, [nav, view]] of Object.entries(tabs)) {
     const active = name === tabName;
     if (nav) {

@@ -119,7 +119,7 @@
     <section id="view-bills" class="tab-view hidden">
       <div class="mb-6">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Bills</h2>
-        <p class="text-sm text-gray-500">Where each bill stands, from introduced to law, with a plain-language summary of the official one. Most bills never get a vote, so this starts with the ones that have moved.</p>
+        <p class="text-sm text-gray-500">Where each bill stands, from introduced to law, with a plain-language summary of the official one. Most bills never get a vote, so this starts with the ones that have moved. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a></p>
       </div>
       <div id="bill-scope-filters" class="flex flex-wrap gap-2 mb-2" role="group" aria-label="Which bills">
         <button type="button" data-scope="moving" class="filter-chip">Moving or passed</button>
@@ -234,6 +234,89 @@
 
     <section id="view-week" class="tab-view hidden">
       <div id="week-container" class="min-h-[300px]"></div>
+    </section>
+
+    <!-- How a bill becomes law (#how-laws-are-made; no tab-bar button). Linked from the
+         stage tracker, the glossary, the Bills tab and This Congress. Our own words. -->
+    <section id="view-process" class="tab-view hidden">
+      <div class="max-w-3xl">
+        <h2 class="font-serif text-3xl font-bold text-gray-900">How a bill becomes law</h2>
+        <p class="text-gray-600 mt-2">The steps every bill takes, what each one means, and where you'll see it on this site. Most bills stop at step 2: in the 118th Congress (2023–24), <strong>16,565</strong> bills were introduced, <strong>962</strong> passed the House or the Senate, <strong>290</strong> passed both and <strong>274</strong> became law.</p>
+
+        <ol class="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-sm" aria-label="The steps in short">
+          <li class="px-3 py-1.5 rounded-full bg-surface border border-gray-200">1 · Introduced</li>
+          <li class="px-3 py-1.5 rounded-full bg-surface border border-gray-200">2 · Committee</li>
+          <li class="px-3 py-1.5 rounded-full bg-surface border border-gray-200">3 · First chamber votes</li>
+          <li class="px-3 py-1.5 rounded-full bg-surface border border-gray-200">4 · Second chamber votes</li>
+          <li class="px-3 py-1.5 rounded-full bg-surface border border-gray-200">5 · Same text in both</li>
+          <li class="px-3 py-1.5 rounded-full bg-surface border border-gray-200">6 · The President</li>
+          <li class="px-3 py-1.5 rounded-full bg-surface border border-gray-200">7 · Law</li>
+        </ol>
+
+        <ol class="mt-8 space-y-8">
+          <li class="relative pl-12">
+            <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">1</span>
+            <h3 class="font-serif text-xl font-bold text-gray-900">Introduced</h3>
+            <div class="text-gray-700 mt-1 space-y-2"><p>Any member can introduce a bill in their own chamber. It gets the next number: H.R. for House bills, S. for Senate bills. A bill has one sponsor and often many cosponsors who sign on to show support.</p></div>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> every bill page shows its sponsor and cosponsor count; the stage tracker starts here.</p>
+          </li>
+          <li class="relative pl-12">
+            <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">2</span>
+            <h3 class="font-serif text-xl font-bold text-gray-900">Committee</h3>
+            <div class="text-gray-700 mt-1 space-y-2"><p>The bill is sent to the <button type="button" data-term="committee" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">committee</button> (or committees) for its subject. Committees hold hearings, rewrite bills in a <button type="button" data-term="markup" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">markup</button>, and decide which ones to send to the full chamber (<button type="button" data-term="reported" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">report</button> them). <strong>This is where most bills stop</strong>: not voted down, just never taken up.</p></div>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> most bills show &ldquo;In committee&rdquo;. The Bills tab starts with &ldquo;Moving or passed&rdquo; for that reason.</p>
+          </li>
+          <li class="relative pl-12">
+            <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">3</span>
+            <h3 class="font-serif text-xl font-bold text-gray-900">A vote in the first chamber</h3>
+            <div class="text-gray-700 mt-1 space-y-2"><p><strong>In the House</strong>, most important bills come to the floor under a <button type="button" data-term="rule" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">rule</button>: a resolution, adopted by majority vote first, that sets how long debate lasts and which amendments are allowed. Less controversial bills use a fast track, <button type="button" data-term="suspension" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">suspension of the rules</button>, which needs two-thirds to pass.</p><p><strong>In the Senate</strong>, any senator can keep debate going. Ending it takes <button type="button" data-term="cloture" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">cloture</button>: 60 votes for most legislation. Many bills instead pass by <button type="button" data-term="unanimous_consent" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">unanimous consent</button>, with no recorded vote at all.</p><p>Along the way there may be votes on <button type="button" data-term="amendment" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">amendments</button>, a <button type="button" data-term="recommit" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">motion to recommit</button> or a <button type="button" data-term="table" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">motion to table</button>. Only the final vote decides whether the bill passes.</p></div>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> the Votes tab&rsquo;s &ldquo;Key votes&rdquo; are those final votes; &ldquo;All roll calls&rdquo; adds the steps on the way. Bills passed by voice vote or unanimous consent have no roll call; their page says so.</p>
+          </li>
+          <li class="relative pl-12">
+            <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">4</span>
+            <h3 class="font-serif text-xl font-bold text-gray-900">The other chamber</h3>
+            <div class="text-gray-700 mt-1 space-y-2"><p>The bill goes to the other chamber, which starts again: committee, then the floor. It can pass the bill as it is, change it, or never take it up.</p></div>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> the tracker shows &ldquo;Passed in the House; next: the Senate&rdquo; (or the reverse).</p>
+          </li>
+          <li class="relative pl-12">
+            <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">5</span>
+            <h3 class="font-serif text-xl font-bold text-gray-900">Agreeing on the same text</h3>
+            <div class="text-gray-700 mt-1 space-y-2"><p>Both chambers must pass exactly the same text. If the second chamber changed it, the first can <button type="button" data-term="concur" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">agree to (concur in)</button> the changes, the chambers can trade amendments, or a conference committee of members from both writes a compromise that each chamber then votes on.</p></div>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> votes to concur show as &ldquo;agreed to the Senate&rsquo;s changes to &hellip;&rdquo;.</p>
+          </li>
+          <li class="relative pl-12">
+            <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">6</span>
+            <h3 class="font-serif text-xl font-bold text-gray-900">The President</h3>
+            <div class="text-gray-700 mt-1 space-y-2"><p>The final, <button type="button" data-term="enrolled" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">enrolled</button> bill is <button type="button" data-term="presented" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">presented to the President</button>, who has 10 days (Sundays excepted) to sign it or <button type="button" data-term="veto" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">veto</button> it. If the President does neither, it becomes law without a signature, unless Congress has adjourned in the meantime: then it doesn&rsquo;t (a &ldquo;pocket veto&rdquo;).</p><p>Congress can override a veto with a two-thirds vote in both chambers.</p></div>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> the tracker&rsquo;s &ldquo;To the President&rdquo; step; a veto shows in red, and override votes read &ldquo;voted to override the veto of &hellip;&rdquo;.</p>
+          </li>
+          <li class="relative pl-12">
+            <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">7</span>
+            <h3 class="font-serif text-xl font-bold text-gray-900">Law</h3>
+            <div class="text-gray-700 mt-1 space-y-2"><p>A signed (or overridden) bill becomes a <button type="button" data-term="public_law" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">public law</button>, numbered by Congress and order: Public Law 119-60 is the 60th law of the 119th Congress. A Congress lasts two years; bills that haven&rsquo;t passed by then die and must be introduced again. Many laws are signed in a term&rsquo;s last weeks.</p></div>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> &ldquo;Became law&rdquo; on bill pages, Home&rsquo;s &ldquo;Recently became law&rdquo;, and the laws chart on This Congress.</p>
+          </li>
+        </ol>
+
+        <section class="mt-10">
+          <h3 class="font-serif text-2xl font-bold text-gray-900">Not every measure is a bill</h3>
+          <ul class="list-disc pl-5 mt-2 space-y-1.5 text-gray-700">
+            <li><strong>Joint resolutions</strong> (H.J.Res., S.J.Res.) work like bills and can become law. One exception: a joint resolution <strong>proposing a constitutional amendment</strong> needs two-thirds of both chambers, skips the President and goes to the states; three-fourths of them (38) must ratify it.</li>
+            <li><strong>Concurrent resolutions</strong> (H.Con.Res., S.Con.Res.) pass both chambers but don&rsquo;t go to the President and aren&rsquo;t law: the budget resolution, for example.</li>
+            <li><strong>Simple resolutions</strong> (H.Res., S.Res.) concern one chamber only: its own rules, honors, or the terms of debate for a bill.</li>
+          </ul>
+        </section>
+
+        <section class="mt-10">
+          <h3 class="font-serif text-2xl font-bold text-gray-900">How votes are taken</h3>
+          <ul class="list-disc pl-5 mt-2 space-y-1.5 text-gray-700">
+            <li>A <button type="button" data-term="roll_call" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">roll-call vote</button> records how each member voted (Yea, Nay, Present or Not Voting). Those are the votes this site shows member by member.</li>
+            <li>A <button type="button" data-term="voice_vote" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">voice vote</button> or <button type="button" data-term="unanimous_consent" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">unanimous consent</button> records only the result, so there&rsquo;s no member-by-member record.</li>
+            <li>Most votes need a simple majority of those voting. The exceptions: two-thirds for suspension of the rules, veto overrides and constitutional amendments; 60 senators for most cloture votes.</li>
+          </ul>
+          <p class="text-sm text-gray-500 mt-4">Terms with a dotted underline explain themselves when tapped; all of them are in the <a href="#methodology" class="text-accent hover:underline">glossary on How we count</a>. See where this Congress stands on <a href="#congress" class="text-accent hover:underline">This Congress</a>.</p>
+        </section>
+      </div>
     </section>
 
     <section id="view-methodology" class="tab-view hidden">
@@ -355,7 +438,7 @@
 
           <section id="glossary">
             <h3>Glossary</h3>
-            <p>Terms from the official record, in plain words. Wherever one appears underlined with dots on the site, tap it for the same explanation.</p>
+            <p>Terms from the official record, in plain words. Wherever one appears underlined with dots on the site, tap it for the same explanation. For how they fit together, see <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a>.</p>
             <div id="glossary-list" class="mt-3 text-sm"></div>
           </section>
         </div>
@@ -374,6 +457,7 @@
         <p id="data-asof" class="mt-3 text-xs"></p>
         <p class="mt-3 flex flex-wrap gap-x-5 gap-y-1">
           <a href="#methodology" class="underline decoration-accent/50 hover:text-white">How we count</a>
+          <a href="#how-laws-are-made" class="underline decoration-accent/50 hover:text-white">How a bill becomes law</a>
           <a href="#" data-report-error class="underline decoration-accent/50 hover:text-white">Report an error</a>
         </p>
       </div>

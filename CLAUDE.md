@@ -752,6 +752,19 @@ stats/overview (monthly party split).
   itself (first 60 days). Once the 119th's tail is over (mid-February 2027), run
   `build-congress-stats.js --congress 119 --write` to freeze its final figures.
 
+## Phone detail windows + How a bill becomes law (2026-11-15)
+
+- Detail windows on phones: full height (`100dvh`), Back / Copy link / Close on their own
+  row and the title full width below (flex `order`, so each control exists once and focus
+  handling is unchanged), 44 px close/back targets, short tab names (`SHORT_TAB`: Votes,
+  Bills, Finance, Members; full names from `sm` up). Header + tabs stay fixed above the
+  scrolling panel. Vote window title = plain headline, official question below.
+- `#how-laws-are-made` (index.html `view-process`, tab key `process`, no tab button): the
+  seven steps (matching the stage tracker), kinds of measures, how votes are taken, with
+  "On this site" notes and tap-to-explain terms; 118th figures (16,565 / 962 / 290 / 274)
+  are its verified final totals. Linked from the stage tracker, Bills lead, This Congress
+  funnel, the glossary and the footer.
+
 ## Link previews and search (2026-11-15)
 
 Nothing after "#" reaches a server, so previews and search engines only saw the home page.

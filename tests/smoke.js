@@ -87,7 +87,8 @@ const openDetail = (kind, id) => page.evaluate(([k, i]) => {
   b.dataset.open = k; b.dataset.id = i;
   document.body.appendChild(b); b.click(); b.remove();
 }, [kind, id]);
-const modalTab = name => page.locator('#modal-root button', { hasText: new RegExp(`^${name}$`) }).first().click();
+// Tabs carry a short name for phones and the full one (both in the text), so match by inclusion.
+const modalTab = name => page.locator('#modal-root [role="tab"]', { hasText: name }).first().click();
 const closeModal = () => page.keyboard.press('Escape');
 
 try {
@@ -246,6 +247,8 @@ try {
   }
   await page.click('footer a[href="#methodology"]');
   await waitText('#view-methodology', /How we count[\s\S]*Party agreement[\s\S]*Campaign finance/, 'Footer link opens How we count');
+  await page.click('footer a[href="#how-laws-are-made"]');
+  await waitText('#view-process', /How a bill becomes law[\s\S]*Committee[\s\S]*The President[\s\S]*Not every measure is a bill/, 'Footer link opens How a bill becomes law');
 
   if (LIVE) {
     // A law passed without roll calls: the Votes tab says how it passed (not "not synced").

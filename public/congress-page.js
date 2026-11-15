@@ -212,7 +212,7 @@ export function renderCongressPage(el, { docs, cur, overview }) {
         </details>`)}
 
       ${card("congress-funnel", "From bill to law",
-        `Most bills never get a vote. So far in the ${ordinal(cur)} Congress, about <strong>1 in ${oneIn(intro, one)}</strong> bills introduced has passed the House or the Senate, and about <strong>1 in ${oneIn(intro, laws)}</strong> has become law. Bars are drawn to scale.`,
+        `Most bills never get a vote. So far in the ${ordinal(cur)} Congress, about <strong>1 in ${oneIn(intro, one)}</strong> bills introduced has passed the House or the Senate, and about <strong>1 in ${oneIn(intro, laws)}</strong> has become law. Bars are drawn to scale. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a>`,
         funnel)}
 
       ${card("congress-votes", "Roll-call votes over the term",
