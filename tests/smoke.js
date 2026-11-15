@@ -36,7 +36,10 @@ function serve(dir) {
 }
 
 const failures = [];
-const check = (ok, what) => { console.log(`${ok ? '✓' : '✗'} ${what}`); if (!ok) failures.push(what); };
+// In GitHub Actions each failure is also an annotation: readable on the run page and via
+// the public check-runs API without signing in (step logs need a login).
+const annotate = what => { if (process.env.GITHUB_ACTIONS) console.log(`::error title=Smoke test::${String(what).replace(/\r?\n/g, '%0A').slice(0, 2000)}`); };
+const check = (ok, what) => { console.log(`${ok ? '✓' : '✗'} ${what}`); if (!ok) { failures.push(what); annotate(what); } };
 
 const server = LIVE ? null : await serve('public');
 const url = LIVE || `http://127.0.0.1:${server.address().port}/`;
