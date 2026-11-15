@@ -102,7 +102,7 @@ export function renderCongressPage(el, { docs, cur, overview }) {
   const lateShare = c => { const all = totalOf(c); return all ? Math.round((all - at(c, "laws", null, N)) / all * 100) : null; };
   const lede = `${fmt(at(cur, "laws"))} laws and ${fmt(votesAt(cur))} roll-call votes in ${fmt(N)} days.` +
     (past.length ? ` Compared with the last ${past.length === 2 ? "two Congresses" : "Congress"} at this point: laws ${rel(at(cur, "laws"), past.map(c => at(c, "laws")))}, roll calls ${rel(votesAt(cur), past.map(c => votesAt(c)))}.` : "") +
-    (!D.final && past.length ? ` But the final weeks matter most: ${past.map(c => `the ${ordinal(c)} signed <strong>${lateShare(c)}%</strong> of its laws after this point`).join(", ")}.` : "");
+    (!D.final && past.length ? ` But the final weeks matter most: the ${ordinal(past[0])} signed <strong>${lateShare(past[0])}%</strong> of its laws after this point${past[1] ? `, the ${ordinal(past[1])} <strong>${lateShare(past[1])}%</strong>` : ""}.` : "");
 
   // --- Comparison tiles ---
   const tiles = [
@@ -204,7 +204,7 @@ export function renderCongressPage(el, { docs, cur, overview }) {
       </section>` : ""}
 
       ${card("congress-laws", "Laws enacted over the two-year term",
-        past.length ? `Laws pile up at the end of a term, when Congress passes what it can before it expires. ${past.filter(c => docs[c].final).map(c => `The ${ordinal(c)} had ${fmt(at(c, "laws"))} laws at this point and finished with ${fmt(totalOf(c))}`).join("; ")}.` : "",
+        past.length ? `Laws pile up at the end of a term, when Congress passes what it can before it expires. ${past.filter(c => docs[c].final).map((c, i) => `${i ? "the" : "The"} ${ordinal(c)} had ${fmt(at(c, "laws"))} laws at this point and finished with ${fmt(totalOf(c))}`).join("; ")}.` : "",
         `<div class="mt-4" data-chart="laws"></div>
         <details class="mt-3 text-sm"><summary class="cursor-pointer text-accent">View as table</summary>
           <div class="mt-2 overflow-x-auto"><table class="text-sm tabular-nums"><thead class="text-xs text-gray-500"><tr><th class="text-left pr-6 py-1">Point in term</th>${all.map(c => `<th class="text-right pr-6">${ordinal(c)}</th>`).join("")}</tr></thead>
