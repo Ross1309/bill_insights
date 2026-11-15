@@ -6,7 +6,8 @@
 // recorded floor vote. Bills that never reached the floor aren't counted.
 
 import { TOPICS } from './topics.js';
-import { partyAlignment } from './vote-stats.js';
+import { easternDate, partyAlignment } from './vote-stats.js';
+import { lawSigning } from './digest.js';
 import { ordinal } from './congress.js';
 
 const LABELS = { HR: 'H.R.', S: 'S.', HRES: 'H.Res.', SRES: 'S.Res.', HJRES: 'H.J.Res.', SJRES: 'S.J.Res.', HCONRES: 'H.Con.Res.', SCONRES: 'S.Con.Res.' };
@@ -63,6 +64,14 @@ function stageCounts(measures) {
 }
 
 // bills: enriched bill docs ({ id, ...data }); votesByBill: Map bill_id -> votes (sorted by date)
+function monthlyActivity(votes, measures) {
+  const out = {};
+  const bump = (ym, key) => { if (!ym) return; out[ym] ||= { votes: 0, laws: 0 }; out[ym][key]++; };
+  for (const v of votes) bump(easternDate(v.date).slice(0, 7), 'votes');
+  for (const b of measures) if (b.stage === 'law') bump(String(lawSigning(b) || '').slice(0, 7), 'laws');
+  return out;
+}
+
 export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { congress } = {}) {
   const t = TOPICS[slug];
   const reached = b => b.stage === 'law' || (votesByBill.get(b.id) || []).length > 0;
@@ -121,6 +130,9 @@ export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { 
     policy_areas: t.policyAreas,
     explainers: t.explainers,
     counts: { ...stageCounts(measures), votes: topicVotes.length, beyond_policy_area: beyond.size },
+    // { "2025-03": { votes, laws } }: recorded votes on the topic's measures (Eastern
+    // month) and laws signed; the Issues page's "Month by month".
+    monthly: monthlyActivity(topicVotes, measures),
     laws,
     key_votes: keyVotes,
     agreement,

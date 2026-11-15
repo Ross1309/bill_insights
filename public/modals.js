@@ -10,6 +10,7 @@ import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
 import { explainQuestion } from "./issues.js";
 import { missedLong } from "./participation.js";
+import { memberTrendsHtml } from "./member-trends.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
@@ -99,7 +100,8 @@ const memberModal = {
           ${stat("Not voting", t.not_voting, "bg-yellow-50 border-yellow-100 text-yellow-800")}
         </div>
         ${t.party_comparable ? `<p class="text-sm text-gray-700 mt-3">Voted with the majority of their party on <strong>${t.with_party} of ${t.party_comparable}</strong> votes where they voted Yea or Nay (${Math.round((t.with_party / t.party_comparable) * 100)}%).</p>` : ""}
-        <p class="text-xs text-gray-500 mt-3">Counts cover every recorded vote this Congress, from the House Clerk and senate.gov. Below: the latest ${r.recent.length}.</p>
+        ${memberTrendsHtml(r)}
+        <p class="text-xs text-gray-500 mt-4">Counts cover every recorded vote this Congress, from the House Clerk and senate.gov. Below: the latest ${r.recent.length}.</p>
         <ul class="mt-2 divide-y divide-gray-100">
           ${r.recent.map(v => {
             const bill = voteBillInfo(v);

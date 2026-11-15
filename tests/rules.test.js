@@ -280,3 +280,16 @@ test('missed-vote wording: delegates explained, shares rounded, typical shown', 
   assert.match(long, /Typical House member: 1\.9%/);
   assert.match(long, /doesn't say why/);
 });
+
+test('member trends: shown only when the history covers every vote; words match the data', async () => {
+  const { memberTrendsHtml } = await import('../public/member-trends.js');
+  const monthly = { '2025-01': [20, 2, 15, 18], '2025-02': [10, 0, 9, 10], '2025-04': [30, 9, 25, 28] };
+  const rec = { totals: { votes: 60, not_voting: 11 }, monthly };
+  const html = memberTrendsHtml(rec);
+  assert.match(html, /most votes in April 2025: 9 of 30/);
+  assert.match(html, /between 83% and 90%/);                       // 15/18, 9/10, 25/28
+  assert.match(html, /Mar ’25/);                                   // gap month kept on the axis...
+  assert.doesNotMatch(html, /March 2025: missed/);                  // ...with no bar
+  assert.equal(memberTrendsHtml({ totals: { votes: 61, not_voting: 11 }, monthly }), '');   // incomplete history
+  assert.equal(memberTrendsHtml({ totals: { votes: 20 }, monthly: { '2025-01': [20, 0, 0, 0] } }), '');   // too short
+});

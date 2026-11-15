@@ -130,6 +130,7 @@ try {
 
   await page.click('#nav-issues');
   await waitText('#view-issues', /What the \d+(st|nd|rd|th) Congress has done/, 'Issues tab renders');
+  await waitText('#view-issues', /Month by month[\s\S]*busiest month/, 'Issues: month by month');
   // Back from the first tab switch returns to the Overview (it used to leave the site).
   await page.goBack();
   await page.waitForTimeout(500);
@@ -201,6 +202,7 @@ try {
   await waitText('#modal-root', /Votes this Congress[\s\S]*Missed \d+ of \d+ roll-call votes[\s\S]*Typical House member/, 'Member window shows missed votes with context');
   await modalTab('Voting Record');
   await waitText('#modal-root', /In the \d+(st|nd|rd|th) Congress, voted on \d+ of \d+/, 'Member Voting Record renders');
+  await waitText('#modal-root', /Month by month[\s\S]*Votes missed[\s\S]*Voted with their party/, 'Member Voting Record: month by month');
   if (LIVE) {
     await modalTab('Campaign Finance');
     await waitText('#modal-root', /RAISED|Raised/, 'Campaign Finance renders');

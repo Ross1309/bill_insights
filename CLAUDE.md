@@ -746,6 +746,19 @@ stats/overview (monthly party split).
   itself (first 60 days). Once the 119th's tail is over (mid-February 2027), run
   `build-congress-stats.js --congress 119 --write` to freeze its final figures.
 
+## Trends (2026-11-15)
+
+- **member_votes.monthly** `{ "2025-03": [roll calls, missed, with party, comparable] }`
+  (Eastern month), kept by `mergeMemberDoc` with the same `applied` idempotency as totals;
+  backfilled with `build-member-votes.js --write` (556 docs, all reconcile with totals).
+  Member window, Voting Record: "Month by month" (member-trends.js): share missed + share
+  with party (months with < 5 comparable votes left out), one sentence each, table view.
+  Shown only when the monthly counts add up to the totals (older docs wouldn't).
+- **stats/topic-<slug>.monthly** `{ "2025-03": { votes, laws } }` (topic-stats.js; laws by
+  `lawSigning`). Issues "At a glance": busiest month, last three calendar months, bars.
+- Bars: `bars()` in member-trends.js, a stretchable SVG with HTML axis labels (readable at
+  any width); labeled scales so small values aren't exaggerated.
+
 ## Missed votes (2026-11-15)
 
 Shown on every member card (Members tab, "Your representatives"), at the top of the member

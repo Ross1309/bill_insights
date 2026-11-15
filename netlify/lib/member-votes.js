@@ -5,6 +5,8 @@
 //   { bioguideId, congress, chamber, name, party, state,
 //     totals: { votes, yea, nay, present, not_voting, with_party, party_comparable },
 //     recent: [latest RECENT_MAX entries, newest first],
+//     monthly: { "2025-03": [roll calls, missed, with party, party-comparable] } (Eastern
+//              month of each vote; the member window's trend charts),
 //     applied: [voteKey of every vote counted, e.g. "2h323"], updated_at }
 //
 // Totals cover every vote this Congress. Each vote doc carries `members_applied`
@@ -13,6 +15,7 @@
 
 import { updateVoteIndex, writeVoteSummaries } from './vote-index.js';
 import { bulkWriter } from './firebase.js';
+import { easternDate } from './vote-stats.js';
 
 const POSITION = { yea: 'yea', aye: 'yea', nay: 'nay', no: 'nay', present: 'present', 'not voting': 'not_voting' };
 export const RECENT_MAX = 50;
@@ -44,6 +47,17 @@ export function memberEntry(vote, iv) {
     group,
     party_majority: majority,
   };
+}
+
+// [roll calls, missed, with party, party-comparable] for the entry's month.
+function addToMonthly(monthly, entry) {
+  if (!entry.date) return;
+  const m = easternDate(entry.date).slice(0, 7);
+  const row = monthly[m] || [0, 0, 0, 0];
+  row[0]++;
+  if (entry.group === 'not_voting') row[1]++;
+  if (entry.party_majority) { row[3]++; if (entry.party_majority === entry.group) row[2]++; }
+  monthly[m] = row;
 }
 
 function addToTotals(totals, entry) {
@@ -89,12 +103,14 @@ export function mergeMemberDoc(existing, bioguideId, congress, { entries, info }
   const fresh = !existing || existing.congress !== congress;
   const totals = fresh ? emptyTotals() : { ...emptyTotals(), ...existing.totals };
   const applied = new Set(fresh ? [] : existing.applied || []);
+  const monthly = fresh ? {} : Object.fromEntries(Object.entries(existing.monthly || {}).map(([k, v]) => [k, [...v]]));
   const added = [];
   for (const e of entries) {
     const key = voteKey(e.id);
     if (applied.has(key)) continue;
     applied.add(key);
     addToTotals(totals, e);
+    addToMonthly(monthly, e);
     added.push(e);
   }
   const seen = new Set(fresh ? [] : (existing.recent || []).map(e => e.id));
@@ -109,6 +125,7 @@ export function mergeMemberDoc(existing, bioguideId, congress, { entries, info }
     party: info.party || existing?.party || null,
     state: info.state || existing?.state || null,
     totals,
+    monthly,
     recent,
     applied: [...applied],
   };

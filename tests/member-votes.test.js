@@ -76,3 +76,19 @@ test('mergeMemberDoc: applying the same votes again changes nothing (retry after
   const more = [votes[1], vote('119-2-house-vote-3', '2026-01-12T15:00:00Z', [{ bioguideId: 'A1', party: 'D', position: 'Yea' }], PB_D_YEA_R_NAY)];
   assert.equal(mergeMemberDoc(twice, 'A1', 119, entriesByMember(more).get('A1')).totals.votes, 3);
 });
+
+test('mergeMemberDoc: monthly counts by Eastern month, idempotent', () => {
+  const e = (id, date, group, party_majority = null) => ({ id, date, group, party_majority });
+  const entries = [
+    e('119-1-house-vote-1', '2025-03-10T15:00:00Z', 'yea', 'yea'),
+    e('119-1-house-vote-2', '2025-03-31T23:30:00Z', 'not_voting'),      // still March in Eastern time
+    e('119-1-house-vote-3', '2025-04-01T03:30:00Z', 'nay', 'yea'),      // March 31, 11:30 PM Eastern (EDT)
+    e('119-1-house-vote-4', '2025-04-02T15:00:00Z', 'nay', 'nay'),
+  ];
+  const info = { chamber: 'House' };
+  const doc = mergeMemberDoc(null, 'A1', 119, { entries, info });
+  assert.deepEqual(doc.monthly, { '2025-03': [3, 1, 1, 2], '2025-04': [1, 0, 1, 1] });
+  const again = mergeMemberDoc(doc, 'A1', 119, { entries, info });       // re-applying changes nothing
+  assert.deepEqual(again.monthly, doc.monthly);
+  assert.equal(again.totals.votes, 4);
+});

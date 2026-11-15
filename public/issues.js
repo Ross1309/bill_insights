@@ -8,6 +8,7 @@
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { PARTY_NAMES as PARTY_NAME, STATE_NAMES, escapeHtml as esc, officialLabel, wireTooltip } from "./util.js";
 import { TERMS, termize } from "./glossary.js";
+import { bars, months } from "./member-trends.js";
 
 const C = { succeeded: "#6fa326", failed: "#c04637", accent: "#13a5b2" };
 const PARTY_CHIP = { D: "ring-party-d/70 text-party-d", R: "ring-party-r/70 text-party-r", I: "ring-party-i/60 text-party-i" };
@@ -80,7 +81,40 @@ function glance(s) {
         <p class="text-[11px] text-gray-400 mt-3">Concurrent and simple resolutions don't go to the President, so "passed" is as far as they can go.</p>
       </div>
       <p class="text-xs text-gray-500 mt-2">Most bills are referred to a committee and never get a floor vote. That's normal, and they aren't shown here. <button type="button" class="text-accent hover:underline" data-explain="no-vote">Why most bills never get a vote</button></p>
+      ${monthByMonth(s)}
     </section>`;
+}
+
+// Recorded votes and laws per month on the topic's measures (stats monthly).
+const monthLabel = ym => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+function monthByMonth(s) {
+  const m = s.monthly || {};
+  const keys = months(m);
+  if (keys.length < 3) return "";
+  const v = k => m[k]?.votes || 0, l = k => m[k]?.laws || 0;
+  const busiest = [...keys].sort((a, b) => v(b) - v(a) || b.localeCompare(a))[0];
+  // The last three calendar months (this one included), even if they had no activity.
+  const now = new Date();
+  const recent = [2, 1, 0].map(i => new Date(Date.UTC(now.getFullYear(), now.getMonth() - i, 15)).toISOString().slice(0, 7));
+  const recentVotes = recent.reduce((n, k) => n + v(k), 0), recentLaws = recent.reduce((n, k) => n + l(k), 0);
+  const scale = max => Math.max(2, Math.ceil(max / 2) * 2);
+  const topic = esc(s.label.toLowerCase());
+  return `
+    <div class="mt-5 bg-surface border border-gray-200 rounded-xl p-5">
+      <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Month by month</p>
+      <p class="text-sm text-gray-800 mt-2">The busiest month for ${topic} votes was <strong>${esc(monthLabel(busiest))}</strong>, with ${v(busiest)} recorded vote${v(busiest) === 1 ? "" : "s"}. In the last three months (${esc(monthLabel(recent[0]))} to ${esc(monthLabel(recent[2]))}): ${recentVotes} vote${recentVotes === 1 ? "" : "s"} and ${recentLaws} new law${recentLaws === 1 ? "" : "s"}.</p>
+      <p class="text-sm font-semibold text-gray-800 mt-4">Recorded votes</p>
+      ${bars(keys, k => (m[k] ? v(k) : null), { max: scale(Math.max(...keys.map(v))), unit: "", title: `Recorded votes on ${s.label} measures each month`,
+        label: k => `${monthLabel(k)}: ${v(k)} recorded vote${v(k) === 1 ? "" : "s"}` })}
+      <p class="text-sm font-semibold text-gray-800 mt-4">Laws signed</p>
+      ${bars(keys, k => (l(k) ? l(k) : null), { max: scale(Math.max(...keys.map(l))), unit: "", title: `${s.label} laws signed each month`,
+        label: k => `${monthLabel(k)}: ${l(k)} law${l(k) === 1 ? "" : "s"} signed` })}
+      <details class="mt-2 text-sm"><summary class="cursor-pointer text-accent">View as table</summary>
+        <div class="overflow-x-auto mt-2"><table class="text-xs tabular-nums"><thead class="text-gray-500"><tr><th class="text-left pr-4 py-1">Month</th><th class="text-right pr-4">Recorded votes</th><th class="text-right">Laws signed</th></tr></thead>
+        <tbody>${keys.filter(k => m[k]).map(k => `<tr class="border-t border-gray-200"><td class="pr-4 py-1">${esc(monthLabel(k))}</td><td class="text-right pr-4">${v(k)}</td><td class="text-right">${l(k)}</td></tr>`).join("")}</tbody></table></div>
+      </details>
+      <p class="text-[11px] text-gray-400 mt-2">Votes on the measures counted above (by Eastern date); laws by the date they were signed.</p>
+    </div>`;
 }
 
 function timeline(focused) {
