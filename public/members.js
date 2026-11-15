@@ -4,6 +4,7 @@ import { collection, doc, getDoc, getDocs, limit, query, where } from "https://w
 import { db, memberById } from "./data.js";
 import { PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, ordinal, store } from "./util.js";
 import { activeTab } from "./tabs.js";
+import { currentCongress } from "./congress.js";
 import { replaceTab } from "./router.js";
 
 const membersContainer = document.getElementById("members-container");
@@ -224,12 +225,19 @@ export async function repsFor(state, district) {
 
 // "Your members", remembered in this browser (localStorage, never sent anywhere): the
 // home page shows how they voted on key votes. { code: "WA-7", members: [...] } or null.
+// A lookup saved in an earlier Congress is marked `stale`: members change on January 3
+// and some states' districts were redrawn, so the page asks for the address again
+// instead of showing who used to represent it. (Saves without `congress` are from the
+// 119th, before it was recorded.)
 export function myReps() {
-  try { return JSON.parse(store.get("cw-reps", "null")); } catch { return null; }
+  let saved = null;
+  try { saved = JSON.parse(store.get("cw-reps", "null")); } catch { /* unreadable: treat as none */ }
+  if (saved && (saved.congress || 119) < currentCongress().congress) return { ...saved, stale: true };
+  return saved;
 }
 export function rememberMyReps(state, district, members) {
   store.set("cw-state", state);   // Issues tab: "Members from <state>"
-  store.set("cw-reps", JSON.stringify({ code: districtCode(state, district), state, district,
+  store.set("cw-reps", JSON.stringify({ code: districtCode(state, district), state, district, congress: currentCongress().congress,
     members: members.map(m => ({ id: m.id, name: m.name, chamber: m.chamber, district: m.district ?? null, party: m.party, state: m.state, imageUrl: m.imageUrl || null })) }));
 }
 export function forgetMyReps() { store.set("cw-reps", "null"); }

@@ -171,7 +171,7 @@ let positionsRequest = 0;
 async function showHome(stats) {
   const reps = myReps();
   renderHome(stats, { reps });
-  if (!reps?.members?.length || !stats.this_week?.key_votes?.length) return;
+  if (reps?.stale || !reps?.members?.length || !stats.this_week?.key_votes?.length) return;
   const request = ++positionsRequest;
   const keyIds = new Set(stats.this_week.key_votes.map(v => v.id));
   const positions = new Map();

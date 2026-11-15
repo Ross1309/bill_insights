@@ -49,7 +49,9 @@ function repsCard(reps) {
   return `
     <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col" aria-labelledby="home-reps-title">
       <h2 id="home-reps-title" class="text-xs font-semibold uppercase tracking-wide text-pink">Who represents me?</h2>
-      ${reps?.members?.length ? `
+      ${reps?.stale ? `
+        <p class="text-sm text-gray-600 mt-1">A new Congress began on January 3, and some states' district maps changed. Enter your address again to see your current senators and representative.</p>${form}`
+      : reps?.members?.length ? `
         <p class="text-sm text-gray-600 mt-1">Your members for ${esc(reps.code)}${reps.state && STATE_NAMES[reps.state] ? ` (${esc(STATE_NAMES[reps.state])}${reps.district ? `'s ${esc(ordinal(reps.district))} district` : ""})` : ""}:</p>
         <div class="mt-3 space-y-3">${reps.members.map(memberRow).join("")}</div>
         <div class="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -62,13 +64,16 @@ function repsCard(reps) {
 }
 
 // --- Card 2: this week -------------------------------------------------------------
+// The card shows the latest week with votes or laws; in a recess (or around January 3)
+// that's an earlier week, so it isn't called "this week". `monday` is "YYYY-MM-DD".
+const isThisWeek = monday => Date.now() - new Date(`${monday}T00:00:00-05:00`).getTime() < 7 * 86400e3;
 function weekCard(tw) {
   if (!tw) return `<article class="bg-surface border border-gray-200 rounded-2xl p-5"><p class="text-sm text-gray-500">The weekly summary isn't available yet.</p></article>`;
   const stat = (n, label) => `<div class="bg-gray-50/60 rounded-lg py-2 text-center"><p class="font-serif text-2xl font-bold text-gray-900 tabular-nums">${num(n)}</p><p class="text-[11px] text-gray-600">${label}</p></div>`;
   const items = (tw.passed_items || []).map(v => ({ ...v, outcome: "succeeded" }));
   return `
     <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col" aria-labelledby="home-week-title">
-      <h2 id="home-week-title" class="text-xs font-semibold uppercase tracking-wide text-pink">This week in Congress · ${esc(weekRange(tw))}</h2>
+      <h2 id="home-week-title" class="text-xs font-semibold uppercase tracking-wide text-pink">${isThisWeek(tw.week) ? "This week" : "Latest week"} in Congress · ${esc(weekRange(tw))}</h2>
       <div class="grid grid-cols-3 gap-2 mt-3">${stat(tw.votes.House + tw.votes.Senate, "roll-call votes")}${stat(tw.passed, "passed by roll call")}${stat(tw.law_count, "became law")}</div>
       ${items.length ? `<ul class="mt-4 space-y-2.5 text-sm">${items.map(v => `
         <li><span class="text-gray-900">${esc(voteHeadline(v))}</span>

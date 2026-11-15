@@ -7,6 +7,7 @@ import { escapeHtml as esc, STATE_NAMES } from "./util.js";
 import { getOverviewDoc } from "./data.js";
 import { loadDirectory } from "./members.js";
 import { switchTab } from "./tabs.js";
+import { currentCongress, ordinal } from "./congress.js";
 
 const fold = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const BILL = /^(h\.?\s*r\.?|s\.?|h\.?\s*res\.?|s\.?\s*res\.?|h\.?\s*j\.?\s*res\.?|s\.?\s*j\.?\s*res\.?|h\.?\s*con\.?\s*res\.?|s\.?\s*con\.?\s*res\.?)\s*(\d{1,5})$/i;
@@ -21,11 +22,14 @@ async function compute(term) {
   const t = fold(term);
   const stats = (await getOverviewDoc().catch(() => null))?.data?.() || {};
 
+  // A bill number means this Congress's bill (from the date: early in a new Congress the
+  // stats still describe the previous one).
   const b = BILL.exec(term.trim());
-  if (b && stats.congress) {
+  if (b) {
+    const { congress } = currentCongress();
     const type = b[1].replace(/[.\s]/g, "").toUpperCase();
-    const id = `${type.toLowerCase()}${b[2]}-${stats.congress}`;
-    out.push({ kind: "Bill", text: `${BILL_LABEL[type] || type} ${b[2]}`, sub: `${stats.congress}th Congress`, attrs: `data-open="bill" data-id="${esc(id)}"` });
+    const id = `${type.toLowerCase()}${b[2]}-${congress}`;
+    out.push({ kind: "Bill", text: `${BILL_LABEL[type] || type} ${b[2]}`, sub: `${ordinal(congress)} Congress`, attrs: `data-open="bill" data-id="${esc(id)}"` });
   }
 
   try {

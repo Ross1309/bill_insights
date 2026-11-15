@@ -82,7 +82,10 @@ export function voteKey(id) {
 // Merge new entries into an existing member doc (or start fresh for a new Congress).
 // Idempotent: `applied` lists every vote already counted, so re-applying a vote (a run
 // that failed after writing member docs but before flagging the votes) changes nothing.
+// Returns null when the doc already belongs to a newer Congress: a late vote of the
+// outgoing Congress (applied after January 3) must not reset a member's new record.
 export function mergeMemberDoc(existing, bioguideId, congress, { entries, info }) {
+  if (existing && Number(existing.congress) > Number(congress)) return null;
   const fresh = !existing || existing.congress !== congress;
   const totals = fresh ? emptyTotals() : { ...emptyTotals(), ...existing.totals };
   const applied = new Set(fresh ? [] : existing.applied || []);
@@ -127,9 +130,12 @@ export async function applyNewMemberVotes(db, admin, congress) {
 
   const now = admin.firestore.FieldValue.serverTimestamp();
   const writer = bulkWriter(db);
+  let written = 0;
   ids.forEach((id, i) => {
     const doc = mergeMemberDoc(existing[i].exists ? existing[i].data() : null, id, congress, byMember.get(id));
+    if (!doc) return;   // record already moved on to the next Congress
     writer.set(refs[i], { ...doc, updated_at: now });
+    written++;
   });
   await writer.close();
   await updateVoteIndex(db, admin, votes);
@@ -138,5 +144,5 @@ export async function applyNewMemberVotes(db, admin, congress) {
   const flag = bulkWriter(db);
   for (const d of snap.docs) flag.update(d.ref, { members_applied: true });
   await flag.close();
-  return { votes: votes.length, members: ids.length };
+  return { votes: votes.length, members: written };
 }

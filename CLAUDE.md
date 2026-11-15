@@ -106,6 +106,8 @@ netlify/lib/vote-index.js          vote_index docs: compact fields of every vote
 netlify/lib/health.js              recordRun(): stats/health, latest run of each scheduled sync
 netlify/lib/tracked-bills.js       sync_state/tracked: enriched bill ids + stored laws (markTracked)
 scripts/build-tracked-bills.js     Rebuild sync_state/tracked from `bills` [--write]
+scripts/rehearse.js                Dry run of a nightly job as of any date (writes recorded, not sent)
+public/congress.js                 currentCongress/outgoingCongress/today, shared by page and server
 netlify/lib/http.js                fetchWithRetry/getJson/getText (timeouts, retries, key masking), json()
 netlify/lib/pool.js                pool(items, concurrency, fn), shared by functions and scripts
 scripts/build-member-votes.js      Rebuild member_votes + vote_index from full votes [--write] [--congress N]
@@ -368,10 +370,22 @@ per-state `members` query and says nationwide search is unavailable.
   plan allows 2 rules, both used; rate-limited functions need explicit paths, hence
   `/api/...`) and `member-finance` set durable `Netlify-CDN-Cache-Control` (404s 1 h).
   `find-district` is POST-only, uncached, unlimited.
-- **Congress rollover (Jan 3):** `currentCongress()` derives it from the date; nothing
-  hard-codes 119. Stats keep describing the previous Congress until the new one has
-  `MIN_VOTES_TO_DISPLAY` (25) votes. member_votes reset per Congress. find-district picks
-  the new district map by itself (reorder its `VINTAGES` then).
+- **Congress rollover (Jan 3):** `currentCongress()` (public/congress.js, shared with the
+  page) derives it from the date per run; nothing hard-codes 119. Stats keep describing
+  the previous Congress until the new one has `MIN_VOTES_TO_DISPLAY` (25) votes; when they
+  switch, the week list is rebuilt for the new Congress. For `TAIL_DAYS` (45) after Jan 3,
+  `outgoingCongress()` makes ingest-votes also fetch + apply the old Congress's last votes
+  and sync-bills check its laws (signed after it ended). `mergeMemberDoc` never applies an
+  older Congress's vote to a newer member record. Senate votes with a senator we can't map
+  yet (newly sworn in) wait up to 7 days. Home asks for the address again when the saved
+  lookup is from an earlier Congress (`cw-reps.congress`); header search uses the date's
+  Congress. find-district: ACS2026_Current already has the 120th layer (checked 2026-11-14);
+  reorder `VINTAGES` after Jan 3 to save a request.
+- **Rehearsed 2026-11-14** with `node scripts/rehearse.js --date 2027-01-04T10:00:00Z
+  ingest|sync-bills|stats`: the real jobs, real reads, writes recorded not sent (a canary
+  write aborts if anything would reach Firestore), OpenAI blocked. All three ran cleanly;
+  the switch-over cases with 120th votes are in tests/rollover.test.js. Re-run it before
+  any risky change to a nightly job.
 - **Tracked bills stay current:** `sync-bills` re-enriches every tracked bill Congress.gov
   changed since `sync_state/bills.last_refresh`, plus new laws (≤60/run), then rebuilds
   stats. The list comes oldest first with dates only; with a backlog the window moves to

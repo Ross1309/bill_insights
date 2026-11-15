@@ -21,7 +21,7 @@ import {
   listLawBillIds,
   parseBillId,
 } from '../lib/bills.js';
-import { currentCongress } from '../lib/congress.js';
+import { currentCongress, outgoingCongress } from '../lib/congress.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { recordRun } from '../lib/health.js';
 import { loadTracked, markTracked } from '../lib/tracked-bills.js';
@@ -51,7 +51,9 @@ async function refreshTrackedBills(db, admin, apiKey, skipIds, timeLeft) {
 
   const [{ bills: updated, truncated }, lawIds] = await Promise.all([
     listBillsUpdatedSince(since, apiKey),
-    listLawBillIds(currentCongress().congress, apiKey),
+    // New laws of this Congress, and of the outgoing one for a few weeks after January
+    // 3 (the President signs its last bills after it ends).
+    Promise.all([currentCongress().congress, outgoingCongress()].filter(Boolean).map(c => listLawBillIds(c, apiKey))).then(l => l.flat()),
   ]);
   const updateDateOf = new Map(updated.map(b => [b.id, b.updateDate]));
   const lawSet = new Set(lawIds);

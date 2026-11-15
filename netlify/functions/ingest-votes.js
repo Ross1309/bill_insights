@@ -6,7 +6,7 @@ import { listSenateVotes, fetchSenateVote, senateVoteId, fillUnmappedSenators, s
 import { listHouseVotes, buildHouseVoteDoc, houseVoteId } from '../lib/house-votes.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
-import { currentCongress } from '../lib/congress.js';
+import { currentCongress, outgoingCongress, today } from '../lib/congress.js';
 import { applyNewMemberVotes } from '../lib/member-votes.js';
 import { loadVoteIndex } from '../lib/vote-index.js';
 import { recordRun } from '../lib/health.js';
@@ -15,13 +15,13 @@ import { pool } from '../lib/pool.js';
 
 const db = getDb();
 const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
-// Current Congress from the date (rolls over on January 3 of odd years).
-const CONGRESS_NUM = currentCongress().congress;
 const API = 'https://api.congress.gov/v3';
 // Every vote not yet stored is fetched (newest first), up to this many per chamber
 // per run so the scheduled function stays inside its 30 s limit; any remainder is
 // picked up the next night. Busy days have had 24 votes in one chamber.
 const MAX_NEW_VOTES_PER_CHAMBER = 40;
+// How long a Senate vote with senators we can't identify yet waits (see syncSenateVotes).
+const HOLD_UNMAPPED_DAYS = 7;
 
 // Netlify's scheduler sends a body with `next_run`; run-ingest.js doesn't, and `netlify
 // dev` (which imitates the scheduler) sets NETLIFY_DEV. Only real scheduled runs count.
@@ -51,22 +51,42 @@ export async function handler(event, context) {
       console.error("Member sync failed:", err);
     }
 
+    // Current Congress from the date, per run (a warm instance can outlive January 3).
+    // For TAIL_DAYS after a new Congress begins, the outgoing one is finished too: votes
+    // from its last days that the House list or senate.gov publish late.
+    const { congress: CONGRESS_NUM, session } = currentCongress();
+    const outgoing = outgoingCongress();
+    const jobs = [];
+    for (const c of outgoing ? [CONGRESS_NUM, outgoing] : [CONGRESS_NUM]) {
+      const indexed = new Set((await loadVoteIndex(db, c) || []).map(v => v.id));
+      // In session 2, last session's Senate list is final once January is over (the
+      // Senate can still vote in session 1 until January 3), so it's only fetched in
+      // January or when none of its votes are indexed yet. The outgoing Congress: its
+      // second session only.
+      const hasSession1 = [...indexed].some(id => id.startsWith(`${c}-1-senate-`));
+      const sessions = c !== CONGRESS_NUM ? [2]
+        : session === 2 ? (today().getUTCMonth() === 0 || !hasSession1 ? [2, 1] : [2]) : [1];
+      const tag = c === CONGRESS_NUM ? "" : ` (${c}th)`;
+      jobs.push([`house votes${tag}`, syncHouseVotes(c, indexed)], [`senate votes${tag}`, syncSenateVotes(c, sessions, legislators, indexed)]);
+    }
     // 2 + 3. Latest House and Senate roll-call votes. Independent, so one source
     // failing doesn't block the other.
-    const indexed = new Set((await loadVoteIndex(db, CONGRESS_NUM) || []).map(v => v.id));
-    const results = await Promise.allSettled([syncHouseVotes(indexed), syncSenateVotes(legislators, indexed)]);
-    results.forEach((r, i) => { if (r.status === "rejected") failures.push(`${["house votes", "senate votes"][i]}: ${r.reason?.message || r.reason}`); });
+    const results = await Promise.allSettled(jobs.map(([, p]) => p));
+    results.forEach((r, i) => { if (r.status === "rejected") failures.push(`${jobs[i][0]}: ${r.reason?.message || r.reason}`); });
     failures.forEach(msg => console.error("Sync step failed:", msg));
 
     // 4. Per-member voting records: count every vote not yet applied (incl. any a
-    //    failed earlier run left behind).
+    //    failed earlier run left behind), the outgoing Congress's too.
     let applied = { votes: 0, members: 0 };
-    try {
-      applied = await applyNewMemberVotes(db, admin, CONGRESS_NUM);
-      if (applied.votes) console.log(`Member records: applied ${applied.votes} votes to ${applied.members} members`);
-    } catch (err) {
-      failures.push(`member votes: ${err.message}`);
-      console.error("Member vote records failed:", err);
+    for (const c of outgoing ? [outgoing, CONGRESS_NUM] : [CONGRESS_NUM]) {
+      try {
+        const r = await applyNewMemberVotes(db, admin, c);
+        applied = { votes: applied.votes + r.votes, members: applied.members + r.members };
+        if (r.votes) console.log(`Member records: applied ${r.votes} votes of the ${c}th Congress to ${r.members} members`);
+      } catch (err) {
+        failures.push(`member votes: ${err.message}`);
+        console.error("Member vote records failed:", err);
+      }
     }
 
     // 5. Issue tracker: enrich the bills these votes are on (sync-bills summarizes them).
@@ -92,7 +112,7 @@ export async function handler(event, context) {
       console.error("Stats rebuild failed:", err);
     }
 
-    await recordRun(db, "ingest_votes", { failedSteps: failures.map(m => m.split(":")[0]), counts: { new_votes: applied.votes }, scheduled: isScheduled(event) });
+    await recordRun(db, "ingest_votes", { failedSteps: [...new Set(failures.map(m => m.split(":")[0]))], counts: { new_votes: applied.votes }, scheduled: isScheduled(event) });
     return {
       statusCode: results.every(r => r.status === "rejected") ? 500 : 200,
       body: JSON.stringify({
@@ -112,16 +132,16 @@ export async function handler(event, context) {
 }
 
 // House: every roll call in the Congress.gov list that isn't stored yet.
-export async function syncHouseVotes(indexed) {
-  const all = await listHouseVotes(CONGRESS_NUM, CONGRESS_API_KEY); // newest first
-  const id = v => houseVoteId(CONGRESS_NUM, v.sessionNumber, v.rollCallNumber);
+export async function syncHouseVotes(congress, indexed) {
+  const all = await listHouseVotes(congress, CONGRESS_API_KEY); // newest first
+  const id = v => houseVoteId(congress, v.sessionNumber, v.rollCallNumber);
   const unstored = await unstoredIds(all.map(id), indexed);
   const missing = all.filter(v => unstored.has(id(v)));
   const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
   if (missing.length > todo.length) console.warn(`House: ${missing.length} missing votes; ingesting ${todo.length}, the rest next run`);
   const billIds = [];
   await pool(todo, 5, async voteItem => {
-    const doc = await buildHouseVoteDoc(voteItem, CONGRESS_NUM, CONGRESS_API_KEY);
+    const doc = await buildHouseVoteDoc(voteItem, congress, CONGRESS_API_KEY);
     if (!doc.individual_votes.length) {
       console.warn(`House ${doc.vote_id}: member positions not published yet; will retry next run`);
       return;
@@ -134,18 +154,12 @@ export async function syncHouseVotes(indexed) {
 }
 
 // Senate: every roll call in the senate.gov vote menus that isn't stored yet.
-export async function syncSenateVotes(legislators, indexed) {
+export async function syncSenateVotes(congress, sessions, legislators, indexed) {
   const lisToBioguide = new Map((legislators || [])
     .filter(l => l.id?.lis && l.id?.bioguide)
     .map(l => [l.id.lis, l.id.bioguide]));
 
-  // In session 2, last session's vote list is final once January is over (the Senate
-  // can still vote in session 1 until January 3), so it's only fetched in January or
-  // when none of its votes are indexed yet.
-  const { session } = currentCongress();
-  const hasSession1 = [...indexed].some(id => id.startsWith(`${CONGRESS_NUM}-1-senate-`));
-  const sessions = session === 2 ? (new Date().getUTCMonth() === 0 || !hasSession1 ? [2, 1] : [2]) : [1];
-  const entries = await listSenateVotes(CONGRESS_NUM, sessions); // newest first
+  const entries = await listSenateVotes(congress, sessions); // newest first
   const unstored = await unstoredIds(entries.map(senateVoteId), indexed);
   const missing = entries.filter(e => unstored.has(senateVoteId(e)));
   const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);
@@ -173,6 +187,13 @@ export async function syncSenateVotes(legislators, indexed) {
     }
     if (unmapped) {
       const left = fillUnmappedSenators(doc.individual_votes, lisToBioguide, await loadFallbacks());
+      // A newly sworn-in senator is missing from every source for a few days (congress-
+      // legislators, then our directory). Storing the vote now would leave it off their
+      // record for good, so a recent vote waits; after HOLD_UNMAPPED_DAYS it's stored anyway.
+      if (left && today() - Date.parse(doc.date) < HOLD_UNMAPPED_DAYS * 86400e3) {
+        console.warn(`Senate vote ${doc.vote_id}: ${left} senator(s) not mapped yet; will retry next run`);
+        return;
+      }
       if (left) console.warn(`Senate vote ${doc.vote_id}: ${left} senator(s) without a bioguide mapping`);
       else console.log(`Senate vote ${doc.vote_id}: mapped ${unmapped} senator(s) via the historical file or name + state`);
     }

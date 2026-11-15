@@ -9,7 +9,7 @@
 import { computeOverview } from './vote-stats.js';
 import { computeTopicStats } from './topic-stats.js';
 import { TOPICS } from './topics.js';
-import { MIN_VOTES_TO_DISPLAY } from './congress.js';
+import { MIN_VOTES_TO_DISPLAY, today as todayDate } from './congress.js';
 import { loadVoteIndex } from './vote-index.js';
 import { computeWeeks, weekSummary, thisWeek, isActiveWeek, recentLaws } from './digest.js';
 import { easternDate, weekStart, addDays } from './vote-stats.js';
@@ -77,7 +77,12 @@ export async function writeOverviewStats(db, admin, { congress, allWeeks = false
 // Reads: the Congress's laws (~140, small fields) + titles of the bills voted on in
 // the recomputed weeks. Returns { written, thisWeek }.
 async function writeDigest(db, now, votes, congress, allWeeks) {
-  const today = weekStart(easternDate(new Date().toISOString()));
+  // The list belongs to another Congress (the stats just switched to the new one): build
+  // all of its weeks, not just the last few, or its earlier weeks would be missing.
+  const listRef = db.collection('stats').doc('weeks');
+  const listed = allWeeks ? null : (await listRef.get()).data() || null;
+  if (listed && listed.congress !== congress) allWeeks = true;
+  const today = weekStart(easternDate(todayDate().toISOString()));
   const onlyWeeks = allWeeks ? null : new Set(Array.from({ length: RECENT_WEEKS }, (_, i) => addDays(today, -7 * i)));
   const inScope = v => v.date && (!onlyWeeks || onlyWeeks.has(weekStart(easternDate(v.date))));
 
@@ -96,8 +101,7 @@ async function writeDigest(db, now, votes, congress, allWeeks) {
   for (const w of weeks.values()) await db.collection('stats').doc(`week-${w.week}`).set({ ...w, generated_at: now });
 
   // The list of weeks: recomputed ones replace their old entries.
-  const listRef = db.collection('stats').doc('weeks');
-  const old = allWeeks ? [] : ((await listRef.get()).data()?.weeks || []).filter(e => !weeks.has(e.week) && e.congress === congress);
+  const old = allWeeks ? [] : (listed?.weeks || []).filter(e => !weeks.has(e.week) && e.congress === congress);
   const list = [...old, ...[...weeks.values()].filter(isActiveWeek).map(w => ({ ...weekSummary(w), congress }))]
     .sort((a, b) => a.week.localeCompare(b.week));
   await listRef.set({ congress, weeks: list, generated_at: now });
