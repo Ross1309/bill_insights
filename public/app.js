@@ -2,7 +2,7 @@
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { renderIssue } from "./issues.js";
 import { renderOverview } from "./overview.js";
-import { db, getFirestoreDoc, getOverviewDoc, getVote } from "./data.js";
+import { db, getFirestoreDoc, getOverviewDoc, getVote, loadParticipation } from "./data.js";
 import { escapeHtml, store } from "./util.js";
 import { activeTab, navBills, navCongress, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
 import { renderCongressPage } from "./congress-page.js";
@@ -172,7 +172,9 @@ async function loadHome() {
 let positionsRequest = 0;
 async function showHome(stats) {
   const reps = myReps();
-  renderHome(stats, { reps });
+  // Missed votes of "your members" (one small doc), only once an address was given.
+  const participation = reps?.members?.length && !reps.stale ? await loadParticipation().catch(() => null) : null;
+  renderHome(stats, { reps, participation });
   if (reps?.stale || !reps?.members?.length || !stats.this_week?.key_votes?.length) return;
   const request = ++positionsRequest;
   const keyIds = new Set(stats.this_week.key_votes.map(v => v.id));
@@ -185,7 +187,7 @@ async function showHome(stats) {
       positions.get(e.id).push({ id: m.id, name: m.name, position: e.position || "Not recorded" });
     }
   }));
-  if (request === positionsRequest) renderHome(stats, { reps, positions });
+  if (request === positionsRequest) renderHome(stats, { reps, positions, participation });
 }
 
 // The home page's address form (find your members) and "Change address".

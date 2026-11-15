@@ -8,6 +8,7 @@ import { writeOverviewStats } from '../lib/overview.js';
 import { fetchEnrichedBill, parseBillId } from '../lib/bills.js';
 import { currentCongress, outgoingCongress, today } from '../lib/congress.js';
 import { applyNewMemberVotes } from '../lib/member-votes.js';
+import { writeParticipation } from '../lib/participation.js';
 import { loadVoteIndex } from '../lib/vote-index.js';
 import { recordRun } from '../lib/health.js';
 import { markTracked } from '../lib/tracked-bills.js';
@@ -86,6 +87,18 @@ export async function handler(event, context) {
       } catch (err) {
         failures.push(`member votes: ${err.message}`);
         console.error("Member vote records failed:", err);
+      }
+    }
+
+    // 4b. Missed votes per member (stats/participation): after new votes were counted, or
+    //     when members changed (a new member, someone leaving).
+    if (applied.votes || memberChanges || !lastRun?.ok) {
+      try {
+        const p = await writeParticipation(db, admin, CONGRESS_NUM);
+        console.log(`Participation: ${p.members} members`);
+      } catch (err) {
+        failures.push(`participation: ${err.message}`);
+        console.error("Participation failed:", err);
       }
     }
 

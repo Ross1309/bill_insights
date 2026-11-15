@@ -249,3 +249,34 @@ test('voteHeadline: only final votes say a measure passed', async () => {
   assert.equal(resultWord({ question: 'On Overriding the Veto', outcome: 'failed', bill }), 'Veto sustained');
   assert.equal(resultWord({ question: 'On Passage of the Bill', outcome: 'succeeded', bill }), 'Passed');
 });
+
+test('participation: counts, chamber medians without delegates or new members', async () => {
+  const { computeParticipation } = await import('../netlify/lib/participation.js');
+  const dir = [
+    { id: 'A', chamber: 'House', state: 'WA' }, { id: 'B', chamber: 'House', state: 'TX' }, { id: 'C', chamber: 'House', state: 'OH' },
+    { id: 'D', chamber: 'House', state: 'AS' },                     // delegate
+    { id: 'E', chamber: 'House', state: 'NY' },                     // sworn in last week
+    { id: 'S', chamber: 'Senate', state: 'WA' },
+  ];
+  const rec = (id, votes, not_voting, congress = 119) => ({ id, congress, totals: { votes, not_voting } });
+  const p = computeParticipation(dir, [rec('A', 100, 1), rec('B', 100, 3), rec('C', 100, 20), rec('D', 85, 70), rec('E', 5, 0), rec('S', 50, 2), rec('X', 100, 50)], 119);
+  assert.deepEqual(p.members.A, [100, 1]);
+  assert.deepEqual(p.members.D, [85, 70]);          // shown (as a delegate note), but not in the median
+  assert.equal(p.members.X, undefined);             // not a current member
+  assert.equal(p.medians.House.missed_share, 0.03); // A, B, C only
+  assert.equal(p.medians.House.members, 3);
+  assert.equal(p.medians.Senate.missed_share, 0.04);
+  assert.equal(computeParticipation(dir, [rec('A', 100, 1, 118)], 119).members.A, undefined);   // another Congress
+});
+
+test('missed-vote wording: delegates explained, shares rounded, typical shown', async () => {
+  const { missedShort, missedLong } = await import('../public/participation.js');
+  const doc = { members: { A: [685, 12], B: [685, 160] }, medians: { House: { missed_share: 0.019 } } };
+  assert.match(missedShort({ id: 'A', chamber: 'House', state: 'WA' }, doc), /Missed 12 of 685 votes \(1\.8%\)/);
+  assert.match(missedShort({ id: 'B', chamber: 'House', state: 'TX' }, doc), /Missed 160 of 685 votes \(23%\)/);
+  assert.match(missedShort({ id: 'D', chamber: 'House', state: 'GU' }, doc), /Delegate/);
+  assert.equal(missedShort({ id: 'Z', chamber: 'House', state: 'WA' }, doc), '');
+  const long = missedLong({ id: 'A', chamber: 'House', state: 'WA' }, doc, { votes: 685, not_voting: 12 });
+  assert.match(long, /Typical House member: 1\.9%/);
+  assert.match(long, /doesn't say why/);
+});

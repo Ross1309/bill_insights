@@ -1,10 +1,11 @@
 // Legislators tab (directory doc + filters) and the header count cards.
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { collection, doc, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { db, memberById } from "./data.js";
+import { db, loadParticipation, memberById } from "./data.js";
 import { PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, ordinal, store } from "./util.js";
 import { activeTab } from "./tabs.js";
 import { currentCongress } from "./congress.js";
+import { missedShort } from "./participation.js";
 import { replaceTab } from "./router.js";
 
 const membersContainer = document.getElementById("members-container");
@@ -132,6 +133,7 @@ function memberCard(m) {
         ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
         <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
         <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}${memberFilters.state ? "" : ` · ${escapeHtml(m.state || "")}`}</p>
+        ${missedShort(m, participation)}
         <p class="text-xs text-accent mt-1">View profile →</p>
       </div>
     </button>`;
@@ -160,9 +162,13 @@ function renderMemberList(members) {
     : `<p class="text-xs text-gray-400">Source: Congress.gov</p>`;
 }
 
+// Missed votes per member (one small doc); cards render without it if it can't load.
+let participation = null;
+
 export async function showDirectory() {
   try {
-    const { members } = await loadDirectory();
+    const [{ members }, p] = await Promise.all([loadDirectory(), loadParticipation().catch(() => null)]);
+    participation = p;
     renderYourReps(members);
     renderMemberList(members);
   } catch (err) {

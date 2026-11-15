@@ -9,6 +9,7 @@ import 'dotenv/config';
 import { getDb, admin, bulkWriter } from '../netlify/lib/firebase.js';
 import { partyBreakdown } from '../netlify/lib/vote-stats.js';
 import { writeOverviewStats } from '../netlify/lib/overview.js';
+import { writeParticipation } from '../netlify/lib/participation.js';
 import { currentCongress } from '../netlify/lib/congress.js';
 
 const BACKFILL = process.argv.includes('--backfill');
@@ -34,6 +35,7 @@ async function main() {
   // Scripts recompute every week of the digest; the nightly runs only the recent ones.
   const result = await writeOverviewStats(db, admin, { congress, allWeeks: true });
   console.log(`stats rebuilt (current: ${congress}th; displayed: ${result.congress}th): ${JSON.stringify(result)}`);
+  console.log(`participation: ${JSON.stringify(await writeParticipation(db, admin, congress))}`);
   if (result.missing) console.warn(`${result.missing} votes lack party_breakdown; run with --backfill.`);
 }
 

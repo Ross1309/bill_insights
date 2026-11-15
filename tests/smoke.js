@@ -179,6 +179,7 @@ try {
 
   await page.click('#nav-members');
   await waitText('#members-container', /\w/, 'Legislators tab lists members');
+  await waitText('#members-container', /Missed \d+ of \d+ votes \(\d/, 'Member cards show missed votes');
   await page.selectOption('#state-select', 'TX');
   await waitText('#members-container', /Cornyn/, 'State filter shows Texas members');
   check(page.url().endsWith('#legislators/TX'), `URL follows the state filter (${page.url().split('#')[1]})`);
@@ -197,6 +198,7 @@ try {
 
   await openDetail('member', MEMBER);
   await waitText('#modal-root', /Jayapal/, 'Member detail opens');
+  await waitText('#modal-root', /Votes this Congress[\s\S]*Missed \d+ of \d+ roll-call votes[\s\S]*Typical House member/, 'Member window shows missed votes with context');
   await modalTab('Voting Record');
   await waitText('#modal-root', /In the \d+(st|nd|rd|th) Congress, voted on \d+ of \d+/, 'Member Voting Record renders');
   if (LIVE) {

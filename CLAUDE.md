@@ -85,6 +85,8 @@ public/home.js                     Home tab: your members, this week, issues, ke
 public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
 public/search.js                   Header search: members, bill numbers, topics, Bills-tab fallback
 public/glossary.js                 Plain definitions of official terms + tap-to-explain (termize)
+public/participation.js            Missed-vote wording (cards, member window, Home); loadParticipation in data.js
+netlify/lib/participation.js       stats/participation: missed votes per member + chamber medians
 netlify/lib/digest.js              computeWeeks(): stats/week-<Monday> docs, stats/weeks, this_week
 public/issues.js                   Issues tab topic pages from stats/topic-<slug> (+ explainers, glossary)
 netlify/lib/topics.js              Topic + watchlist definitions (CRS policy areas / subjects)
@@ -743,6 +745,22 @@ stats/overview (monthly party split).
   the 119th until the 120th has 25 votes. The nightly job starts a new Congress's state by
   itself (first 60 days). Once the 119th's tail is over (mid-February 2027), run
   `build-congress-stats.js --congress 119 --write` to freeze its final figures.
+
+## Missed votes (2026-11-15)
+
+Shown on every member card (Members tab, "Your representatives"), at the top of the member
+window ("Votes this Congress") and on Home's "your members": "Missed 48 of 685 votes
+(7.0%)", with the chamber's typical (median) share in the window and on Home. User's
+decisions: show it everywhere members appear, with the median for context. Never sorted,
+filtered or listed as a ranking (footer promise); neutral gray text, no warning colors.
+- **stats/participation** (public, ~12 KB): `{ congress, members: { id: [roll calls,
+  missed] }, medians: { House|Senate: { missed_share, members } } }`, from member_votes
+  totals (Not Voting = missed; Present isn't). Rebuilt by ingest-votes when votes were
+  applied or members changed (`writeParticipation`), and by build-stats.js.
+- Medians leave out delegates (they may vote only on some amendments: they get an
+  explanation, not a share) and members with < 20 roll calls. 119th at launch: House 1.9%
+  (433 members), Senate 2.5%.
+- Every statement notes the record doesn't say why a vote was missed; we never suggest one.
 
 ## Clarity pass (2026-11-15)
 

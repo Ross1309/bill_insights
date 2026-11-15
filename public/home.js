@@ -8,6 +8,7 @@ import { escapeHtml as esc, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } fr
 import { voteHeadline, partyWords } from "./plain.js";
 import { voteCardHtml } from "./vote-card.js";
 import { weekRange } from "./week.js";
+import { missedShort, WHY_NOTE } from "./participation.js";
 
 const day = (ymd, opts = { month: "short", day: "numeric", year: "numeric" }) => new Date(`${ymd}T12:00:00`).toLocaleDateString(undefined, opts);
 const num = n => Number(n || 0).toLocaleString();
@@ -23,7 +24,7 @@ const sectionHead = (title, link, linkText, note) => `
 const billChip = b => b?.id ? `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="text-accent hover:underline">${esc(officialLabel(b.label || b.id))}</button>` : "";
 
 // --- Card 1: your members --------------------------------------------------------
-function memberRow(m) {
+function memberRow(m, participation) {
   const role = m.chamber === "Senate" ? "Senator" : (STATE_NAMES[m.state] && ["DC", "PR", "GU", "VI", "AS", "MP"].includes(m.state)) ? "Delegate" : `Representative${m.district ? `, District ${m.district}` : ", at large"}`;
   const p = PARTY_LETTER[m.party] || "";
   return `
@@ -32,11 +33,21 @@ function memberRow(m) {
       <span class="min-w-0">
         <span class="block text-sm font-semibold text-gray-900 truncate">${esc(String(m.name || "").split(", ").reverse().join(" "))}</span>
         <span class="block text-xs text-gray-500">${esc(role)}${p ? ` · <span class="${PARTY_TEXT[p]} font-semibold">${p}</span>` : ""}</span>
+        ${missedShort(m, participation)}
       </span>
     </button>`;
 }
 
-function repsCard(reps) {
+// Context for the missed-vote lines: the typical member of each chamber, and that the
+// record doesn't say why (participation.js).
+function typicalLine(p) {
+  const h = p?.medians?.House?.missed_share, s = p?.medians?.Senate?.missed_share;
+  if (h == null || s == null) return "";
+  const f = x => `${(x * 100).toFixed(1)}%`;
+  return `<p class="text-[11px] text-gray-500 mt-3">Typical member missed ${f(h)} of House votes and ${f(s)} of Senate votes this Congress. ${esc(WHY_NOTE)}</p>`;
+}
+
+function repsCard(reps, participation) {
   const form = `
     <form data-home-find class="mt-3 flex gap-2">
       <label for="home-address" class="sr-only">Your home address</label>
@@ -53,7 +64,8 @@ function repsCard(reps) {
         <p class="text-sm text-gray-600 mt-1">A new Congress began on January 3, and some states' district maps changed. Enter your address again to see your current senators and representative.</p>${form}`
       : reps?.members?.length ? `
         <p class="text-sm text-gray-600 mt-1">Your members for ${esc(reps.code)}${reps.state && STATE_NAMES[reps.state] ? ` (${esc(STATE_NAMES[reps.state])}${reps.district ? `'s ${esc(ordinal(reps.district))} district` : ""})` : ""}:</p>
-        <div class="mt-3 space-y-3">${reps.members.map(memberRow).join("")}</div>
+        <div class="mt-3 space-y-3">${reps.members.map(m => memberRow(m, participation)).join("")}</div>
+        ${typicalLine(participation)}
         <div class="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <a href="#legislators/${esc(reps.code)}" class="font-semibold text-accent hover:underline">All about them →</a>
           <button type="button" data-home-change class="text-gray-500 hover:text-gray-800 underline">Change address</button>
@@ -111,9 +123,9 @@ function keyVoteCard(v, reps, positions) {
 }
 
 // --- Page ------------------------------------------------------------------------------
-export function renderHome(stats, { reps = null, positions = null } = {}) {
+export function renderHome(stats, { reps = null, positions = null, participation = null } = {}) {
   const tw = stats.this_week;
-  document.getElementById("home-hero").innerHTML = repsCard(reps) + weekCard(tw) + issuesCard(stats.topics_summary);
+  document.getElementById("home-hero").innerHTML = repsCard(reps, participation) + weekCard(tw) + issuesCard(stats.topics_summary);
 
   const key = tw?.key_votes || [];
   const others = tw ? tw.votes.House + tw.votes.Senate - key.length : 0;

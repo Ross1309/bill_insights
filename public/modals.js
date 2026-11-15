@@ -2,13 +2,14 @@
 // Anything with data-open="member|bill|vote" data-id="…" opens one, so you can go
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
-import { fetchFunction, getBill, getFirestoreDoc, getMember, getVote, getVotesForBill } from "./data.js";
+import { fetchFunction, getBill, getFirestoreDoc, getMember, getVote, getVotesForBill, loadParticipation } from "./data.js";
 import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { voteCardHtml } from "./vote-card.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
 import { explainQuestion } from "./issues.js";
+import { missedLong } from "./participation.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
@@ -30,6 +31,7 @@ const memberModal = {
     loadInto(e, "member", getMember(e.id));
     loadInto(e, "profile", fetchFunction("member-profile", e.id));
     loadInto(e, "record", getFirestoreDoc("member_votes", e.id));
+    loadInto(e, "participation", loadParticipation());
     if (e.financeRequested) loadInto(e, "finance", fetchFunction("member-finance", e.id)); // Retry
   },
   header(e) {
@@ -57,7 +59,14 @@ const memberModal = {
       if (m) facts.push(["Role", memberRole(m)], ["State", STATE_NAMES[m.state] || m.state], ["Party", m.party]);
       if (p) facts.push(["First took office", p.firstTermStart], ["Born", p.birthYear], ["Office", p.office?.address], ["Phone", p.office?.phone]);
       if (m && m.current === false) facts.push(["Status", "No longer serving"]);
+      const r = e.data.record;
+      const votes = m && m.current !== false && r?.totals?.votes ? `
+        <section class="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Votes this Congress</h3>
+          <div class="mt-1">${missedLong(m, e.data.participation, r.totals)}</div>
+        </section>` : "";
       return `
+        ${votes}
         ${factList(facts)}
         ${p ? `
           <div class="grid grid-cols-2 gap-3 mt-4">
@@ -82,6 +91,7 @@ const memberModal = {
       const stat = (label, value, cls) => `<div class="${cls} border rounded-lg p-2 text-center"><p class="text-[11px] font-semibold uppercase">${label}</p><p class="text-lg font-bold tabular-nums">${value}</p></div>`;
       return `
         <p class="text-sm text-gray-800">In the ${escapeHtml(ordinal(r.congress))} Congress, voted on <strong>${cast} of ${t.votes}</strong> ${escapeHtml(r.chamber || "")} roll calls they were eligible for (${Math.round((cast / t.votes) * 100)}%).</p>
+        ${e.data.member && e.data.member.current !== false ? `<div class="mt-1">${missedLong(e.data.member, e.data.participation, t)}</div>` : ""}
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
           ${stat("Yea", t.yea, "bg-green-50 border-green-200 text-green-700")}
           ${stat("Nay", t.nay, "bg-red-50 border-red-200 text-red-700")}

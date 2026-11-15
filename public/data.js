@@ -95,3 +95,10 @@ export async function getVotesForBill(billId) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }
+
+// Missed votes per member + chamber medians (stats/participation), one read, cached.
+let participationDoc = null;
+export function loadParticipation() {
+  participationDoc ??= getFirestoreDoc("stats", "participation").catch(err => { participationDoc = null; throw err; });
+  return participationDoc;
+}
