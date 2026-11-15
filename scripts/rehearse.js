@@ -5,6 +5,7 @@
 //
 //   node scripts/rehearse.js --date 2027-01-04T12:00:00Z ingest
 //   node scripts/rehearse.js --date 2027-01-04T12:00:00Z sync-bills
+//   node scripts/rehearse.js --date 2027-01-04T12:00:00Z congress-stats
 //   node scripts/rehearse.js --date 2027-01-04T12:00:00Z stats
 //   ... --show stats/overview      print what a write to that doc would contain
 //
@@ -18,8 +19,8 @@ const arg = name => { const i = process.argv.indexOf(`--${name}`); return i > 0 
 const date = arg('date');
 const job = process.argv.at(-1);
 const show = arg('show');
-if (!date || !['ingest', 'sync-bills', 'stats'].includes(job)) {
-  console.error('usage: node scripts/rehearse.js --date <ISO date> [--show <collection/doc>] ingest|sync-bills|stats');
+if (!date || !['ingest', 'sync-bills', 'congress-stats', 'stats'].includes(job)) {
+  console.error('usage: node scripts/rehearse.js --date <ISO date> [--show <collection/doc>] ingest|sync-bills|congress-stats|stats');
   process.exit(2);
 }
 process.env.CW_TODAY = date;
@@ -73,6 +74,10 @@ if (job === 'ingest') {
   const { default: run } = await import('../netlify/functions/sync-bills.js');
   const res = await run(null);
   result = { status: res.status, body: await res.text() };
+} else if (job === 'congress-stats') {
+  const { default: run } = await import('../netlify/functions/sync-congress-stats.js');
+  const res = await run(null);
+  result = { status: res.status, body: await res.text() };
 } else {
   const { getDb, admin } = await import('../netlify/lib/firebase.js');
   result = await (await import('../netlify/lib/overview.js')).writeOverviewStats(getDb(), admin, { congress: currentCongress().congress });
@@ -87,7 +92,7 @@ for (const w of writes) {
 }
 console.log(`\n${writes.length} write(s) that would have been sent:`);
 for (const [k, n] of [...byCollection].sort()) console.log(`  ${k}: ${n}`);
-const notable = writes.filter(w => /^(stats\/(overview|weeks|health)|sync_state\/)/.test(w.path));
+const notable = writes.filter(w => /^(stats\/(overview|weeks|health|congress-\d+)|sync_state\/)/.test(w.path));
 for (const w of notable) {
   const d = w.data || {};
   const brief = { congress: d.congress, generated_at: d.generated_at ? '(timestamp)' : undefined,

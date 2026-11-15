@@ -7,6 +7,7 @@ export const navIssues = document.getElementById("nav-issues");
 export const navBills = document.getElementById("nav-bills");
 export const navVotes = document.getElementById("nav-votes");
 export const navMembers = document.getElementById("nav-members");
+export const navCongress = document.getElementById("nav-congress");
 
 const viewOverview = document.getElementById("view-overview");
 const viewIssues = document.getElementById("view-issues");
@@ -15,7 +16,7 @@ const viewVotes = document.getElementById("view-votes");
 const viewMembers = document.getElementById("view-members");
 const viewMethodology = document.getElementById("view-methodology");   // no tab-bar button
 const viewWeek = document.getElementById("view-week");                 // no tab-bar button (#week/<Monday>)
-const viewCharts = document.getElementById("view-charts");             // no tab-bar button (#charts)
+const viewCharts = document.getElementById("view-charts");             // "This Congress" (#congress)
 
 // Each tab's loader, called every time it's shown (loaders skip work already done).
 export const onTabOpen = {};
@@ -31,7 +32,7 @@ const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-8
 // `push`: record it in browser history / the URL (false when the router is applying
 // a URL, e.g. Back/Forward or a pasted link).
 export function switchTab(tabName, { push = true } = {}) {
-  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers], methodology: [null, viewMethodology], week: [null, viewWeek], charts: [null, viewCharts] };
+  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers], methodology: [null, viewMethodology], week: [null, viewWeek], charts: [navCongress, viewCharts] };
   for (const [name, [nav, view]] of Object.entries(tabs)) {
     const active = name === tabName;
     if (nav) {

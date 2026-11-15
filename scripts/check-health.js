@@ -1,6 +1,6 @@
 // Did last night's scheduled syncs succeed? Reads the stats/health doc through the site's
 // /api/health function (no credentials; App Check blocks Firestore's public API for
-// non-browser callers) and exits 1 if either sync failed or hasn't succeeded recently.
+// non-browser callers) and exits 1 if any sync failed or hasn't succeeded recently.
 // HEALTH_URL overrides the endpoint (e.g. http://localhost:8888/api/health).
 // Run daily by .github/workflows/health.yml (GitHub emails on a failed run).
 //
@@ -11,7 +11,10 @@
 
 const URL = process.env.HEALTH_URL || 'https://congress-watcher.netlify.app/api/health';
 const MAX_AGE_H = Number(process.env.HEALTH_MAX_AGE_H) || 20;
-const SYNCS = { ingest_votes: 'Votes + members (ingest-votes, 10:00 UTC)', sync_bills: 'Bills (sync-bills, 10:30 UTC)' };
+const SYNCS = { ingest_votes: 'Votes + members (ingest-votes, 10:00 UTC)', sync_bills: 'Bills (sync-bills, 10:30 UTC)',
+  congress_stats: 'This Congress so far (sync-congress-stats, 11:00 UTC)' };
+// Added later than the others: until it has run once it's reported, not failed.
+const OPTIONAL_UNTIL_FIRST_RUN = new Set(['congress_stats']);
 
 const res = await fetch(URL);
 if (!res.ok) {
@@ -23,7 +26,7 @@ const doc = await res.json();
 const problems = [];
 for (const [key, label] of Object.entries(SYNCS)) {
   const run = doc[key];
-  if (!run) { problems.push(`${label}: no run recorded`); continue; }
+  if (!run) { if (OPTIONAL_UNTIL_FIRST_RUN.has(key)) console.log(`${label}: no run recorded yet`); else problems.push(`${label}: no run recorded`); continue; }
   // Judge the *scheduled* runs: a manual run (run-ingest.js, curl) mustn't mask a failed
   // nightly one. Records written before scheduled runs were tracked fall back to the
   // plain fields.
@@ -44,4 +47,4 @@ if (problems.length) {
     + ' or `netlify logs --function ingest-votes --since 24h`. Re-run with "Run now" on the function page.');
   process.exit(1);
 }
-console.log('\nBoth nightly syncs are healthy.');
+console.log('\nAll nightly syncs are healthy.');

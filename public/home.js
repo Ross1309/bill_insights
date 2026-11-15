@@ -139,7 +139,7 @@ export function renderHome(stats, { reps = null, positions = null } = {}) {
   const totals = stats.totals || {};
   const h = splitPct(al.House), s = splitPct(al.Senate);
   document.getElementById("home-numbers").innerHTML = `
-    ${sectionHead(`The ${stats.congress ? esc(ordinal(stats.congress)) : ""} Congress by the numbers`, "#charts", "See the charts")}
+    ${sectionHead(`The ${stats.congress ? esc(ordinal(stats.congress)) : ""} Congress by the numbers`, "#congress", "Compared with past Congresses")}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
       ${tile(num((totals.House || 0) + (totals.Senate || 0)), "roll-call votes", `House ${num(totals.House)} · Senate ${num(totals.Senate)}`)}
       ${stats.laws_total != null ? tile(num(stats.laws_total), "bills became law", "this Congress") : ""}

@@ -66,7 +66,7 @@ async function fetchMenu(congress, session) {
     .map(number => ({ congress, session, number }));
 }
 
-function parseVote(xml, { congress, session, number }, lisToBioguide) {
+export function parseVote(xml, { congress, session, number }, lisToBioguide) {
   const docType = (tag(xml, 'document_type') || '').replace(/\./g, '').replace(/\s+/g, '').toUpperCase();
   const docNumber = tag(xml, 'document_number');
   const docCongress = Number(tag(xml, 'document_congress')) || congress;

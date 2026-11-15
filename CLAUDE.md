@@ -76,6 +76,10 @@ public/bills.js, votes.js,         One module per tab (state stays inside its mo
 public/modals.js, finance.js       Detail modals (member/bill/vote) and the Campaign Finance tab
 public/states.js                   State/delegate list, shared by UI dropdown and ingest
 public/overview.js                 Overview tab charts (plain SVG/HTML) from stats/overview
+public/congress-page.js            This Congress tab (#congress): so far vs the last two Congresses
+netlify/lib/congress-stats.js      stats/congress-<n> daily series: GovInfo parsing, passage dates, builder
+netlify/functions/sync-congress-stats.js  Nightly 11:00 UTC: new bills + passage for the current Congress
+scripts/build-congress-stats.js    Backfill stats/congress-<n> (GovInfo bulk + votes; seeds upkeep state)
 public/week.js                     Weekly digest: #week/<Monday> page (rendering only)
 public/home.js                     Home tab: your members, this week, issues, key votes, laws, numbers
 public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
@@ -705,6 +709,39 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   pages in the browser (console warning with Firestore's create link). The service
   account can't create indexes (403), so they're created in the Firebase console.
 - Exact bill-number search ignores the scope.
+
+## This Congress (#congress) (2026-11-15)
+
+Tab "This Congress" (internal tab name `charts`; old `#charts` links work): the Congress so
+far next to the last two at the same day of their terms (congress-page.js), then the four
+older charts under "More charts". Reads stats/congress-<cur, cur-1, cur-2> (~17 KB each) +
+stats/overview (monthly party split).
+- **stats/congress-<n>** (public, under stats/): daily counts (index = day from Jan 3):
+  `introduced, passed_one, passed_both, laws, floor_voted, votes{House,Senate},
+  split{House|Senate:{same,opposed}}`, plus `totals`, `days`, `final`, `as_of`. Bills =
+  H.R./S./H.J.Res./S.J.Res.; passage = first "Passed/agreed to in House|Senate" action
+  (`passageDates`, same rule as the bill stage). Laws run past day 730 (signed after the term).
+- **Finished Congresses** (117th, 118th): `node scripts/build-congress-stats.js --congress
+  118 --write`. GovInfo BILLSTATUS zips (hr ~35 MB; cached in the OS temp dir), Congress.gov
+  House vote list, House Clerk XML party totals, senate.gov vote XML. The Clerk and senate.gov
+  throttle bursts (403): the script caches every record on disk, spaces requests, retries
+  throttled ones and stops (writes nothing) if a record can't be read. Speaker elections /
+  quorum calls have no party totals: "unclear", correctly. Verified 118th: 16,565 bills,
+  274 laws, 1,241 + 691 votes = Congress.gov's counts.
+- **Current Congress**: the same script without --congress seeds `sync_state/congress-<n>`
+  ({ introduced[], max{type: highest bill number}, bills{hr1234:{h,s}}, last_check }) from
+  GovInfo (which lags: its newest 119th files were ~Nov 9 on Nov 15) + Congress.gov for gaps
+  (GovInfo lacked 6 H.R. bills; H.R. 2/3/5/8/10 are reserved, no actions). Bill numbers have
+  gaps (S. 5718 existed with 5,702 bills), so new bills are found by `probeNewBills`
+  (walk past the highest known until 8 misses), never by count.
+- **Nightly** `sync-congress-stats` (11:00 UTC, health key `congress_stats`): new bills,
+  then bills Congress.gov updated that `maybePassed` (not a referral in their own chamber)
+  get their actions read; resumable window like sync-bills; votes from vote_index, laws from
+  `bills`. Rehearse with `node scripts/rehearse.js --date … congress-stats`.
+- After Jan 3 the page shows the displayed Congress (stats/overview.congress), so it stays on
+  the 119th until the 120th has 25 votes. The nightly job starts a new Congress's state by
+  itself (first 60 days). Once the 119th's tail is over (mid-February 2027), run
+  `build-congress-stats.js --congress 119 --write` to freeze its final figures.
 
 ## Votes paging (frontend)
 

@@ -69,7 +69,7 @@ export async function listBillsUpdatedSince(sinceIso, apiKey, max = 1000) {
     const data = await getJson(`${API}/bill?api_key=${apiKey}&format=json&limit=250&offset=${offset}&sort=updateDate+asc&fromDateTime=${since}`);
     const items = data.bills || [];
     bills.push(...items.filter(b => b.type && b.number && b.congress)
-      .map(b => ({ id: makeBillId(b.type, b.number, b.congress), updateDate: b.updateDate || null })));
+      .map(b => ({ id: makeBillId(b.type, b.number, b.congress), updateDate: b.updateDate || null, latestAction: b.latestAction || null, originChamber: b.originChamber || null })));
     if (items.length < 250) break;
   }
   return { bills, truncated };

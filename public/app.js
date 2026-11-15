@@ -4,7 +4,8 @@ import { renderIssue } from "./issues.js";
 import { renderOverview } from "./overview.js";
 import { db, getFirestoreDoc, getOverviewDoc, getVote } from "./data.js";
 import { escapeHtml, store } from "./util.js";
-import { activeTab, navBills, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
+import { activeTab, navBills, navCongress, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
+import { renderCongressPage } from "./congress-page.js";
 import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
 import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
@@ -222,6 +223,7 @@ async function loadCharts() {
     const snap = await getOverviewDoc();
     if (!snap.exists()) { container.innerHTML = `<p class="text-center text-gray-500 py-12">The charts haven't been built yet.</p>`; return; }
     chartsLoaded = true;
+    loadCongressPage(snap.data());
     renderOverview(container, snap.data(), {
       // State tile -> that state's members in the directory.
       onState: code => {
@@ -232,6 +234,20 @@ async function loadCharts() {
   } catch (err) {
     console.error("Error loading charts:", err);
     container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load the charts: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+// "This Congress so far": the displayed Congress and the two before it (3 small docs).
+async function loadCongressPage(overview) {
+  const el = document.getElementById("congress-container");
+  const cur = overview.congress;
+  try {
+    const list = await Promise.all([cur, cur - 1, cur - 2].map(c => getFirestoreDoc("stats", `congress-${c}`).catch(() => null)));
+    const docs = Object.fromEntries(list.map((d, i) => [cur - i, d]).filter(([, d]) => d));
+    renderCongressPage(el, { docs, cur, overview });
+  } catch (err) {
+    console.error("Error loading This Congress:", err);
+    el.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -314,6 +330,7 @@ async function init() {
 function setupTabs() {
   navOverview.addEventListener("click", () => switchTab("overview"));
   navIssues.addEventListener("click", () => switchTab("issues"));
+  navCongress.addEventListener("click", () => switchTab("charts"));
   navBills.addEventListener("click", () => switchTab("bills"));
   navVotes.addEventListener("click", () => switchTab("votes"));
   navMembers.addEventListener("click", () => switchTab("members"));

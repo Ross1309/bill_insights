@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Congress Watcher: This Congress so far (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Same theme as tailwind.config.js (mockup only; the site uses the built styles.css).
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], serif: ['"Source Serif 4"', 'ui-serif', 'Georgia', 'serif'] },
+      colors: {
+        gray: { 50: '#2c2c2c', 100: '#333333', 200: '#444444', 300: '#555555', 400: '#a0a0a0', 500: '#b0b0b0', 600: '#c4c4c4', 700: '#d4d4d4', 800: '#e4e4e4', 900: '#f3f3f3' },
+        surface: { DEFAULT: '#363636', deep: '#232323' }, ink: '#2c2c2c',
+        accent: { DEFAULT: '#a8dadc', light: '#cdebec' }, pink: { DEFAULT: '#ffc1cc' }, cta: { DEFAULT: '#b39cd0', light: '#c8b6df' },
+        green: { 50: '#26331c', 100: '#30451f', 200: '#456230', 700: '#b5e48c', 800: '#c9eda8' },
+        red: { 50: '#3a2a22', 100: '#523226', 200: '#6e4130', 500: '#f4a07a', 600: '#f6ad8d', 700: '#f4a07a', 800: '#f8b89c' },
+        party: { r: '#f59a9a', d: '#a3b4f7', i: '#c4c4c4' },
+      } } } };
+  </script>
+  <style>
+    .no-scrollbar{scrollbar-width:none}.no-scrollbar::-webkit-scrollbar{display:none}
+    .tip{position:fixed;pointer-events:none;z-index:50;background:#1e1e1e;border:1px solid #555;border-radius:8px;padding:8px 10px;font-size:12px;color:#e4e4e4;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:260px}
+    svg text{font-family:Inter,system-ui,sans-serif}
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 font-sans antialiased">
+  <!-- Mockup banner (not part of the design) -->
+  <div class="bg-cta text-ink text-xs font-semibold text-center py-1.5 px-4">MOCKUP · "This Congress so far" · real data from Congress.gov and senate.gov as of <span id="m-asof"></span> · not live</div>
+
+  <header class="bg-surface-deep">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <a href="#" class="flex items-center gap-2.5 shrink-0">
+        <svg class="w-8 h-8" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3a3a3a"/><path d="M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z" fill="#b39cd0"/></svg>
+        <span class="font-serif text-xl font-bold text-white">Congress Watcher</span>
+      </a>
+      <label class="order-3 sm:order-none w-full sm:w-auto sm:flex-1 max-w-xl relative">
+        <span class="sr-only">Search</span>
+        <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3a5.5 5.5 0 104.37 8.84l3.4 3.4a.75.75 0 101.06-1.06l-3.4-3.4A5.5 5.5 0 008.5 3zm-4 5.5a4 4 0 118 0 4 4 0 01-8 0z" clip-rule="evenodd"/></svg>
+        <input type="search" placeholder="Search members, bills (e.g. HR 2102) or topics" class="w-full pl-9 pr-3 py-2 rounded-lg bg-surface border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+      </label>
+    </div>
+    <nav class="border-t border-white/5">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 flex gap-6 overflow-x-auto no-scrollbar text-sm font-semibold">
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Home</a>
+        <a href="#" class="py-3 border-b-2 border-pink text-gray-900 whitespace-nowrap">This Congress</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Issues</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Bills</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Votes</a>
+        <a href="#" class="py-3 border-b-2 border-transparent text-gray-500">Members</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-12">
+    <!-- 1. Where we are in the term -->
+    <section>
+      <h1 class="font-serif text-3xl sm:text-4xl font-bold text-gray-900">The <span data-c></span> Congress so far</h1>
+      <p class="text-gray-600 mt-2 max-w-3xl" id="m-lede"></p>
+      <div class="mt-4 max-w-3xl">
+        <div class="flex justify-between text-xs text-gray-500"><span id="m-term-start"></span><span id="m-term-end"></span></div>
+        <div class="h-2 rounded-full bg-gray-200 mt-1 overflow-hidden" role="img" id="m-term-bar"><div class="h-full rounded-full" style="background:#13a5b2" id="m-term-fill"></div></div>
+        <p class="text-xs text-gray-500 mt-1" id="m-term-note"></p>
+      </div>
+    </section>
+
+    <!-- 2. Headline numbers, each next to the same point in the last two Congresses -->
+    <section>
+      <h2 class="font-serif text-2xl font-bold text-gray-900">Is this normal?</h2>
+      <p class="text-sm text-gray-500 mt-1 max-w-3xl">Each number next to the last two Congresses at the same point in their two-year terms (<span data-day></span> days in).</p>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-4" id="m-tiles"></div>
+    </section>
+
+    <!-- 3. Laws over the term -->
+    <section>
+      <div class="bg-surface border border-gray-200 rounded-2xl p-5">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Laws enacted over the two-year term</h2>
+        <p class="text-sm text-gray-600 mt-1 max-w-3xl" id="m-laws-note"></p>
+        <div class="mt-4" id="m-laws-chart"></div>
+        <details class="mt-3 text-sm"><summary class="cursor-pointer text-accent">View as table</summary><div class="mt-2 overflow-x-auto" id="m-laws-table"></div></details>
+      </div>
+    </section>
+
+    <!-- 4. Bill to law: the funnel -->
+    <section>
+      <div class="bg-surface border border-gray-200 rounded-2xl p-5">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">From bill to law</h2>
+        <p class="text-sm text-gray-600 mt-1 max-w-3xl" id="m-funnel-note"></p>
+        <div class="mt-5 space-y-4" id="m-funnel"></div>
+        <div class="mt-6 pt-4 border-t border-gray-200 grid gap-3 sm:grid-cols-2" id="m-funnel-past"></div>
+      </div>
+    </section>
+
+    <!-- 5. Floor votes over the term, one chart per chamber -->
+    <section>
+      <div class="bg-surface border border-gray-200 rounded-2xl p-5">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Roll-call votes over the term</h2>
+        <p class="text-sm text-gray-600 mt-1 max-w-3xl" id="m-votes-note"></p>
+        <div class="grid gap-6 lg:grid-cols-2 mt-4">
+          <div><h3 class="text-sm font-bold text-gray-900">House</h3><div id="m-house-chart"></div></div>
+          <div><h3 class="text-sm font-bold text-gray-900">Senate</h3><div id="m-senate-chart"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Party agreement (this Congress; earlier ones need a backfill) -->
+    <section>
+      <div class="bg-surface border border-gray-200 rounded-2xl p-5">
+        <h2 class="font-serif text-2xl font-bold text-gray-900">How often the parties split</h2>
+        <p class="text-sm text-gray-600 mt-1 max-w-3xl" id="m-party-note"></p>
+        <div class="mt-4" id="m-party-chart"></div>
+      </div>
+    </section>
+
+    <!-- 7. How we count -->
+    <section class="text-sm text-gray-600 max-w-3xl">
+      <h2 class="font-serif text-xl font-bold text-gray-900">How these numbers are counted</h2>
+      <ul class="list-disc pl-5 mt-2 space-y-1.5">
+        <li><strong>Same point in the term:</strong> each Congress starts on January 3 of an odd year; "day N" is N days after that, so every Congress is compared at the same stage of its two years.</li>
+        <li><strong>Laws:</strong> public and private laws from Congress.gov, dated by the "Became Public/Private Law" action.</li>
+        <li><strong>Bills introduced:</strong> measures that can become law (H.R., S., H.J.Res., S.J.Res.). Simple and concurrent resolutions, which can't, are left out. Earlier Congresses are counted up to the same day by introduction date.</li>
+        <li><strong>Got a roll-call vote:</strong> those measures that had at least one recorded House or Senate vote (any question, not only final passage). Many bills pass by voice vote or unanimous consent without one.</li>
+        <li><strong>Roll-call votes:</strong> every recorded vote: the House list from Congress.gov (House Clerk) and senate.gov's vote lists.</li>
+        <li><strong>Parties split:</strong> most Democrats and most Republicans voted opposite ways (Yea vs Nay); ties left out.</li>
+      </ul>
+    </section>
+
+    <!-- Mockup notes (not part of the design) -->
+    <section class="border border-dashed border-cta/60 rounded-2xl p-5 text-sm text-gray-700">
+      <h2 class="font-bold text-cta">Mockup notes: decisions for you</h2>
+      <ul class="list-disc pl-5 mt-2 space-y-1.5">
+        <li><strong>Where it lives:</strong> a "This Congress" tab (shown), replacing the separate Charts page; Home's "by the numbers" links here.</li>
+        <li><strong>"Passed a chamber" is missing from the funnel.</strong> Congress.gov has no count by stage; getting it means reading the action history of every bill that left committee, a one-time backfill of a few thousand requests, then nightly upkeep. Worth it?</li>
+        <li><strong>Party split has no comparison yet.</strong> The earlier Congresses need their vote-by-vote party totals (about 3,900 House Clerk and senate.gov records, one time).</li>
+        <li>After January 3 this page becomes "The 120th Congress so far" with the 119th as the nearest comparison.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="bg-surface-deep text-gray-600 text-sm mt-12">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap gap-x-8 gap-y-2">
+      <span class="font-serif text-white font-bold">Congress Watcher</span>
+      <span>Non-partisan. No scores, rankings or judgments of members.</span>
+      <a href="#" class="underline decoration-accent/50">How we count</a>
+      <a href="#" class="underline decoration-accent/50">Report an error</a>
+    </div>
+  </footer>
+
+  <div class="tip hidden" id="tip" role="status"></div>
+
+  <script>
+    const D = /*DATA*/null;
+    const CUR = 119, PAST = [118, 117];
+    const C = D.congresses;
+    const N = D.dayN, TERM = 730;
+    const fmt = n => Number(n).toLocaleString('en-US');
+    const ord = n => `${n}th`;
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const dayOf = (c, iso) => Math.round((Date.parse(iso) - Date.parse(C[c].start)) / 86400e3);
+    const upTo = (c, dates, day) => dates.filter(x => dayOf(c, x) <= day).length;
+    const dateOf = (c, day) => new Date(Date.parse(C[c].start) + day * 86400e3).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    // Series colors: this Congress = the site's activity mark; earlier ones = neutral grays,
+    // told apart by line style and direct labels (never color alone).
+    const STYLE = { 119: { color: '#13a5b2', width: 2.5, dash: '' }, 118: { color: '#a0a0a0', width: 2, dash: '' }, 117: { color: '#a0a0a0', width: 2, dash: '5 4' } };
+
+    document.getElementById('m-asof').textContent = new Date(D.asOf).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    document.querySelectorAll('[data-c]').forEach(e => e.textContent = ord(CUR));
+    document.querySelectorAll('[data-day]').forEach(e => e.textContent = fmt(N));
+
+    // --- 1. Term progress ---------------------------------------------------------------
+    const lawsNow = c => upTo(c, C[c].laws, N);
+    const votesNow = c => upTo(c, [...C[c].house, ...C[c].senate], N);
+    const pct = Math.round(N / TERM * 100);
+    document.getElementById('m-term-start').textContent = `Began ${dateOf(CUR, 0)}`;
+    document.getElementById('m-term-end').textContent = `Ends ${dateOf(CUR, TERM)}`;
+    document.getElementById('m-term-fill').style.width = `${pct}%`;
+    document.getElementById('m-term-bar').setAttribute('aria-label', `Day ${N} of ${TERM}, ${pct}% of the term`);
+    document.getElementById('m-term-note').textContent = `Day ${fmt(N)} of ${fmt(TERM)} (${pct}% of the two-year term).`;
+    const lateShare = c => Math.round(C[c].laws.filter(x => dayOf(c, x) > N).length / C[c].laws.length * 100);
+    const rel = (a, others) => { const hi = others.filter(o => a > o).length; return hi === others.length ? 'more than either' : hi === 0 ? 'fewer than either' : 'between'; };
+    document.getElementById('m-lede').innerHTML =
+      `${fmt(lawsNow(CUR))} laws and ${fmt(votesNow(CUR))} roll-call votes in ${fmt(N)} days. Compared with the last two Congresses at this point: laws ${rel(lawsNow(CUR), PAST.map(lawsNow))}, roll calls ${rel(votesNow(CUR), PAST.map(votesNow))}. ` +
+      `But the final weeks matter most: the ${ord(118)} Congress signed <strong>${lateShare(118)}%</strong> of its laws after this point, the ${ord(117)} <strong>${lateShare(117)}%</strong>.`;
+
+    // --- 2. Comparison tiles ---------------------------------------------------------------
+    const tiles = [
+      { label: 'Laws enacted', v: c => lawsNow(c), note: 'Signed into law (public and private).' },
+      { label: 'Roll-call votes', v: c => votesNow(c), note: 'House and Senate together.' },
+      { label: 'Bills introduced', v: c => C[c].introduced_law_capable.by_cutoff, note: 'Bills and joint resolutions (measures that can become law).' },
+      { label: 'Got a roll-call vote', v: c => C[c].floor_voted.by_cutoff, note: 'Bills and joint resolutions with at least one recorded vote.' },
+    ];
+    const compare = (a, others) => {
+      const hi = others.filter(o => a > o).length;
+      return hi === others.length ? 'More than either of the last two at this point'
+        : hi === 0 ? 'Fewer than either of the last two at this point' : 'Between the last two at this point';
+    };
+    document.getElementById('m-tiles').innerHTML = tiles.map(t => {
+      const vals = [CUR, ...PAST].map(c => ({ c, v: t.v(c) }));
+      const max = Math.max(...vals.map(x => x.v));
+      return `
+        <article class="bg-surface border border-gray-200 rounded-2xl p-5">
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-pink">${t.label}</h3>
+          <p class="font-serif text-4xl font-bold text-gray-900 tabular-nums mt-1">${fmt(vals[0].v)}</p>
+          <p class="text-sm text-gray-700 mt-1">${compare(vals[0].v, vals.slice(1).map(x => x.v))}.</p>
+          <div class="mt-3 space-y-1.5" role="img" aria-label="${t.label} at day ${N}: ${vals.map(x => `${ord(x.c)} ${fmt(x.v)}`).join(', ')}">
+            ${vals.map(x => `
+              <div class="flex items-center gap-2 text-xs" aria-hidden="true">
+                <span class="w-10 shrink-0 ${x.c === CUR ? 'font-bold text-gray-900' : 'text-gray-500'}">${ord(x.c)}</span>
+                <span class="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden"><span class="block h-full rounded-full" style="width:${x.v / max * 100}%;background:${x.c === CUR ? '#13a5b2' : '#777'}"></span></span>
+                <span class="w-14 shrink-0 text-right tabular-nums ${x.c === CUR ? 'text-gray-900 font-semibold' : 'text-gray-600'}">${fmt(x.v)}</span>
+              </div>`).join('')}
+          </div>
+          <p class="text-[11px] text-gray-500 mt-3">${t.note}</p>
+        </article>`;
+    }).join('');
+
+    // --- Line chart: cumulative counts by day of term ------------------------------------
+    const tip = document.getElementById('tip');
+    function cumulative(c, dates) {
+      const days = dates.map(x => dayOf(c, x)).filter(d => d >= 0).sort((a, b) => a - b);
+      return day => { let lo = 0, hi = days.length; while (lo < hi) { const m = (lo + hi) >> 1; if (days[m] <= day) lo = m + 1; else hi = m; } return lo; };
+    }
+    // xmax: laws run a little past the term (the President signs the last bills after it ends).
+    function lineChart(el, { series, height = 300, ymax, xmax = TERM }) {
+      // Drawn at the width it's shown, so text stays 12px on phones too.
+      const W = Math.max(320, Math.round(el.clientWidth || 1000));
+      height = W < 600 ? Math.round(height * 0.85) : height;
+      const H = height, L = 48, R = 92, T = 14, B = 34;
+      const x = d => L + d / xmax * (W - L - R), y = v => T + (1 - v / ymax) * (H - T - B);
+      const ticks = []; const step = ymax > 1000 ? 500 : ymax > 300 ? 100 : 50;
+      for (let v = 0; v <= ymax; v += step) ticks.push(v);
+      const xt = W < 800 ? [[0, 'Start'], [365, '1 year'], [TERM, '2 years']] : [[0, 'Start'], [182, '6 months'], [365, '1 year'], [547, '18 months'], [TERM, '2 years']];
+      const path = s => { let p = ''; const lastDay = s.until ?? xmax; for (let d = 0; d <= lastDay; d += 2) p += `${p ? 'L' : 'M'}${x(d).toFixed(1)},${y(s.f(d)).toFixed(1)}`; return p; };
+      const ends = series.map(s => ({ s, v: s.f(s.until ?? xmax), d: s.until ?? xmax }));
+      // Spread end labels so they don't overlap.
+      const placed = [...ends].sort((a, b) => y(a.v) - y(b.v)); for (let i = 1; i < placed.length; i++) placed[i].ly = Math.max(y(placed[i].v), (placed[i - 1].ly ?? y(placed[i - 1].v)) + 16); placed[0].ly = y(placed[0].v);
+      el.innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="${esc(series.map(s => `${s.label}: ${fmt(s.f(N))} at day ${N}${s.until == null ? `, ${fmt(s.f(TERM))} at the end` : ''}`).join('; '))}">
+          ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#444" stroke-width="1"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="12" fill="#b0b0b0">${fmt(v)}</text>`).join('')}
+          ${xt.map(([d, t]) => `<text x="${x(d)}" y="${H - 10}" text-anchor="${d === 0 ? 'start' : d === TERM && xmax === TERM ? 'end' : 'middle'}" font-size="12" fill="#b0b0b0">${t}</text>`).join('')}
+          ${xmax > TERM ? `<line x1="${x(TERM)}" x2="${x(TERM)}" y1="${T}" y2="${H - B}" stroke="#666" stroke-width="1"/><text x="${x(TERM) + 4}" y="${H - B - 6}" font-size="11" fill="#b0b0b0">term ends;</text><text x="${x(TERM) + 4}" y="${H - B + 7}" font-size="11" fill="#b0b0b0">last signings</text>` : ''}
+          <line x1="${x(N)}" x2="${x(N)}" y1="${T}" y2="${H - B}" stroke="#ffc1cc" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x="${x(N) - 6}" y="${T + 10}" text-anchor="end" font-size="12" fill="#e4e4e4">Today (day ${fmt(N)})</text>
+          ${[...series].reverse().map(s => `<path d="${path(s)}" fill="none" stroke="${STYLE[s.c].color}" stroke-width="${STYLE[s.c].width}" stroke-dasharray="${STYLE[s.c].dash}" stroke-linejoin="round"/>`).join('')}
+          ${placed.map(e => `<circle cx="${x(e.d)}" cy="${y(e.v)}" r="4" fill="${STYLE[e.s.c].color}" stroke="#363636" stroke-width="2"/><text x="${x(e.d) + 8}" y="${e.ly + 4}" font-size="12" fill="${e.s.c === CUR ? '#f3f3f3' : '#c4c4c4'}" font-weight="${e.s.c === CUR ? 700 : 400}">${ord(e.s.c)} · ${fmt(e.v)}</text>`).join('')}
+          <line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="#e4e4e4" stroke-width="1" opacity="0"/>
+          <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" class="hit"/>
+        </svg>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-600 mt-1">${series.map(s => `<span class="inline-flex items-center gap-1.5"><svg width="22" height="6" aria-hidden="true"><line x1="0" x2="22" y1="3" y2="3" stroke="${STYLE[s.c].color}" stroke-width="${STYLE[s.c].width}" stroke-dasharray="${STYLE[s.c].dash}"/></svg>${ord(s.c)} Congress (${s.c === 119 ? '2025–26' : s.c === 118 ? '2023–24' : '2021–22'})</span>`).join('')}</div>`;
+      const svg = el.querySelector('svg'), xh = svg.querySelector('.xh');
+      const move = ev => {
+        const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) / r.width * W;
+        const d = Math.max(0, Math.min(xmax, Math.round((px - L) / (W - L - R) * xmax)));
+        xh.setAttribute('x1', x(d)); xh.setAttribute('x2', x(d)); xh.setAttribute('opacity', 0.5);
+        tip.innerHTML = `<div class="font-semibold mb-1">Day ${fmt(d)}</div>` + series.map(s => `<div class="flex justify-between gap-4"><span>${ord(s.c)} <span class="text-gray-500">${dateOf(s.c, d)}</span></span><span class="tabular-nums">${s.until != null && d > s.until ? '—' : fmt(s.f(d))}</span></div>`).join('');
+        tip.classList.remove('hidden'); tip.style.left = `${Math.min(ev.clientX + 14, innerWidth - 270)}px`; tip.style.top = `${ev.clientY + 14}px`;
+      };
+      svg.querySelector('.hit').addEventListener('pointermove', move);
+      svg.querySelector('.hit').addEventListener('pointerleave', () => { tip.classList.add('hidden'); xh.setAttribute('opacity', 0); });
+    }
+
+    // --- 3. Laws chart -----------------------------------------------------------------------
+    const lawSeries = [CUR, ...PAST].map(c => ({ c, label: `${ord(c)} Congress`, f: cumulative(c, C[c].laws), until: c === CUR ? N : null }));
+    const LAST_SIGNING = Math.max(...PAST.flatMap(c => C[c].laws.map(x => dayOf(c, x))));
+    lineChart(document.getElementById('m-laws-chart'), { series: lawSeries, ymax: 400, xmax: LAST_SIGNING + 4 });
+    const endLaws = c => C[c].laws.length;
+    document.getElementById('m-laws-note').innerHTML =
+      `Laws pile up at the end of a term, when Congress passes what it can before it expires. The ${ord(118)} had ${fmt(lawsNow(118))} laws at this point and finished with ${fmt(endLaws(118))}; the ${ord(117)} went from ${fmt(lawsNow(117))} to ${fmt(endLaws(117))}.`;
+    const checkpoints = [[182, '6 months'], [365, '1 year'], [547, '18 months'], [N, `Today (day ${N})`], [TERM, 'End of term'], [LAST_SIGNING, 'With laws signed after the term']];
+    document.getElementById('m-laws-table').innerHTML = `<table class="text-sm tabular-nums"><thead class="text-xs text-gray-500"><tr><th class="text-left pr-6 py-1">Point in term</th>${[CUR, ...PAST].map(c => `<th class="text-right pr-6">${ord(c)}</th>`).join('')}</tr></thead><tbody>${checkpoints.map(([d, t]) => `<tr class="border-t border-gray-200"><td class="pr-6 py-1">${t}</td>${lawSeries.map(s => `<td class="text-right pr-6">${s.until != null && d > s.until ? '—' : fmt(s.f(d))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+
+    // --- 4. Funnel ---------------------------------------------------------------------------
+    const intro = C[CUR].introduced_law_capable.by_cutoff, voted = C[CUR].floor_voted.by_cutoff, laws = lawsNow(CUR);
+    const oneIn = (a, b) => Math.round(a / b);
+    document.getElementById('m-funnel-note').innerHTML = `Most bills never get a vote. So far in the ${ord(CUR)} Congress, about <strong>1 in ${oneIn(intro, voted)}</strong> bills introduced has had a recorded floor vote, and about <strong>1 in ${oneIn(intro, laws)}</strong> has become law. Bars are drawn to scale.`;
+    const step = (label, n, sub) => `
+      <div>
+        <div class="flex items-baseline justify-between gap-3"><span class="text-sm font-semibold text-gray-900">${label}</span><span class="text-sm tabular-nums text-gray-800"><strong>${fmt(n)}</strong>${sub ? ` <span class="text-gray-500">· ${sub}</span>` : ''}</span></div>
+        <div class="h-3 rounded-full bg-gray-100 mt-1.5 overflow-hidden"><div class="h-full rounded-full" style="width:max(${n / intro * 100}%, 3px);background:#13a5b2"></div></div>
+      </div>`;
+    document.getElementById('m-funnel').innerHTML =
+      step('Bills introduced', intro, 'bills and joint resolutions') +
+      step('Got a recorded floor vote', voted, `${(voted / intro * 100).toFixed(1)}% of those introduced`) +
+      step('Became law', laws, `${(laws / intro * 100).toFixed(1)}%`) +
+      `<p class="text-xs text-gray-500">Not every law had a recorded vote: many pass by voice vote or unanimous consent.</p>`;
+    document.getElementById('m-funnel-past').innerHTML = PAST.map(c => {
+      const i = C[c].introduced_law_capable.total, l = endLaws(c);
+      return `<div class="text-sm"><p class="font-semibold text-gray-900">The full ${ord(c)} Congress</p><p class="text-gray-600">${fmt(i)} bills introduced, ${fmt(C[c].floor_voted.total)} got a recorded vote, ${fmt(l)} became law: about <strong class="text-gray-900">1 in ${oneIn(i, l)}</strong>.</p></div>`;
+    }).join('');
+
+    // --- 5. Votes charts -------------------------------------------------------------------
+    const vmax = Math.ceil(Math.max(...[CUR, ...PAST].flatMap(c => [C[c].house.length, C[c].senate.length])) / 250) * 250;
+    for (const ch of ['house', 'senate']) {
+      lineChart(document.getElementById(`m-${ch}-chart`), { height: 300, ymax: vmax, series: [CUR, ...PAST].map(c => ({ c, label: `${ord(c)} Congress`, f: cumulative(c, C[c][ch]), until: c === CUR ? N : null })) });
+    }
+    const hv = c => upTo(c, C[c].house, N), sv = c => upTo(c, C[c].senate, N);
+    document.getElementById('m-votes-note').innerHTML = `At this point the House had held ${fmt(hv(CUR))} roll-call votes (${ord(118)}: ${fmt(hv(118))}, ${ord(117)}: ${fmt(hv(117))}) and the Senate ${fmt(sv(CUR))} (${ord(118)}: ${fmt(sv(118))}, ${ord(117)}: ${fmt(sv(117))}). Most Senate roll calls are on nominations.`;
+
+    // --- 6. Party split by month (this Congress) ------------------------------------------------
+    const P = D.party_119;
+    const share = t => t.same + t.opposed ? Math.round(t.opposed / (t.same + t.opposed) * 100) : null;
+    document.getElementById('m-party-note').innerHTML = `So far, most Democrats and most Republicans voted opposite ways on <strong>${share(P.totals.House)}%</strong> of House roll calls and <strong>${share(P.totals.Senate)}%</strong> of Senate roll calls. Comparing with earlier Congresses needs their vote-by-vote party totals (see notes).`;
+    {
+      const months = P.monthly, W = Math.max(320, Math.round(document.getElementById('m-party-chart').clientWidth || 1000)), RH = 120, L = 44, R = 8, T = 30, gap = 46, B = 28;
+      const H = T + 2 * RH + gap + B, bw = (W - L - R) / months.length;
+      const label = m => new Date(m.month + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      const row = (ch, top) => {
+        const y = v => top + (1 - v / 100) * RH;
+        return `<text x="${L}" y="${top - 12}" font-size="13" font-weight="700" fill="#f3f3f3">${ch}</text>
+          ${[0, 50, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#444"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#b0b0b0">${v}%</text>`).join('')}
+          ${months.map((m, i) => { const s = share(m[ch]); if (s == null) return '';
+            return `<rect x="${L + i * bw + 2}" y="${y(s)}" width="${bw - 4}" height="${y(0) - y(s)}" rx="2" fill="#8f68cb" data-tip="${esc(`${label(m)} · ${ch}: parties split on ${s}% (${m[ch].opposed} of ${m[ch].same + m[ch].opposed} roll calls)`)}"/>`; }).join('')}`;
+      };
+      document.getElementById('m-party-chart').innerHTML = `
+        <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="Share of roll calls where most Democrats and most Republicans voted opposite ways, by month: House and Senate">
+          ${row('House', T)}${row('Senate', T + RH + gap)}
+          ${months.map((m, i) => i % (W < 600 ? 6 : 3) === 0 ? `<text x="${L + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="12" fill="#b0b0b0">${new Date(m.month + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })}</text>` : '').join('')}
+        </svg>
+        <p class="text-xs text-gray-500 mt-1">Months with no bar had no roll calls where both parties took a side (recess).</p>`;
+      document.getElementById('m-party-chart').addEventListener('pointermove', ev => {
+        const t = ev.target.closest('[data-tip]');
+        if (!t) return tip.classList.add('hidden');
+        tip.textContent = t.dataset.tip; tip.classList.remove('hidden');
+        tip.style.left = `${Math.min(ev.clientX + 14, innerWidth - 270)}px`; tip.style.top = `${ev.clientY + 14}px`;
+      });
+      document.getElementById('m-party-chart').addEventListener('pointerleave', () => tip.classList.add('hidden'));
+    }
+  </script>
+</body>
+</html>

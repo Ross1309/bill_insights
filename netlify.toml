@@ -17,3 +17,8 @@
 # Bills after votes, so the new day's activity is in both.
 [functions."sync-bills"]
   schedule = "30 10 * * *"
+
+# "This Congress so far" series: bills introduced / passed a chamber since the last run,
+# then stats/congress-<n> rebuilt (after the other two, which it reads).
+[functions."sync-congress-stats"]
+  schedule = "0 11 * * *"

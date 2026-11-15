@@ -97,8 +97,11 @@ try {
   await waitText('#home-laws', /Recently became law[\s\S]*Signed/, 'Home: recent laws');
   await waitText('#home-numbers', /by the numbers[\s\S]*roll-call votes/, 'Home: by the numbers');
   await waitText('footer', /Data last updated/, 'Footer shows data freshness');
-  await page.click('#home-numbers a[href="#charts"]');
-  await waitText('#overview-container', /How busy has Congress been/, 'Charts page renders');
+  await page.click('#home-numbers a[href="#congress"]');
+  await waitText('#congress-container', /Congress (so far|in full)[\s\S]*From bill to law/, 'This Congress page renders');
+  await waitText('#congress-container', /Is this normal\?[\s\S]*(at this point)/, 'This Congress: compared with past Congresses');
+  await waitText('#overview-container', /How busy has Congress been/, 'This Congress: the charts below');
+  check(/#congress$/.test(page.url()), 'URL is #congress');
   await page.click('#nav-overview');
 
   // Header search: a member by name, a bill by number (Enter opens it).

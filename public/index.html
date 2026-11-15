@@ -37,6 +37,7 @@
   <nav class="sticky top-0 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar" role="tablist">
       <button id="nav-overview" role="tab" class="nav-tab">Home</button>
+      <button id="nav-congress" role="tab" class="nav-tab">This Congress</button>
       <button id="nav-issues" role="tab" class="nav-tab">Issues</button>
       <button id="nav-bills" role="tab" class="nav-tab">Bills</button>
       <button id="nav-votes" role="tab" class="nav-tab">Votes</button>
@@ -61,11 +62,18 @@
       <section id="home-numbers" class="empty:hidden"></section>
     </section>
 
-    <!-- VIEW 0a: CHARTS (#charts; linked from Home, no tab-bar button) -->
+    <!-- VIEW 0a: THIS CONGRESS (#congress; old #charts links land here): the Congress so
+         far next to the last two at the same point (congress-page.js), then the charts. -->
     <section id="view-charts" class="tab-view hidden">
+      <div id="congress-container" class="min-h-[300px] mb-12">
+        <div class="text-center py-12">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <p class="text-gray-500">Loading...</p>
+        </div>
+      </div>
       <div class="mb-6">
-        <h2 class="font-serif text-2xl font-bold text-gray-900">This Congress in charts</h2>
-        <p class="text-sm text-gray-500">What the official record shows about this Congress at a glance. Every number links back to roll-call votes and member records you can browse.</p>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">More charts</h2>
+        <p class="text-sm text-gray-500">Votes week by week, party agreement by month, how votes turned out, and each state's delegation.</p>
       </div>
       <div id="overview-container" class="min-h-[300px]">
         <div class="text-center py-12">
@@ -251,6 +259,16 @@
             <ul>
               <li>Written by an AI model (OpenAI gpt-4o-mini) <strong>only from the official CRS summary</strong>, and labeled with that source. The model is told to stay neutral and not add anything that isn't in the CRS text.</li>
               <li>No CRS summary yet means no AI summary: the bill says CRS hasn't published one. We never summarize from a title alone. Waiting bills are re-checked every night in turn (25 a night, bills with new activity first), so a new CRS summary usually appears within days for a bill that's moving, and within about six weeks otherwise.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>This Congress so far</h3>
+            <ul>
+              <li><strong>Same point in the term:</strong> a Congress starts on January 3 of an odd year; "day N" is N days after that, so each Congress is compared with the last two at the same stage of their two-year terms.</li>
+              <li><strong>Bills</strong> are measures that can become law (H.R., S., H.J.Res., S.J.Res.), counted by introduction date. <strong>Passed a chamber / both:</strong> the first "Passed/agreed to in House" or "in Senate" action. <strong>Laws:</strong> the "Became Public/Private Law" action, including bills signed after a term ended.</li>
+              <li><strong>Parties split:</strong> most Democrats voted the opposite way from most Republicans (Yea vs Nay); ties, quorum calls and Speaker elections are left out.</li>
+              <li><strong>Sources:</strong> GovInfo's bill status files (the bulk record of every bill's actions) and Congress.gov for bills; the House Clerk and senate.gov for votes and party totals. The current Congress is updated nightly from Congress.gov.</li>
             </ul>
           </section>
 
