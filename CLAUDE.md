@@ -265,7 +265,8 @@ id, label, title, law_number, signed, first summary bullet), `laws_total` and
 the page's Earlier/Later links). `stats/overview.this_week` = the latest active week's
 summary + up to 3 laws and 3 passed bills (the Overview card; no extra read). Rules: laws by
 the "Became Public Law" action date (`lawSigning`); passed/failed = voteCategory 'passage'
-by result; closest = 3 smallest margins among passage/cloture/nomination/amendment. Nightly
+by result, House rules (`isRuleVote`) kept apart in `rules` + `counts.rules` ("Debate rules";
+vote cards say "Agreed to"); closest = 3 smallest margins among passage/cloture/nomination/amendment. Nightly
 rebuilds recompute the last 3 weeks (merging into stats/weeks); `build-stats.js` does all.
 Vote index entries carry `legislation` + `document_title` for this (nominee names).
 
