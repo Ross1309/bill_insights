@@ -4,6 +4,9 @@
 import { getJson, fetchWithRetry } from './http.js';
 import { ordinal } from './congress.js';
 import { topicTags } from './topics.js';
+import { stageFromActions } from '../../public/stage.js';
+
+export { stageFromActions };
 
 const API = 'https://api.congress.gov/v3';
 
@@ -244,36 +247,7 @@ export async function summaryUpdate(bill, existingSummary, keys) {
 
 // --- Issue-tracker enrichment: CRS subjects, legislative stage, sponsor, topics ---
 
-// Stages in order. Concurrent/simple resolutions stop at passed_both / passed_one.
-// (introduced -> committee -> passed_one -> passed_both -> to_president -> law)
-
-// Stage from the action history. Library of Congress action text starts with
-// "Passed/agreed to in House: …" on success and "Failed of passage/not agreed to in
-// House: …" on failure, so match at the start (a substring test confuses the two).
-export function stageFromActions(actions = [], { isLaw = false } = {}) {
-  const texts = actions.map(a => (a.text || '').trim().toLowerCase());
-  const has = re => texts.some(t => re.test(t));
-  const passedHouse = has(/^passed\/agreed to in house/);
-  const passedSenate = has(/^passed\/agreed to in senate/);
-  let stage = 'introduced';
-  if (has(/referred to/)) stage = 'committee';
-  if (passedHouse || passedSenate) stage = 'passed_one';
-  if (passedHouse && passedSenate) stage = 'passed_both';
-  if (has(/presented to president/)) stage = 'to_president';
-  if (isLaw || has(/became (public|private) law/)) stage = 'law';
-  // Signing date: the "Became Public/Private Law" action (later actions, e.g. a committee
-  // report filed afterwards, can follow it, so the latest action isn't always it).
-  const lawAction = actions.find(a => /^became (public|private) law/i.test((a.text || '').trim()));
-  return {
-    stage,
-    law_date: lawAction?.actionDate || null,
-    passed_house: passedHouse,
-    passed_senate: passedSenate,
-    failed_house: has(/^failed of passage\/not agreed to in house/),
-    failed_senate: has(/^failed of passage\/not agreed to in senate/),
-    vetoed: has(/vetoed by president/),
-  };
-}
+// Stage + flags from the action history: shared with the page (public/stage.js).
 
 // Extra fields for the issue tracker (3 Congress.gov requests: detail is passed in,
 // plus subjects and actions). `detail` is the bill-detail response's `bill`.

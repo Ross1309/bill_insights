@@ -193,3 +193,34 @@ test('resultWord: rules are agreed to, nominations confirmed, bills passed', asy
   assert.equal(resultWord({ outcome: 'succeeded', bill: { id: 'hr1-119', title: 'An Act' } }), 'Passed');
   assert.equal(resultWord({ outcome: 'succeeded', bill: null, question: 'On the Nomination' }), 'Confirmed');
 });
+
+test('stageSteps: bills, resolutions, failures, vetoes', async () => {
+  const { stageSteps } = await import('../public/stage.js');
+  const states = s => s.steps.map(x => x.state[0]).join('');
+  const b = stageSteps({ type: 'HR', chamber: 'House', stage: 'passed_one', passed_house: true });
+  assert.deepEqual(b.steps.map(x => x.label), ['Introduced', 'Committee', 'Passed House', 'Passed Senate', 'To the President', 'Law']);
+  assert.equal(states(b), 'dddttt');
+  assert.equal(b.status, 'Passed in the House; next: the Senate');
+  // Senate bill: Senate first.
+  assert.equal(stageSteps({ type: 'S', chamber: 'Senate', stage: 'committee' }).steps[2].label, 'Passed Senate');
+  assert.equal(stageSteps({ type: 'S', chamber: 'Senate', stage: 'committee' }).status, 'In committee');
+  const law = stageSteps({ type: 'HR', chamber: 'House', stage: 'law', passed_house: true, passed_senate: true });
+  assert.equal(states(law), 'dddddd'); assert.equal(law.status, 'Became law'); assert.ok(law.final);
+  // Simple resolution: one chamber, final once agreed to.
+  const res = stageSteps({ type: 'HRES', chamber: 'House', stage: 'passed_one', passed_house: true });
+  assert.deepEqual(res.steps.map(x => x.label), ['Introduced', 'Committee', 'Agreed to in House']);
+  assert.equal(res.status, 'Agreed to in the House'); assert.ok(res.final);
+  // Concurrent resolution: both chambers, no President.
+  assert.equal(stageSteps({ type: 'SCONRES', chamber: 'Senate', stage: 'passed_both', passed_house: true, passed_senate: true }).status, 'Agreed to by both chambers');
+  // Failed in the House.
+  const f = stageSteps({ type: 'HR', chamber: 'House', stage: 'committee', failed_house: true });
+  assert.equal(f.steps[2].label, 'Failed in House'); assert.equal(f.steps[2].state, 'failed'); assert.equal(f.status, 'Failed in the House');
+  // Vetoed.
+  const v = stageSteps({ type: 'HJRES', chamber: 'House', stage: 'to_president', passed_house: true, passed_senate: true, vetoed: true });
+  assert.equal(v.steps[4].label, 'Vetoed'); assert.equal(v.status, 'Vetoed by the President');
+  // Constitutional amendment: no President; final after both chambers.
+  const am = stageSteps({ type: 'HJRES', chamber: 'House', title: 'Proposing an amendment to the Constitution of the United States to ...', stage: 'passed_both', passed_house: true, passed_senate: true });
+  assert.equal(am.steps.length, 4); assert.equal(am.status, 'Passed both chambers; goes to the states for ratification'); assert.ok(am.final);
+  // No stage data -> no tracker (never guessed).
+  assert.equal(stageSteps({ type: 'HR' }), null);
+});

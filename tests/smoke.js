@@ -138,6 +138,8 @@ try {
 
   await page.click('#nav-bills');
   await waitText('#bills-container', /Latest action \(\d{4}-\d{2}-\d{2}\)/, 'Bills tab lists bills');
+  await waitText('#bills-container', /Became law|Passed in the|Agreed to|Sent to the President|Passed both|Vetoed|Failed in the/, 'Bills tab: Moving or passed with stage trackers');
+  check(await page.$eval('#bill-scope-filters [data-scope="moving"]', el => el.getAttribute('aria-pressed') === 'true'), 'Moving or passed is the default');
   const dates = await page.$$eval('#bills-container', els => [...els[0].innerText.matchAll(/Latest action \((\d{4}-\d{2}-\d{2})\)/g)].map(m => m[1]));
   check(dates.length > 0 && dates.every((d, i) => !i || dates[i - 1] >= d), `Bills are newest first (${dates.length} checked)`);
   await page.fill('#search-input', 'HR 1');

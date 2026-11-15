@@ -677,6 +677,21 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - `officialLabel()` (util.js) turns "HR 2102"/"hres1247-119"/"PN 1181" into "H.R. 2102",
   "H.Res. 1247", "Nomination PN 1181"; use it wherever a bill number is shown.
 
+## Bill stage tracker + "Moving or passed" (2026-11-14)
+
+- `public/stage.js`: `stageFromActions` (shared with the server; `netlify/lib/bills.js`
+  re-exports it), `stageSteps(bill)` (steps by type: bills/joint res. to the President and
+  Law; H.Res./S.Res. one chamber; concurrent both; constitutional amendments end after both
+  chambers), `stageTrackerHtml` (compact on cards, labeled in the bill window). The window
+  uses the stored stage, else `stageFromDetail` (bill-detail actions, only when all came back).
+  Bills without stage data (~1,900 never enriched) show no tracker.
+- Bills tab defaults to **Moving or passed**: `where('stage','in',MOVING_STAGES)` + House
+  rules (`isRuleBill`) dropped in the browser. Needs indexes (stage ASC, latest_action_date
+  DESC) and (category ASC, stage ASC, latest_action_date DESC); without them it filters
+  pages in the browser (console warning with Firestore's create link). The service
+  account can't create indexes (403), so they're created in the Firebase console.
+- Exact bill-number search ignores the scope.
+
 ## Votes paging (frontend)
 
 - `loadVotes` pages `vote_summaries` (not `votes`): `orderBy('date','desc')`, 10 per page,

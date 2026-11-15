@@ -101,8 +101,13 @@
     <section id="view-bills" class="tab-view hidden">
       <div class="mb-6">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Bills &amp; Summaries</h2>
-        <p class="text-sm text-gray-500">Recently updated bills from Congress.gov, with plain-language summaries labeled by source.</p>
+        <p class="text-sm text-gray-500">Bills from Congress.gov: where each one is in the process, with plain-language summaries labeled by source.</p>
       </div>
+      <div id="bill-scope-filters" class="flex flex-wrap gap-2 mb-2" role="group" aria-label="Which bills">
+        <button type="button" data-scope="moving" class="filter-chip">Moving or passed</button>
+        <button type="button" data-scope="all" class="filter-chip">All bills</button>
+      </div>
+      <p id="bill-scope-note" class="text-xs text-gray-500 mb-6"></p>
       <div class="mb-8 flex flex-col md:flex-row gap-4 md:items-center justify-between">
         <div class="w-full md:w-1/2 lg:w-1/3">
           <label for="search-input" class="sr-only">Search bills</label>
@@ -236,6 +241,8 @@
               <li>The Bills tab lists them by the date of their <strong>latest action</strong>, newest first.</li>
               <li>Categories (Economy, Healthcare, Foreign Affairs) come from the bill's <strong>policy area</strong>, which the Congressional Research Service (CRS) assigns.</li>
               <li><strong>Stage</strong> comes from the official action history: a chamber counts as passing a bill only when an action <em>starts</em> with "Passed/agreed to in House/Senate". "Became law" requires a law number or a "Became Public Law" action.</li>
+              <li><strong>Stage tracker</strong> (bill cards and bill pages): Introduced, Committee, each chamber, the President, Law. Simple resolutions (H.Res., S.Res.) need only their own chamber; concurrent resolutions both chambers; neither goes to the President. Constitutional amendments go to the states after both chambers, not the President (ratification isn't tracked). "Failed" and "Vetoed" are shown only when an official action says so. Bills we haven't stored get their stage from the same rule applied to their action history; with no stage data, no tracker is shown.</li>
+              <li><strong>Moving or passed</strong> (the Bills tab's default): bills and resolutions that passed at least one chamber, sent to the President or became law. House rules, which only set the terms of debate for another bill, are left out. "All bills" shows everything we store.</li>
             </ul>
           </section>
 

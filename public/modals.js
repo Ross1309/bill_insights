@@ -6,6 +6,7 @@ import { fetchFunction, getBill, getFirestoreDoc, getMember, getVote, getVotesFo
 import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { voteCardHtml } from "./vote-card.js";
+import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
@@ -151,7 +152,7 @@ const billModal = {
     return `
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2 text-xs">
-          <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded uppercase">${escapeHtml(label)}</span>
+          <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded">${escapeHtml(label)}</span>
           ${congress ? `<span class="text-gray-500">${escapeHtml(ordinal(Number(congress)))} Congress</span>` : ""}
           ${policy ? `<span class="text-gray-500">· ${escapeHtml(policy)}</span>` : ""}
         </div>
@@ -193,7 +194,10 @@ const billModal = {
         </section>`
         : d ? `<p class="text-xs text-gray-400 mt-3">No official CRS summary yet.</p>`
         : e.errors.detail ? errorBlock(e.errors.detail) : spinner("Loading sponsor and official summary…");
+      // Stored stage, else worked out from the official actions bill-detail returned.
+      const staged = b?.stage ? b : stageFromDetail(d);
       return `
+        ${staged ? stageTrackerHtml(staged) : ""}
         ${factList(facts)}
         ${ai}
         ${crs}

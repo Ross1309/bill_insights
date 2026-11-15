@@ -2,6 +2,8 @@
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
 import { escapeHtml, officialLabel, ordinal, safeHref } from "./util.js";
+import { isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
+import { setChipGroup } from "./members.js";
 
 // DOM Elements
 const billsContainer = document.getElementById("bills-container");
@@ -23,6 +25,16 @@ let billsGeneration = 0;   // bumps on category change so stale pages are droppe
 let billsStarted = false;   // first page is requested when the Bills tab opens
 let categoryIndexReady = true;   // false once the (category, latest_action_date) index is found missing
 let billsError = null;   // message shown instead of bills until the next reset
+// "moving": bills that passed at least one chamber (stage in MOVING_STAGES), the default;
+// "all": every stored bill. Filtered in the query; needs the (stage, latest_action_date)
+// and (category, stage, latest_action_date) indexes. Without them pages are filtered in
+// the browser (bigger pages, so each still shows something).
+let billScope = "moving";
+let movingIndexReady = true;
+const SCOPE_NOTE = {
+  moving: "Bills and resolutions that have passed at least one chamber, newest action first (House rules, which only set the terms of debate, left out). Most bills never get a vote: switch to All bills to see those too.",
+  all: "Every bill we track, including ones just introduced or in committee, newest action first.",
+};
 
 // First page of bills, the first time the tab opens (Overview is the default tab).
 export function startBills() {
@@ -61,26 +73,43 @@ async function loadBills({ reset = false } = {}) {
     // happens in the query so every page is full; it needs the (category ASC,
     // latest_action_date DESC) index in firestore.indexes.json. Until that index
     // exists, categories fall back to the older (category, update_date) index.
-    const constraints = [];
-    if (activeCategory !== "all") constraints.push(where("category", "==", activeCategory));
-    constraints.push(orderBy(activeCategory !== "all" && !categoryIndexReady ? "update_date" : "latest_action_date", "desc"));
-    if (billsCursor) constraints.push(startAfter(billsCursor));
-    constraints.push(limit(BILLS_PAGE_SIZE));
+    const serverStage = billScope === "moving" && movingIndexReady;
+    const clientStage = billScope === "moving" && !movingIndexReady;
+    const size = clientStage ? 48 : BILLS_PAGE_SIZE;
+    let found = 0;
+    // House rules are dropped from "Moving or passed" here, so a page can come up short:
+    // fetch again (a few rounds at most).
+    for (let round = 0; round < (clientStage ? 5 : billScope === "moving" ? 3 : 1) && !billsExhausted && found < BILLS_PAGE_SIZE; round++) {
+      const constraints = [];
+      if (activeCategory !== "all") constraints.push(where("category", "==", activeCategory));
+      if (serverStage) constraints.push(where("stage", "in", MOVING_STAGES));
+      constraints.push(orderBy(activeCategory !== "all" && !categoryIndexReady ? "update_date" : "latest_action_date", "desc"));
+      if (billsCursor) constraints.push(startAfter(billsCursor));
+      constraints.push(limit(size));
 
-    const snapshot = await getDocs(query(collection(db, "bills"), ...constraints));
-    if (generation !== billsGeneration) return;
+      const snapshot = await getDocs(query(collection(db, "bills"), ...constraints));
+      if (generation !== billsGeneration) return;
 
-    const page = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    rememberBills(page);
-    allBills.push(...page);
-    billsCursor = snapshot.docs.at(-1) || billsCursor;
-    billsExhausted = snapshot.docs.length < BILLS_PAGE_SIZE;
+      const page = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      rememberBills(page);
+      const kept = billScope === "moving" ? page.filter(b => MOVING_STAGES.includes(b.stage) && !isRuleBill(b)) : page;
+      allBills.push(...kept);
+      found += kept.length;
+      billsCursor = snapshot.docs.at(-1) || billsCursor;
+      billsExhausted = snapshot.docs.length < size;
+    }
     billsLoading = false;
     applyBillFilters();
   } catch (err) {
     if (generation !== billsGeneration) return;
     billsLoading = false;
-    console.error("Error fetching bills:", err);
+    // A missing index is handled (fallback below): a warning, with Firestore's create link.
+    const fallback = err.code === "failed-precondition" && ((billScope === "moving" && movingIndexReady) || (activeCategory !== "all" && categoryIndexReady));
+    (fallback ? console.warn : console.error)("Error fetching bills:", err);
+    if (err.code === "failed-precondition" && billScope === "moving" && movingIndexReady) {
+      movingIndexReady = false; // filter in the browser instead
+      return loadBills({ reset: true });
+    }
     if (err.code === "failed-precondition" && activeCategory !== "all" && categoryIndexReady) {
       categoryIndexReady = false; // retry this page on the older index
       return loadBills({ reset: true });
@@ -163,11 +192,12 @@ function renderBills(bills, term = "") {
         <div class="bg-surface border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded uppercase">${escapeHtml(billLabel(bill))}</span>
+              <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded">${escapeHtml(billLabel(bill))}</span>
               <span>${bill.congress ? `${escapeHtml(ordinal(Number(bill.congress)))} Congress` : ''}</span>
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
             <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(bill.title || 'Untitled Bill')}</button></h3>
+            ${stageTrackerHtml(bill, { compact: true })}
             ${renderSummary(bill)}
           </div>
           <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
@@ -192,6 +222,18 @@ export function setupBillFilters() {
       debounce = setTimeout(lookupBillNumber, 300);
     });
   }
+
+  setChipGroup("bill-scope-filters", "scope", billScope);
+  const note = document.getElementById("bill-scope-note");
+  if (note) note.textContent = SCOPE_NOTE[billScope];
+  document.getElementById("bill-scope-filters")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-scope]");
+    if (!b || b.dataset.scope === billScope) return;
+    billScope = b.dataset.scope;
+    setChipGroup("bill-scope-filters", "scope", billScope);
+    if (note) note.textContent = SCOPE_NOTE[billScope];
+    loadBills({ reset: true });
+  });
 
   document.querySelectorAll("#category-filters .filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -254,8 +296,10 @@ function applyBillFilters() {
   // "HR 1234", "hr1234" and "1234" should all match bill HR 1234
   const compactTerm = term.replace(/[\s.]/g, "");
 
-  const matches = bill => {
+  // Exact bill-number hits ignore "Moving or passed": someone asking for H.R. 5 wants it.
+  const matches = (bill, { anyStage = false } = {}) => {
     if (activeCategory !== "all" && bill.category !== activeCategory) return false;
+    if (!anyStage && billScope === "moving" && (!MOVING_STAGES.includes(bill.stage) || isRuleBill(bill))) return false;
     if (!term) return true;
     const title = (bill.title || "").toLowerCase();
     const policyArea = (bill.policy_area || "").toLowerCase();
@@ -266,7 +310,7 @@ function applyBillFilters() {
   const byId = new Map();
   for (const bill of allBills) if (matches(bill)) byId.set(bill.id, bill);
   if (term && numberLookupTerm.toLowerCase() === term) {
-    for (const bill of numberMatches) if (matches(bill)) byId.set(bill.id, bill);
+    for (const bill of numberMatches) if (matches(bill, { anyStage: true })) byId.set(bill.id, bill);
   }
   // Exact bill-number hits ("HR 1" -> HR 1, not HR 10970) first, then newest.
   const parsed = term ? parseBillNumberTerm(term) : null;
