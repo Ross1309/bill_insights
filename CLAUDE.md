@@ -164,6 +164,10 @@ npm run health                                    # did last night's syncs succe
 in `public/` (comments too) for class names, so even a JS comment can make
 `public/styles.css` stale ("invisible" in a comment did, 2026-11-12); the stale-CSS check
 then fails the Netlify build and nothing deploys. Fix: `npm run build:css` and commit.
+CI and Netlify run **Node 24**; this Mac runs 26. Date formatting (Intl/ICU) differs between
+them ("Mar 25" vs "Mar ’25" broke a deploy on 2026-11-15), so for date-related changes also
+run `npx -y node@24 --test tests/*.test.js`, and don't let tests or UI depend on Intl's
+short forms (build labels by hand).
 
 **Checks and alerts.** ESLint runs in `npm test` (Netlify build) and catches undefined
 names; it would have blocked the Nov 12 regression (a refactor deleted `renderFinanceTab`).

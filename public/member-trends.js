@@ -5,7 +5,14 @@
 
 import { escapeHtml as esc } from "./util.js";
 
-const monthName = (ym, style = "short") => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("en-US", { month: style, year: style === "short" ? "2-digit" : "numeric", timeZone: "UTC" });
+// "Mar ’25" / "March 2025", built by hand: Intl's short form differs between engines
+// ("Mar 25" in Node 24, "Mar ’25" in Node 26 and some browsers).
+const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const monthName = (ym, style = "short") => {
+  const [y, m] = ym.split("-").map(Number);
+  return style === "short" ? `${SHORT[m - 1]} ’${String(y).slice(2)}` : `${LONG[m - 1]} ${y}`;
+};
 const pct = (a, b) => (b ? Math.round(a / b * 100) : null);
 
 // Every month from the first to the last with votes (recess months stay as gaps).
