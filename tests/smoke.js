@@ -197,6 +197,13 @@ try {
     await waitText('#find-reps-result', /Your representatives: WA-7[\s\S]*Jayapal/, 'Find your representatives (address -> WA-7)');
   }
 
+  // Shared links carry the item's own preview (netlify/functions/share.js); live only.
+  if (LIVE) {
+    const html = await (await fetch(new URL('bill/hr2102-119', url))).text();
+    check(/<meta property="og:title" content="H\.R\. 2102: [^"]+"/.test(html) && /og:image/.test(html), 'Shared bill link has its own preview');
+    const sitemap = await (await fetch(new URL('sitemap.xml', url))).text();
+    check((sitemap.match(/<url>/g) || []).length > 1000, 'Sitemap lists bills and members');
+  }
   await openDetail('member', MEMBER);
   await waitText('#modal-root', /Jayapal/, 'Member detail opens');
   await waitText('#modal-root', /Votes this Congress[\s\S]*Missed \d+ of \d+ roll-call votes[\s\S]*Typical House member/, 'Member window shows missed votes with context');

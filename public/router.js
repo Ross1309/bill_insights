@@ -47,7 +47,12 @@ export function tabHash(tab) {
 export const detailHash = (kind, id) => `#${kind}/${encodeURIComponent(id)}`;
 
 // Absolute link for sharing (no hash = Overview).
-export const shareUrl = hash => `${location.origin}${location.pathname}${hash || ""}`;
+// Details get a path link (/bill/hr2102-119): previews and search engines see that item
+// (netlify/functions/share.js); everything else stays a #route.
+export const shareUrl = hash => {
+  const m = /^#(bill|member|vote)\/(.+)$/.exec(hash || "");
+  return m ? `${location.origin}/${m[1]}/${m[2]}` : `${location.origin}/${hash || ""}`;
+};
 
 const current = () => location.hash || "";
 let lastTabHash = "";   // where closing all details returns to
@@ -112,6 +117,10 @@ function apply(route) {
 
 // Call once after every module has registered.
 export function startRouter() {
+  // A path link (/bill/<id>, /member/<id>, /vote/<id>, served by share.js) becomes its
+  // #route, so the rest of the app (and its relative links) work as usual.
+  const path = /^\/(bill|member|vote)\/([^/]+)\/?$/.exec(location.pathname);
+  if (path) history.replaceState(history.state, "", `/#${path[1]}/${path[2]}`);
   addEventListener("popstate", () => {
     pushedDetails = history.state?.detailDepth || 0;
     apply(parseHash());

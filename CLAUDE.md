@@ -129,6 +129,8 @@ netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receip
                                    donation-size buckets, itemized by state (api.data.gov key)
 netlify/functions/find-district.js POST /api/find-district {address}: Census geocoder -> { state, district }
 netlify/functions/health.js        GET /api/health: stats/health via admin (CDN 5 min), for check-health.js
+netlify/functions/share.js         /bill/<id>, /member/<id>, /vote/<id>: the page with that item's title + preview tags
+netlify/functions/sitemap.js       /sitemap.xml: every stored bill + current member (CDN 1 day)
 netlify/functions/bill-detail.js   GET /api/bill-detail?id={bill_id}: sponsor, cosponsor count, latest CRS
                                    summary, action history (works for bills not in `bills`)
 netlify/lib/bills.js               Congress.gov fetch helpers, bill doc shaping,
@@ -749,6 +751,24 @@ stats/overview (monthly party split).
   the 119th until the 120th has 25 votes. The nightly job starts a new Congress's state by
   itself (first 60 days). Once the 119th's tail is over (mid-February 2027), run
   `build-congress-stats.js --congress 119 --write` to freeze its final figures.
+
+## Link previews and search (2026-11-15)
+
+Nothing after "#" reaches a server, so previews and search engines only saw the home page.
+- **Path links** `/bill/<id>`, `/member/<bioguideId>`, `/vote/<vote id>` (share.js, Netlify
+  function with `config.path`): index.html with the item's `<title>`, description, canonical,
+  Open Graph + Twitter tags (from Firestore; the home page's own tags in index.html are
+  replaced, never duplicated: `withMeta`). CDN-cached 1 day (404s 1 h). Bill: stage status
+  + first summary bullet; member: role + missed votes vs typical; vote: plain headline,
+  result, party tallies.
+- In the browser, router.js turns the path into its `#route` (replaceState), so everything
+  else is unchanged. index.html loads `/app.js` and `/styles.css` by **absolute** path (the
+  page is served at /bill/...): keep them absolute. **Copy link** (`shareUrl`) gives path
+  links for details; tabs stay `#routes`.
+- `public/og.png` (1200x630) from `mockups/og.html`; regenerate with Playwright:
+  `page.setViewportSize(1200x630)`, goto the file, screenshot to public/og.png.
+- `/sitemap.xml` (sitemap.js, ~2,600 reads per CDN miss, cached a day) + `public/robots.txt`.
+  Optional: submit the sitemap in Google Search Console (owner step).
 
 ## Trends (2026-11-15)
 
