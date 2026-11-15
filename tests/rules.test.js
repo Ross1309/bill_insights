@@ -183,3 +183,13 @@ test('stageFromActions: law_date from the Became Public/Private Law action', asy
   assert.equal(stageFromActions([{ actionDate: '2026-03-26', text: 'Became Private Law No: 119-1.' }]).law_date, '2026-03-26');
   assert.equal(stageFromActions([{ actionDate: '2026-01-01', text: 'Referred to committee.' }]).law_date, null);
 });
+
+test('resultWord: rules are agreed to, nominations confirmed, bills passed', async () => {
+  const { resultWord } = await import('../public/plain.js');
+  const rule = { outcome: 'succeeded', bill: { id: 'hres1650-119', title: 'Providing for consideration of the bill (H.R. 1013) to amend...' } };
+  assert.equal(resultWord(rule), 'Agreed to');
+  assert.equal(resultWord({ ...rule, outcome: 'failed' }), 'Rejected');
+  assert.equal(resultWord({ outcome: 'succeeded', kind: 'rule', bill: { id: 'hres1-119' } }), 'Agreed to');
+  assert.equal(resultWord({ outcome: 'succeeded', bill: { id: 'hr1-119', title: 'An Act' } }), 'Passed');
+  assert.equal(resultWord({ outcome: 'succeeded', bill: null, question: 'On the Nomination' }), 'Confirmed');
+});

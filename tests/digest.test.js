@@ -71,6 +71,11 @@ test('thisWeek key_votes: final votes and nominations, rules left out; recentLaw
   const card = thisWeek(computeWeeks(extra, laws, t2).get('2026-11-09'));
   assert.ok(isRuleVote({ bill: { title: 'Providing for consideration of the bill (H.R. 1)' } }));
   assert.ok(!card.key_votes.some(k => k.id === 'h6'));                 // the rule is procedural
+  const wk = computeWeeks(extra, laws, t2).get('2026-11-09');
+  assert.deepEqual(wk.rules.map(r => r.id), ['h6']);                    // listed apart...
+  assert.ok(!wk.passage.some(p => p.id === 'h6'));
+  assert.equal(wk.counts.rules, 1);
+  assert.equal(wk.counts.passed, computeWeeks(votes, laws, titles).get('2026-11-09').counts.passed); // ...not counted as passed
   assert.ok(card.key_votes.some(k => k.id === 's1'));                  // nominations are included
   assert.equal(card.key_votes[0].id, 'h4');                             // newest first
   assert.ok(card.key_votes.every(k => k.parties));

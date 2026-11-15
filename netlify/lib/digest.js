@@ -6,7 +6,8 @@
 // Everything is rule-based from stored records, and the page prints the rules:
 //  - Became law: bills whose latest action is "Became Public Law" with a date in the week
 //  - Passed / failed: roll calls whose question is passage of a bill or resolution
-//    (voteCategory 'passage'), by official result
+//    (voteCategory 'passage'), by official result; House rules (isRuleVote) are kept
+//    apart in `rules`
 //  - Closest votes: the smallest Yea-Nay margins among passage, cloture, nomination and
 //    amendment votes (procedural motions left out)
 //  - Nominations: Senate votes on a nomination, with the nominee from the vote record
@@ -68,8 +69,8 @@ export function computeWeeks(votes, laws, billsById, { congress, onlyWeeks } = {
     if (!weeks.has(monday)) {
       weeks.set(monday, {
         week: monday, week_end: addDays(monday, 6), congress: congress ?? null,
-        counts: { votes: { House: 0, Senate: 0 }, passed: 0, failed: 0, laws: 0, confirmed: 0, nominations: 0, same: 0, opposed: 0 },
-        laws: [], passage: [], closest: [], nominations: [],
+        counts: { votes: { House: 0, Senate: 0 }, passed: 0, failed: 0, rules: 0, laws: 0, confirmed: 0, nominations: 0, same: 0, opposed: 0 },
+        laws: [], passage: [], rules: [], closest: [], nominations: [],
       });
     }
     return weeks.get(monday);
@@ -94,7 +95,11 @@ export function computeWeeks(votes, laws, billsById, { congress, onlyWeeks } = {
       const cat = voteCategory(v.question || '');
       const outcome = voteOutcome(v.result || '');
       if (cat === 'passage' && outcome !== 'other') {
-        w.passage.push(voteItem(v, billsById));
+        const item = voteItem(v, billsById);
+        // House rules only set the terms of debate for another bill: listed apart, not
+        // counted as bills/resolutions passed.
+        if (isRuleVote(item)) { w.rules.push(item); w.counts.rules++; continue; }
+        w.passage.push(item);
         w.counts[outcome === 'succeeded' ? 'passed' : 'failed']++;
       }
       if (cat === 'nomination') {

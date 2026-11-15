@@ -4,6 +4,7 @@
 
 import { escapeHtml as esc, officialLabel, ordinal } from "./util.js";
 import { voteCardHtml } from "./vote-card.js";
+import { resultWord, ruleTarget } from "./plain.js";
 
 // "2026-11-09" -> "Nov 9" (calendar days; parsed at noon so no time zone shifts the day).
 const day = (ymd, opts = { month: "short", day: "numeric" }) => new Date(`${ymd}T12:00:00`).toLocaleDateString(undefined, opts);
@@ -20,6 +21,15 @@ const billLink = b => b?.id
 // The shared vote card (vote-card.js), two per row on wide screens.
 const voteGrid = (list, opts = {}) => `<div class="grid gap-4 md:grid-cols-2">${list.map(v =>
   voteCardHtml(v, { margin: opts.showMargin && Number.isFinite(v.margin) ? v.margin : null })).join("")}</div>`;
+
+// One line per House rule: "H.Res. 1650 · terms of debate for H.R. 1013 · Agreed to 215–209".
+const ruleRow = v => `
+  <li class="py-2 flex flex-wrap items-baseline gap-x-2">
+    ${billLink(v.bill)}
+    <span class="text-gray-800">terms of debate for ${esc(ruleTarget(v) || "another bill")}</span>
+    <span class="text-xs font-bold px-2 py-0.5 rounded ${v.outcome === "succeeded" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">${esc(resultWord(v))} ${v.yea ?? "—"}–${v.nay ?? "—"}</span>
+    <button type="button" data-open="vote" data-id="${esc(v.id)}" class="text-xs text-accent hover:underline">${esc(v.chamber)} · ${esc(new Date(v.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }))} · how members voted →</button>
+  </li>`;
 
 const section = (title, note, body) => `
   <section>
@@ -67,6 +77,7 @@ export function renderWeekPage(el, w, list) {
         The House held <strong>${c.votes.House}</strong> and the Senate <strong>${c.votes.Senate}</strong> roll-call votes.
         ${c.passed || c.failed ? `<strong>${c.passed}</strong> ${c.passed === 1 ? "bill or resolution" : "bills and resolutions"} passed a chamber by roll call${c.failed ? ` and <strong>${c.failed}</strong> failed` : ""}.` : ""}
         ${c.laws ? `<strong>${plural(c.laws, "law")}</strong> ${c.laws === 1 ? "was" : "were"} signed.` : "No new laws were signed."}
+        ${c.rules ? `The House also voted on ${plural(c.rules, "rule")} setting the terms of debate.` : ""}
         ${c.nominations ? `The Senate confirmed <strong>${c.confirmed}</strong> of ${plural(c.nominations, "nominee")} it voted on.` : ""}
         ${c.same + c.opposed ? `On the ${votes} votes, most Democrats and most Republicans voted the same way <strong>${c.same}</strong> times and opposite ways <strong>${c.opposed}</strong> times.` : ""}
       </p>
@@ -75,6 +86,8 @@ export function renderWeekPage(el, w, list) {
       ${section("Passed by roll call", "Passage votes that succeeded, in order. Bills passed by voice vote or unanimous consent have no roll call; they appear here when they become law.",
         passed.length ? voteGrid(passed) : empty("No bills or resolutions passed a chamber by roll call this week."))}
       ${failed.length ? section("Failed", "Passage votes that failed.", voteGrid(failed)) : ""}
+      ${(w.rules || []).length ? section("Debate rules", "House resolutions that only set the terms of debate for another bill (a procedural step, not counted as passed above).",
+        `<ul class="divide-y divide-gray-200 text-sm">${w.rules.map(ruleRow).join("")}</ul>`) : ""}
       ${section("Closest votes", "The smallest Yea–Nay margins among passage, cloture, nomination and amendment votes (procedural motions left out).",
         w.closest.length ? voteGrid(w.closest, { showMargin: true }) : empty("No such votes this week."))}
       ${c.nominations ? section("Nominations", "Senate votes on nominations (nominee as named in the vote record).",

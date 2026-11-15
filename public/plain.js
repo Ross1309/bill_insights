@@ -30,11 +30,17 @@ export function voteHeadline(v) {
   return `${v.chamber} ${verb} the ${title}`;
 }
 
-// Result badge text: Passed / Failed, Confirmed / Rejected for nominations.
+// Result badge text: Passed / Failed; Confirmed / Rejected for nominations; Agreed to /
+// Rejected for House rules (they set the terms of debate, nothing passes).
+export const isRule = v => v.kind === "rule" || RULE.test(v.bill?.title || "");
 export function resultWord(v) {
+  const ok = v.outcome === "succeeded";
+  if (v.bill && isRule(v)) return ok ? "Agreed to" : "Rejected";
   const nom = !v.bill && /nomination/i.test(v.question || "");
-  return v.outcome === "succeeded" ? (nom ? "Confirmed" : "Passed") : (nom ? "Rejected" : "Failed");
+  return ok ? (nom ? "Confirmed" : "Passed") : (nom ? "Rejected" : "Failed");
 }
+// "H.R. 1013" from a rule's title, or null.
+export const ruleTarget = v => RULE.exec(v.bill?.title || "")?.[1] || null;
 
 // "Most Democrats and most Republicans voted Yea" / "Most Democrats voted Nay; most Republicans voted Yea".
 export function partyWords(p) {
