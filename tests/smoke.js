@@ -55,7 +55,10 @@ const errors = [];
 // Google's reCAPTCHA script (App Check) is third-party: it throws on a malformed URL
 // itself and complains about storage access in headless browsers. Only its errors are
 // ignored; anything from our code still fails the run.
-const fromRecaptcha = text => /\/recaptcha\/|requestStorageAccess/.test(text);
+// Also Google's own report-only security-policy notices about framing google.com (reCAPTCHA's
+// frame): informational, nothing is blocked (seen intermittently in CI, 2026-11).
+const fromRecaptcha = text => /\/recaptcha\/|requestStorageAccess/.test(text)
+  || (/report-only Content Security Policy/.test(text) && /https:\/\/www\.google\.com\//.test(text));
 page.on('pageerror', err => { if (!fromRecaptcha(err.stack || '')) errors.push(`uncaught: ${err.message}`); });
 page.on('console', msg => {
   if (msg.type() !== 'error') return;
