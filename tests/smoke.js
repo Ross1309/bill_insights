@@ -160,6 +160,16 @@ try {
   check(await page.$eval('#view-votes [data-scope="key"]', el => el.getAttribute('aria-pressed') === 'true' || el.classList.contains('active') || /bg-cta/.test(el.className)), 'Key votes is the default');
   await page.click('#view-votes [data-scope="all"]');
   await waitText('#vote-scope-note', /Every roll call/, 'All roll calls filter');
+  // Tap-to-explain: an official term opens its plain explanation; Escape closes it.
+  const term = page.locator('#votes-container [data-term]').first();
+  await term.waitFor({ timeout: 20000 }).catch(() => {});
+  if (await term.count()) {
+    await term.scrollIntoViewIfNeeded();
+    await term.click();
+    check(await page.locator('#term-popover').evaluate(e => !e.classList.contains('hidden') && e.textContent.length > 40), `Tapping "${await term.textContent()}" explains it`);
+    await page.keyboard.press('Escape');
+    check(await page.locator('#term-popover').evaluate(e => e.classList.contains('hidden')), 'Escape closes the explanation');
+  } else check(false, 'Votes show tap-to-explain terms');
   await page.click('#view-votes [data-scope="key"]');
   await page.click('#view-votes [data-chamber="Senate"]');
   await waitText('#votes-container', /Senate roll call/, 'Senate chamber filter');

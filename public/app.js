@@ -6,6 +6,7 @@ import { db, getFirestoreDoc, getOverviewDoc, getVote } from "./data.js";
 import { escapeHtml, store } from "./util.js";
 import { activeTab, navBills, navCongress, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
 import { renderCongressPage } from "./congress-page.js";
+import { glossaryHtml, setupGlossary } from "./glossary.js";
 import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
 import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
@@ -319,6 +320,9 @@ async function init() {
   setupIssues();
   setupHome();
   setupSearch();
+  setupGlossary();
+  const glossary = document.getElementById("glossary-list");
+  if (glossary) glossary.innerHTML = glossaryHtml();
   setupCopyLinks();
   setupReportError();
   loadHealth();

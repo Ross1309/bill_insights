@@ -7,6 +7,7 @@
 
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { PARTY_NAMES as PARTY_NAME, STATE_NAMES, escapeHtml as esc, officialLabel, wireTooltip } from "./util.js";
+import { TERMS, termize } from "./glossary.js";
 
 const C = { succeeded: "#6fa326", failed: "#c04637", accent: "#13a5b2" };
 const PARTY_CHIP = { D: "ring-party-d/70 text-party-d", R: "ring-party-r/70 text-party-r", I: "ring-party-i/60 text-party-i" };
@@ -42,14 +43,8 @@ const EXPLAINERS = {
   "no-vote": ["Why most bills never get a vote",
     "Thousands of bills are introduced each Congress. Most are referred to a committee and never move further: committees and chamber leaders decide what reaches the floor. A bill that never gets a vote hasn't been rejected; it just didn't advance. This page focuses on measures that reached a floor vote or became law."],
 };
-const GLOSSARY = {
-  Cloture: "A Senate vote to end debate. Needs 60 votes. Without it, most bills can't get a final vote.",
-  "Suspension of the rules": "A House fast track for less controversial bills: limited debate, no amendments, two-thirds needed to pass.",
-  "Motion to recommit": "The House minority's last chance to send a bill back to committee before the final vote.",
-  "Motion to table": "A vote to set something aside; adopting it usually ends that measure.",
-  "Motion to discharge": "A vote to pull a measure out of committee for consideration by the full chamber.",
-  Appropriations: "Bills that provide the actual money. Authorization bills set policy and allow spending; appropriations fund it.",
-};
+// Glossary chips on topic pages: shared definitions (glossary.js).
+const GLOSSARY_KEYS = ["cloture", "suspension", "recommit", "table", "discharge", "rule", "two_thirds", "appropriations"];
 
 const STAGE_TEXT = { law: "Became law", passed_both: "Passed both chambers", to_president: "Sent to President", passed_one: "Passed one chamber", committee: "Didn't pass", introduced: "Introduced" };
 function stageChip(b) {
@@ -225,7 +220,7 @@ function keyVotes(s) {
             <div class="min-w-0 flex-1">
               <p class="text-xs text-gray-500">${esc(v.chamber)} · ${day(v.date)} · ${billLink(v.bill)}</p>
               <h4 class="font-serif text-lg font-bold text-gray-900 mt-1 leading-snug">${esc((v.bill.title || "").length > 140 ? v.bill.title.slice(0, 140) + "…" : v.bill.title)}</h4>
-              <p class="text-sm text-gray-600 mt-1"><span class="text-gray-800 font-medium">${esc(v.question)}.</span> ${esc(explainQuestion(v.question || ""))}</p>
+              <p class="text-sm text-gray-600 mt-1"><span class="text-gray-800 font-medium">${termize(esc(v.question))}.</span> ${esc(explainQuestion(v.question || ""))}</p>
             </div>
             <div class="flex items-center gap-2 sm:flex-col sm:items-end shrink-0">
               <span class="inline-block px-2.5 py-1 text-xs font-bold rounded ${v.passed ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">${esc(v.result)}</span>
@@ -280,7 +275,7 @@ function explainers(s) {
           <p class="text-sm text-gray-700 mt-2">${esc(EXPLAINERS[k][1].slice(0, 190))}… <button type="button" class="text-accent hover:underline" data-explain="${k}">Read more</button></p>
         </article>`).join("")}
       </div>
-      <div class="mt-4 flex flex-wrap gap-2 text-xs"><span class="text-gray-500 mr-1 py-1">Glossary:</span>${Object.entries(GLOSSARY).map(([t, d]) => `<button type="button" class="px-2.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-700 hover:border-accent/60" data-tip="${esc(d)}">${esc(t)}</button>`).join("")}</div>
+      <div class="mt-4 flex flex-wrap gap-2 text-xs"><span class="text-gray-500 mr-1 py-1">Glossary:</span>${GLOSSARY_KEYS.map(k => `<button type="button" data-term="${k}" aria-expanded="false" class="px-2.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-700 hover:border-accent/60">${esc(TERMS[k][0])}</button>`).join("")}</div>
     </section>`;
 }
 

@@ -10,6 +10,7 @@
 import { escapeHtml as esc, formatVoteDate, officialLabel, PARTY_BADGES, safeHref } from "./util.js";
 import { explainQuestion } from "./issues.js";
 import { voteHeadline, resultWord, partyWords, outcomeOf } from "./plain.js";
+import { termize } from "./glossary.js";
 
 const SOURCE = { House: "House Clerk record", Senate: "Senate.gov record" };
 // Key votes: final votes on bills/resolutions and nominations (vote_summaries.kind).
@@ -56,7 +57,7 @@ export function voteCardHtml(raw, { yours = "", margin = null } = {}) {
         ${v.bill ? `<button type="button" data-open="bill" data-id="${esc(v.bill.id)}" class="font-semibold text-accent hover:underline">${esc(label)}</button> · ` : label ? `${esc(label)} · ` : ""}${esc(v.chamber || "")}${v.roll != null ? ` roll call #${esc(String(v.roll))}` : ""} · ${esc(formatVoteDate(v.date))}${margin != null ? ` · <strong class="text-gray-800">margin ${margin}</strong>` : ""}
       </p>
       ${!v.bill && v.document_title ? `<p class="text-sm text-gray-700 mt-1">${esc(v.document_title)}</p>` : ""}
-      <p class="text-sm text-gray-600 mt-1"><span class="text-gray-500">${esc(v.question)}.</span>${meaning ? ` ${esc(meaning)}` : ""}</p>
+      <p class="text-sm text-gray-600 mt-1"><span class="text-gray-500">${termize(esc(v.question))}.</span>${meaning ? ` ${esc(meaning)}` : ""}</p>
       <div class="mt-3 space-y-1.5">${partyBar("Democrats", v.parties?.D, PARTY_BADGES.Democratic)}${partyBar("Republicans", v.parties?.R, PARTY_BADGES.Republican)}</div>
       ${independents}
       ${partyWords(v.parties) ? `<p class="text-xs text-gray-500 mt-2">${esc(partyWords(v.parties))}.</p>` : ""}

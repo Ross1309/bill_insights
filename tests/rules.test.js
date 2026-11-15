@@ -224,3 +224,28 @@ test('stageSteps: bills, resolutions, failures, vetoes', async () => {
   // No stage data -> no tracker (never guessed).
   assert.equal(stageSteps({ type: 'HR' }), null);
 });
+
+test('voteHeadline: only final votes say a measure passed', async () => {
+  const { voteHeadline, resultWord } = await import('../public/plain.js');
+  const bill = { id: 'hr4-119', label: 'HR 4', title: 'Rescissions Act of 2025' };
+  const h = (chamber, question, outcome, extra = {}) => voteHeadline({ chamber, question, outcome, bill, ...extra });
+  assert.equal(h('Senate', 'On the Cloture Motion', 'succeeded'), 'Senate voted to end debate on the Rescissions Act');
+  assert.equal(h('Senate', 'On the Motion to Proceed', 'failed'), 'Senate voted not to take up the Rescissions Act');
+  assert.equal(h('Senate', 'On the Amendment', 'failed'), 'Senate rejected an amendment to the Rescissions Act');
+  assert.equal(h('House', 'On Motion to Recommit', 'failed'), 'House voted not to send the Rescissions Act back to committee');
+  assert.equal(h('House', 'On Motion to Concur in the Senate Amendment', 'succeeded'), "House agreed to the Senate's changes to the Rescissions Act");
+  assert.equal(h('Senate', 'On the Motion to Discharge', 'failed'), 'Senate voted not to take the Rescissions Act out of committee');
+  assert.equal(h('House', 'On Overriding the Veto', 'failed'), 'House failed to override the veto of the Rescissions Act');
+  assert.equal(h('House', 'On Motion to Suspend the Rules and Pass, as Amended', 'succeeded'), 'House passed the Rescissions Act');
+  assert.equal(h('Senate', 'On Passage of the Bill', 'failed'), 'Senate rejected the Rescissions Act');
+  // A concurrent resolution's own vote is final passage, not "concurring".
+  assert.equal(voteHeadline({ chamber: 'Senate', question: 'On the Concurrent Resolution', outcome: 'succeeded', bill: { id: 'hconres86-119', label: 'HCONRES 86', title: 'Establishing the budget' } }),
+    'Senate adopted H.Con.Res. 86: Establishing the budget');
+  const rule = { id: 'hres1247-119', label: 'HRES 1247', title: 'Providing for consideration of the bill (H.R. 2102) to amend' };
+  assert.equal(voteHeadline({ chamber: 'House', question: 'On Ordering the Previous Question', outcome: 'succeeded', bill: rule }), 'House voted to end debate on the rule for H.R. 2102');
+  assert.equal(voteHeadline({ chamber: 'Senate', question: 'On the Cloture Motion', outcome: 'succeeded', bill: null, document_title: 'Anna St. John, of Louisiana, to be Judge' }),
+    'Senate voted to end debate on the nomination of Anna St. John');
+  assert.equal(resultWord({ question: 'On the Cloture Motion', outcome: 'succeeded', bill }), 'Agreed to');
+  assert.equal(resultWord({ question: 'On Overriding the Veto', outcome: 'failed', bill }), 'Veto sustained');
+  assert.equal(resultWord({ question: 'On Passage of the Bill', outcome: 'succeeded', bill }), 'Passed');
+});

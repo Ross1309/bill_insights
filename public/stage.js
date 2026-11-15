@@ -12,6 +12,8 @@
 //   the states, not the President (ratification isn't tracked here)
 // Only what the actions say counts; nothing is inferred.
 
+import { termize } from "./glossary.js";
+
 // Stages in order (introduced -> committee -> passed_one -> passed_both -> to_president -> law).
 // Action text starts with "Passed/agreed to in House: …" on success and "Failed of
 // passage/not agreed to in House: …" on failure, so match at the start (a substring test
@@ -131,7 +133,7 @@ export function stageTrackerHtml(bill, { compact = false } = {}) {
         ${s.steps.map(x => `
           <li class="min-w-0">
             <span class="block h-1.5 rounded-full ${SEG[x.state]}" aria-hidden="true"></span>
-            <span class="block text-[11px] leading-tight mt-1 ${x.state === "todo" ? "text-gray-400" : x.state === "failed" ? "text-red-600 font-semibold" : "text-gray-700"}">${esc(x.label)}<span class="sr-only">${x.state === "todo" ? " (not yet)" : x.state === "failed" ? "" : " (done)"}</span></span>
+            <span class="block text-[11px] leading-tight mt-1 ${x.state === "todo" ? "text-gray-400" : x.state === "failed" ? "text-red-600 font-semibold" : "text-gray-700"}">${termize(esc(x.label))}<span class="sr-only">${x.state === "todo" ? " (not yet)" : x.state === "failed" ? "" : " (done)"}</span></span>
           </li>`).join("")}
       </ol>
       <p class="text-[11px] text-gray-500 mt-2">From the official action history. <a href="#methodology" class="text-accent hover:underline">How we count</a></p>

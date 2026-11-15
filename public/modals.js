@@ -7,6 +7,8 @@ import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberL
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { voteCardHtml } from "./vote-card.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
+import { termize } from "./glossary.js";
+import { explainQuestion } from "./issues.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
@@ -172,7 +174,7 @@ const billModal = {
         ["Introduced", bill.introduced_date],
         ["Origin chamber", bill.chamber],
         ["Policy area", bill.policy_area || (d ? "Not yet assigned by CRS" : null)],
-        ["Latest action", latest?.text ? `${latest.actionDate ? `${escapeHtml(latest.actionDate)}: ` : ""}${escapeHtml(latest.text)}` : null, true],
+        ["Latest action", latest?.text ? `${latest.actionDate ? `${escapeHtml(latest.actionDate)}: ` : ""}${termize(escapeHtml(latest.text))}` : null, true],
       ];
       const ai = b?.ai_summary?.bullet_points?.length ? `
         <section class="mt-5">
@@ -216,7 +218,7 @@ const billModal = {
             <li class="ml-4 pb-4">
               <span class="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-accent/60 border border-surface"></span>
               <p class="text-xs text-gray-500">${escapeHtml(a.actionDate || "")}${a.source ? ` · ${escapeHtml(a.source)}` : ""}</p>
-              <p class="text-sm text-gray-800">${escapeHtml(a.text)}</p>
+              <p class="text-sm text-gray-800">${termize(escapeHtml(a.text))}</p>
               ${a.recordedVotes.map(rv => {
                 const id = recordedVoteId(rv);
                 return `<span class="inline-flex flex-wrap gap-x-3 mr-3">
@@ -282,7 +284,7 @@ const voteModal = {
     return `
       <div class="min-w-0 flex-1">
         <span class="text-xs font-semibold px-2 py-0.5 rounded bg-accent/10 text-accent ring-1 ring-accent/30 uppercase">${voteHeadingBadge(v)}</span>
-        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(v.question || "Question not available")}</h2>
+        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${v.question ? termize(escapeHtml(v.question)) : "Question not available"}</h2>
         <p class="text-sm text-gray-500 mt-0.5">
           <span class="inline-block px-2 py-0.5 text-xs font-bold rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
           ${escapeHtml(formatVoteDate(v.date))}
@@ -296,8 +298,9 @@ const voteModal = {
       if (v === undefined) return spinner("Loading vote…");
       if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This roll call isn't in our records yet. New votes are added nightly, and only the current Congress's votes are stored.</p>`;
       return `
+        ${v.question ? `<p class="text-sm text-gray-700 mb-3"><span class="font-semibold text-gray-900">What this vote was:</span> ${escapeHtml(/nomination/i.test(v.question) && !v.bill_id ? "A Senate vote on whether to confirm the President's nominee." : explainQuestion(v.question))}</p>` : ""}
         ${voteBillLine(v)}
-        ${v.vote_type ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(v.vote_type)}</p>` : ""}
+        ${v.vote_type ? `<p class="text-xs text-gray-400 mt-1">${termize(escapeHtml(v.vote_type))}</p>` : ""}
         ${voteTalliesHtml(v)}
         <div class="flex flex-wrap gap-4 mt-4 text-sm">${externalLink(v.source_url, sourceLabel(v))}</div>`;
     }],
@@ -395,7 +398,7 @@ function noRollCallHtml(e) {
   return box(`
     <p>No recorded (roll-call) vote: it passed or failed without one.</p>
     <ul class="space-y-1.5">${floor.map(a => `
-      <li><strong class="text-gray-900">${escapeHtml(chamberOf(a))}</strong>, ${escapeHtml(actionDay(a.actionDate))}: ${escapeHtml(a.text.replace(FLOOR_RESULT, ""))}</li>`).join("")}
+      <li><strong class="text-gray-900">${escapeHtml(chamberOf(a))}</strong>, ${escapeHtml(actionDay(a.actionDate))}: ${termize(escapeHtml(a.text.replace(FLOOR_RESULT, "")))}</li>`).join("")}
     </ul>${why}`);
 }
 

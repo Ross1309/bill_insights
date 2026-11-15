@@ -84,6 +84,7 @@ public/week.js                     Weekly digest: #week/<Monday> page (rendering
 public/home.js                     Home tab: your members, this week, issues, key votes, laws, numbers
 public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
 public/search.js                   Header search: members, bill numbers, topics, Bills-tab fallback
+public/glossary.js                 Plain definitions of official terms + tap-to-explain (termize)
 netlify/lib/digest.js              computeWeeks(): stats/week-<Monday> docs, stats/weeks, this_week
 public/issues.js                   Issues tab topic pages from stats/topic-<slug> (+ explainers, glossary)
 netlify/lib/topics.js              Topic + watchlist definitions (CRS policy areas / subjects)
@@ -742,6 +743,22 @@ stats/overview (monthly party split).
   the 119th until the 120th has 25 votes. The nightly job starts a new Congress's state by
   itself (first 60 days). Once the 119th's tail is over (mid-February 2027), run
   `build-congress-stats.js --congress 119 --write` to freeze its final figures.
+
+## Clarity pass (2026-11-15)
+
+- **Tap-to-explain** (`public/glossary.js`): `TERMS` (our own neutral definitions),
+  `termize(escapedText)` marks the first mention of each term in official text as a
+  `<button data-term>`; one capture-phase listener opens a popover (Escape / tap elsewhere
+  closes, focus returns, `aria-describedby`). Used on vote questions (cards, Issues key
+  votes, vote window title + "Majority required"), bill latest action / Actions timeline /
+  "no roll call" text, stage tracker labels; the Issues glossary chips use the same terms;
+  How we count lists them all (`#glossary`). Only pass *escaped* text to termize.
+- **Headlines by vote type** (`questionKind` in plain.js): only final votes say a measure
+  passed. Before 2026-11-15, cloture, amendment, recommit, table, motion-to-proceed votes on a
+  bill read "passed/rejected the bill" (All roll calls, a bill's Votes tab, week pages'
+  closest votes). "concurrent resolution" is not "concur". Generic Senate "On the Motion"
+  (79 votes) stays generic: the record doesn't say more. Vote window: "What this vote was".
+- Page leads say what each page is for; headings match the tab names.
 
 ## Votes paging (frontend)
 

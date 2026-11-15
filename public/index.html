@@ -52,7 +52,7 @@
     <section id="view-overview" class="tab-view space-y-12">
       <div>
         <h1 class="font-serif text-3xl sm:text-4xl font-bold text-gray-900">What is Congress doing?</h1>
-        <p class="text-gray-600 mt-2 max-w-2xl">Plain language from the official record. Non-partisan, with every AI summary labeled.</p>
+        <p class="text-gray-600 mt-2 max-w-2xl">This week's key votes, new laws and your own members, in plain language from the official record. Non-partisan; every AI summary is labeled.</p>
         <div id="home-hero" class="grid gap-4 lg:grid-cols-3 mt-6">
           <div class="lg:col-span-3 text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
         </div>
@@ -88,7 +88,7 @@
       <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 class="font-serif text-2xl font-bold text-gray-900" id="issue-title">Issues</h2>
-          <p class="text-sm text-gray-500">What Congress has done on the issues people follow most, in plain language.</p>
+          <p class="text-sm text-gray-500">What Congress has done on the issues people follow most: the laws, the key votes and where the parties stand.</p>
         </div>
         <div id="issue-topics" class="flex flex-wrap gap-2" role="tablist" aria-label="Issue">
           <button type="button" role="tab" data-topic="economy" class="filter-chip">Economy</button>
@@ -108,8 +108,8 @@
     <!-- VIEW 1: BILLS & SUMMARIES -->
     <section id="view-bills" class="tab-view hidden">
       <div class="mb-6">
-        <h2 class="font-serif text-2xl font-bold text-gray-900">Bills &amp; Summaries</h2>
-        <p class="text-sm text-gray-500">Bills from Congress.gov: where each one is in the process, with plain-language summaries labeled by source.</p>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Bills</h2>
+        <p class="text-sm text-gray-500">Where each bill stands, from introduced to law, with a plain-language summary of the official one. Most bills never get a vote, so this starts with the ones that have moved.</p>
       </div>
       <div id="bill-scope-filters" class="flex flex-wrap gap-2 mb-2" role="group" aria-label="Which bills">
         <button type="button" data-scope="moving" class="filter-chip">Moving or passed</button>
@@ -146,7 +146,7 @@
     <section id="view-votes" class="tab-view hidden">
       <div class="mb-6">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Votes</h2>
-        <p class="text-sm text-gray-500">Every recorded House and Senate vote, from the House Clerk and senate.gov, with how each party voted.</p>
+        <p class="text-sm text-gray-500">How the House and Senate voted and how each party lined up, from the House Clerk and senate.gov. Tap an underlined term to see what that kind of vote means.</p>
       </div>
       <div class="flex flex-wrap gap-x-6 gap-y-2 mb-2">
         <div id="vote-scope-filters" class="flex flex-wrap gap-2" role="group" aria-label="Which votes">
@@ -172,8 +172,8 @@
     <!-- VIEW 3: LEGISLATORS -->
     <section id="view-members" class="tab-view hidden">
       <div class="mb-6">
-        <h2 class="font-serif text-2xl font-bold text-gray-900">Members of Congress</h2>
-        <p class="text-sm text-gray-500">Every current senator, representative and delegate, from Congress.gov.</p>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Members</h2>
+        <p class="text-sm text-gray-500">Who represents you, how each member votes and where their campaign money comes from: every current senator, representative and delegate.</p>
       </div>
       <form id="find-reps" class="mb-6 bg-surface border border-gray-200 rounded-xl p-4 sm:p-5">
         <label for="find-reps-address" class="font-serif text-lg font-bold text-gray-900">Find your representatives</label>
@@ -280,7 +280,7 @@
               <li>Times are converted from Eastern time. Senate nomination votes show the nominee but have no bill.</li>
               <li><strong>Vote types</strong> are grouped from the official question text: cloture (ending debate), nominations, passage (bills and resolutions, including suspension votes, concurring in the other chamber's changes and veto overrides), amendments, procedural motions, and other.</li>
               <li><strong>Key votes</strong> (the Votes tab's default, and the home page): final votes on passing a bill or resolution and on nominations. House "rules" (resolutions that only set the terms of debate for another bill) are left out even though they are resolutions; they, cloture, amendments and procedural motions are under All roll calls.</li>
-              <li><strong>Headlines</strong> such as "House passed the … Act" are written from the official question, result and bill title by fixed rules; the official question and record are always shown with them. Bills are labeled the way Congress writes them (H.R. 2102, H.Res. 1247, S. 5).</li>
+              <li><strong>Headlines</strong> such as "House passed the … Act" are written from the official question, result and bill title by fixed rules; the official question and record are always shown with them. Only a final vote says a measure passed: a cloture vote reads "voted to end debate on …", an amendment vote "adopted an amendment to …", and so on. Bills are labeled the way Congress writes them (H.R. 2102, H.Res. 1247, S. 5).</li>
               <li><strong>Outcomes:</strong> "succeeded" means the official result says passed, agreed to, confirmed, adopted or sustained. A failed procedural motion can still be a win for the side that opposed it.</li>
             </ul>
           </section>
@@ -336,6 +336,12 @@
             <ul>
               <li>Your address is sent to the U.S. Census Bureau's geocoder to find your congressional district, using the district map of the Congress now in office. We don't store or log the address.</li>
             </ul>
+          </section>
+
+          <section id="glossary">
+            <h3>Glossary</h3>
+            <p>Terms from the official record, in plain words. Wherever one appears underlined with dots on the site, tap it for the same explanation.</p>
+            <div id="glossary-list" class="mt-3 text-sm"></div>
           </section>
         </div>
       </div>
