@@ -199,7 +199,7 @@ function renderBills(bills, term = "") {
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
             <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(billName(bill) || 'Untitled Bill')}</button></h3>
-            ${bill.short_title && bill.title ? `<p class="text-xs text-gray-500 -mt-2 mb-3">${escapeHtml(bill.title)}</p>` : ""}
+            ${bill.title && billName(bill) !== bill.title ? `<p class="text-xs text-gray-500 -mt-2 mb-3">${escapeHtml(bill.title)}</p>` : ""}
             ${stageTrackerHtml(bill, { compact: true })}
             ${renderSummary(bill)}
           </div>
@@ -304,7 +304,7 @@ function applyBillFilters() {
     if (activeCategory !== "all" && bill.category !== activeCategory) return false;
     if (!anyStage && billScope === "moving" && (!MOVING_STAGES.includes(bill.stage) || isRuleBill(bill))) return false;
     if (!term) return true;
-    const title = `${bill.short_title || ""} ${bill.title || ""}`.toLowerCase();
+    const title = `${billName(bill) || ""} ${bill.title || ""}`.toLowerCase();
     const policyArea = (bill.policy_area || "").toLowerCase();
     const label = billLabel(bill).toLowerCase().replace(/[\s.]/g, "");
     return title.includes(term) || policyArea.includes(term) || label.includes(compactTerm);

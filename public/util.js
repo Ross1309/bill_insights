@@ -154,8 +154,25 @@ export function wireTooltip(root, { signal } = {}) {
 }
 
 // A bill's name as people know it: its short title when it has one ("One Big Beautiful
-// Bill Act"), else the official title. Server stats store this as their `title`.
-export const billName = b => b?.short_title || b?.title || null;
+// Bill Act"), a plain version of a disapproval resolution's title, else the official
+// title. Server stats store this as their `title`; pages show the official title under it.
+export const billName = b => b?.short_title || plainDisapproval(b?.title) || b?.title || null;
+
+// Congressional Review Act resolutions all start "Providing for congressional disapproval
+// under chapter 8 of title 5, United States Code, of the rule submitted by …", so cut
+// names lose what they're about. Same words, reordered: what it overturns and whose rule.
+// Other disapprovals (arms sales, nuclear agreements) keep their own wording.
+// Anchored at the start: a House rule ("Providing for consideration of the joint resolution
+// … providing for congressional disapproval …") names several and must stay as it is.
+const CRA_RULE = /^(?:A (?:joint |concurrent )?resolution )?providing (?:for )?congressional disapproval under chapter 8 of title 5, United States Code, of the rule (?:submitted|issued) by (?:the )?(.+?) relating to (.+?)\.?$/i;
+const DISAPPROVAL = /^(?:A (?:joint |concurrent )?resolution )?providing (?:for )?congressional disapproval of (.+?)\.?$/i;
+export function plainDisapproval(title) {
+  const t = String(title || "").trim();
+  const rule = CRA_RULE.exec(t);
+  if (rule) return `Overturning the ${rule[1]} rule "${rule[2].replace(/^the\s+/i, "").replace(/^["“]|["”]$/g, "")}"`;
+  const other = DISAPPROVAL.exec(t);
+  return other && !/under chapter 8 of title 5/i.test(other[1]) ? `Disapproving ${other[1]}` : null;
+}
 
 // --- Bill and nomination labels in the official style -----------------------------------
 // Accepts "HR 2102", "hr2102-119", "H.R. 2102", "HRES 1247", "PN 1181-1", "PN1181-7";

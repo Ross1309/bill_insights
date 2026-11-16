@@ -165,8 +165,8 @@ const billModal = {
   header(e) {
     const b = e.data.bill, d = e.data.detail;
     const label = b ? billLabel(b) : d?.bill_number || e.id.toUpperCase();
-    const title = billName(b) || d?.short_title || d?.title || (e.errors.detail ? "" : "Loading…");
-    const official = b?.short_title ? b.title : d?.short_title ? d.title : null;
+    const title = billName(b) || billName(d) || (e.errors.detail ? "" : "Loading…");
+    const official = b?.title && title !== b.title ? b.title : d?.title && title !== d.title ? d.title : null;
     const policy = b?.policy_area || d?.policy_area;
     const congress = b?.congress || d?.congress;
     return `

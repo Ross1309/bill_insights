@@ -34,3 +34,16 @@ test('billName prefers the short title', () => {
   assert.equal(billName({ title: 'Laken Riley Act', short_title: null }), 'Laken Riley Act');
   assert.equal(billName(null), null);
 });
+
+test('disapproval resolutions read as what they overturn', () => {
+  const cra = 'Providing for congressional disapproval under chapter 8 of title 5, United States Code, of the rule submitted by the Bureau of Land Management relating to "Miles City Field Office Record of Decision and Approved Resource Management Plan Amendment".';
+  assert.equal(billName({ title: cra }), 'Overturning the Bureau of Land Management rule "Miles City Field Office Record of Decision and Approved Resource Management Plan Amendment"');
+  assert.equal(billName({ title: 'Providing for congressional disapproval under chapter 8 of title 5, United States Code, of the rule issued by the Environmental Protection Agency relating to the "California State Nonroad Engine Pollution Control Standards".' }),
+    'Overturning the Environmental Protection Agency rule "California State Nonroad Engine Pollution Control Standards"');
+  assert.equal(billName({ title: 'A joint resolution providing for congressional disapproval of the proposed foreign military sale to the Government of Israel of certain defense articles and services.' }),
+    'Disapproving the proposed foreign military sale to the Government of Israel of certain defense articles and services');
+  assert.equal(billName({ title: 'Major Richard Star Act' }), 'Major Richard Star Act');
+  // A House rule that names such resolutions keeps its own title.
+  const rule = 'Providing for consideration of the joint resolution (H.J. Res. 60) providing for congressional disapproval under chapter 8 of title 5, United States Code, of the rule submitted by the National Park Service relating to "Glen Canyon"; and for other purposes';
+  assert.equal(billName({ title: rule }), rule);
+});

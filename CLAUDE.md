@@ -199,7 +199,9 @@ accepts, so `member-finance` uses `FEC_API_KEY` if set, else `CONGRESS_API_KEY` 
 bill_id, congress (number), type ("HR"), number ("1234"), bill_number ("HR 1234"),
 title, short_title (common name when Congress.gov's display title is a sentence, e.g. H.R. 1
 "One Big Beautiful Bill Act"; null = none; `pickShortTitle`, `billName(b)` in util.js; stats,
-vote_summaries.bill_title and the search index use billName), chamber, policy_area (CRS name or null),
+vote_summaries.bill_title and the search index use billName; billName also turns CRA
+resolutions into `Overturning the <agency> rule "<rule>"` (plainDisapproval, anchored at the
+start so House rules naming them keep their title)), chamber, policy_area (CRS name or null),
 category ("Economy" | "Healthcare" | "Foreign Affairs" | "Other" | "Uncategorized"),
 introduced_date, update_date, latestAction { actionDate, text },
 latest_action_date (= latestAction.actionDate, top-level for ordering; null if none),
