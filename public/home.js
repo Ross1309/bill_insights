@@ -112,12 +112,15 @@ function issuesCard(topics) {
 // --- Key votes: the shared vote card + "your members" -------------------------------
 const posBadge = p => /yea|aye/i.test(p) ? "bg-green-100 text-green-800" : /nay|no/i.test(p) ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-700";
 
+// positions: Map vote id -> [{ id, name, position }] (members of yours on that roll call),
+// or null for a vote whose record couldn't be read; no Map yet = still loading.
 function keyVoteCard(v, reps, positions) {
-  const mine = positions?.get(v.id) || [];
-  const yours = reps?.members?.length
+  const known = positions?.has(v.id);
+  const mine = positions?.get(v.id);
+  const yours = reps?.members?.length && !reps.stale
     ? `<div class="mt-3 pt-3 border-t border-gray-200"><p class="text-xs text-gray-500 mb-1.5">Your members (${esc(reps.code)})</p>
-        <div class="flex flex-wrap gap-1.5">${mine.length ? mine.map(m => `<button type="button" data-open="member" data-id="${esc(m.id)}" class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200 hover:border-accent/60"><span class="text-gray-800">${esc(String(m.name || "").split(",")[0])}</span><span class="font-bold px-1 rounded ${posBadge(m.position)}">${esc(m.position)}</span></button>`).join("")
-          : `<span class="text-xs text-gray-500">${positions ? `None of your members voted in the ${esc(v.chamber)} on this.` : "Loading…"}</span>`}</div></div>`
+        <div class="flex flex-wrap gap-1.5">${mine?.length ? mine.map(m => `<button type="button" data-open="member" data-id="${esc(m.id)}" class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200 hover:border-accent/60"><span class="text-gray-800">${esc(String(m.name || "").split(",")[0])}</span><span class="font-bold px-1 rounded ${posBadge(m.position)}">${esc(m.position)}</span></button>`).join("")
+          : `<span class="text-xs text-gray-500">${!positions ? "Loading…" : !known || mine === null ? "How your members voted isn't available right now." : `None of your members are in the ${esc(v.chamber)}.`}</span>`}</div></div>`
     : `<p class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">Enter your address above to see how your members voted.</p>`;
   return voteCardHtml(v, { yours });
 }
@@ -139,7 +142,7 @@ export function renderHome(stats, { reps = null, positions = null, participation
     ${sectionHead("Recently became law", "#issues", "Laws by topic")}
     <div class="grid gap-4 md:grid-cols-2 mt-4">${laws.map(l => `
       <article class="bg-surface border border-gray-200 rounded-2xl p-5">
-        <p class="text-xs text-gray-500">Signed ${esc(day(l.signed))}${l.law_number ? ` · Public Law ${esc(l.law_number)}` : ""} · ${billChip(l)}</p>
+        <p class="text-xs text-gray-500">Signed ${esc(day(l.signed))}${l.law_number ? ` · ${esc(l.law_type || "Public Law")} ${esc(l.law_number)}` : ""} · ${billChip(l)}</p>
         <h3 class="font-serif text-lg font-bold text-gray-900 mt-1 leading-snug">${esc(l.title || "")}</h3>
         ${l.summary ? `<p class="text-sm text-gray-700 mt-2">${esc(l.summary)}</p><p class="text-[11px] text-gray-500 mt-1">AI summary of the official CRS summary · <button type="button" data-open="bill" data-id="${esc(l.id)}" class="text-accent hover:underline">Read more</button></p>`
           : `<p class="text-sm text-gray-500 mt-2">No official CRS summary yet.</p>`}

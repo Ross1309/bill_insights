@@ -87,12 +87,16 @@ export function withMeta(html, { title, description, url, image }) {
     // The shell's own (home page) preview tags give way to this item's.
     .replace(/\s*<!-- Link previews[^>]*-->/, '')
     .replace(/\s*<(link rel="canonical"|meta property="og:|meta name="twitter:)[^>]*>(<meta property="og:[^>]*>)?/g, '')
-    .replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>`)
-    .replace(/<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${esc(description)}" />\n  ${tags}`);
+    // Replacer functions: "$&" etc. in a title must stay literal text.
+    .replace(/<title>[^<]*<\/title>/, () => `<title>${esc(title)}</title>`)
+    .replace(/<meta name="description" content="[^"]*" \/>/, () => `<meta name="description" content="${esc(description)}" />\n  ${tags}`);
 }
 
 export default async req => {
   const url = new URL(req.url);
+  // A query string would make every request a CDN miss (and Firestore reads): send it to
+  // the clean URL instead, before reading anything.
+  if (url.search) return new Response(null, { status: 301, headers: { Location: url.pathname, 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400' } });
   const [, kind, raw] = url.pathname.split('/');
   const id = decodeURIComponent(raw || '');
   if (!KINDS[kind] || !VALID[kind].test(id)) return new Response('Not found', { status: 404 });

@@ -96,10 +96,10 @@ export default async (req) => {
       cosponsoredCount: m.cosponsoredLegislation?.count ?? null,
       sponsored: sponsored ? (sponsored.sponsoredLegislation || []).map(shapeSponsored) : null,
       bioguideUrl: `https://bioguide.congress.gov/search/bio/${id}`,
-    }, 200, { 'Cache-Control': 'public, max-age=3600', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=21600, stale-while-revalidate=86400' });
+    }, 200, { 'Cache-Control': 'public, max-age=3600', 'Netlify-Vary': 'query=id', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=21600, stale-while-revalidate=86400' });
   } catch (err) {
     console.error(`member-profile ${id}:`, err);
-    if (err.status === 404) return json({ error: 'Member not found.' }, 404, { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
+    if (err.status === 404) return json({ error: 'Member not found.' }, 404, { 'Netlify-Vary': 'query=id', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
     return json({ error: 'Could not load member profile.' }, 502);
   }
 };

@@ -38,7 +38,8 @@ export function switchTab(tabName, { push = true } = {}) {
     const active = name === tabName;
     if (nav) {
       nav.className = active ? TAB_ACTIVE : TAB_IDLE;
-      nav.setAttribute("aria-selected", String(active));
+      // Sections are pages, not tab panels: the current one is marked as the current page.
+      if (active) nav.setAttribute("aria-current", "page"); else nav.removeAttribute("aria-current");
     }
     view?.classList.toggle("hidden", !active);
   }

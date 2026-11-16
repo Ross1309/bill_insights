@@ -25,8 +25,13 @@ export function asVote(v) {
     parties: v.parties || v.party_breakdown || {}, bill, document_title: v.document_title || null, legislation: v.legislation || null,
     roll: v.roll_call_number ?? v.roll ?? null, source_url: v.source_url || null, kind: v.kind || null,
     members: v.member_count || v.individual_votes?.length || null,
+    tie_breaker: v.tie_breaker || null,
   };
 }
+
+// "The Vice President broke the 50–50 tie, voting Yea." (Senate; senators' tallies stay as recorded)
+export const tieLine = v => (v.tie_breaker?.by && v.tie_breaker.vote
+  ? `<p class="text-xs text-gray-700 mt-1">The ${esc(v.tie_breaker.by)} broke the ${v.yea ?? "?"}–${v.nay ?? "?"} tie, voting ${esc(v.tie_breaker.vote)}.</p>` : "");
 
 export function partyBar(label, c, cls) {
   const tot = (c?.yea || 0) + (c?.nay || 0) || 1;
@@ -60,6 +65,7 @@ export function voteCardHtml(raw, { yours = "", margin = null } = {}) {
       <p class="text-sm text-gray-600 mt-1"><span class="text-gray-500">${termize(esc(v.question))}.</span>${meaning ? ` ${esc(meaning)}` : ""}</p>
       <div class="mt-3 space-y-1.5">${partyBar("Democrats", v.parties?.D, PARTY_BADGES.Democratic)}${partyBar("Republicans", v.parties?.R, PARTY_BADGES.Republican)}</div>
       ${independents}
+      ${tieLine(v)}
       ${partyWords(v.parties) ? `<p class="text-xs text-gray-500 mt-2">${esc(partyWords(v.parties))}.</p>` : ""}
       <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs">
         <button type="button" data-open="vote" data-id="${esc(v.id)}" class="font-semibold text-accent hover:underline">How each member voted →</button>

@@ -73,7 +73,8 @@ export function setupSearch() {
   const box = document.getElementById("site-search-results");
   if (!input || !box) return;
   let timer, request = 0;
-  const close = () => { results = []; active = -1; render(box, input); };
+  // Closing also cancels a search still running, so it can't show results for an old term.
+  const close = () => { request++; results = []; active = -1; render(box, input); };
 
   input.addEventListener("input", () => {
     clearTimeout(timer);

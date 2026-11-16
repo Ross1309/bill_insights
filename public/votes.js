@@ -64,7 +64,7 @@ async function loadVotes({ reset = false } = {}) {
     Object.assign(st, { items: [], cursor: null, exhausted: false, loading: false });
     votesContainer.innerHTML = `
       <div class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+        <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
         <p class="text-gray-500">Loading vote records...</p>
       </div>`;
     votesMore.innerHTML = "";
@@ -76,7 +76,9 @@ async function loadVotes({ reset = false } = {}) {
   renderVotesMore();
   try {
     const page = [];
-    while (page.length < VOTES_PAGE_SIZE && !st.exhausted) {
+    // A few rounds at most: if summaries ever lacked `kind`, Key votes mustn't read the
+    // whole collection in one click.
+    for (let round = 0; round < 5 && page.length < VOTES_PAGE_SIZE && !st.exhausted; round++) {
       // Key votes are ~40% of roll calls: fetch bigger pages to fill one.
       const res = await queryVotes({ chamber: voteChamber, cursor: st.cursor, size: voteScope === "key" ? 25 : VOTES_PAGE_SIZE });
       if (generation !== st.generation) return;

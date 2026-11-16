@@ -195,6 +195,9 @@ export default async request => {
 
     const writes = [];
     for (let i = 0; i < billsList.length; i++) {
+      // A failed detail fetch ({}) would write policy_area/category/introduced_date as
+      // null over a good record: skip that bill this run (it's listed again tomorrow).
+      if (!details[i]?.number) continue;
       const meta = billMetadata(details[i], billsList[i]);
       const existing = snaps[i].exists ? snaps[i].data() : {};
       const update = { ...meta, ...enrichments[i], synced_at: FieldValue.serverTimestamp() };
@@ -250,7 +253,13 @@ export default async request => {
         .slice(0, RECHECK_PER_RUN);
 
       // A failed check still gets crs_checked_at, so it moves to the back of the queue.
-      const failed = d => { summaryErrors++; return d.ref.set({ crs_checked_at: new Date().toISOString(), crs_check_errors: FieldValue.increment(1) }, { merge: true }); };
+      // A never-checked (null) bill is picked by an unordered query, so after 3 failures
+      // it becomes "no summary yet" (false) and joins the stale queue, ordered by check date.
+      const failed = d => {
+        summaryErrors++;
+        const giveUp = d.data().crs_summary_available == null && (d.data().crs_check_errors || 0) + 1 >= 3;
+        return d.ref.set({ crs_checked_at: new Date().toISOString(), crs_check_errors: FieldValue.increment(1), ...(giveUp ? { crs_summary_available: false } : {}) }, { merge: true });
+      };
       const ready = [];
       await pool(waiting, 5, async d => {
         if (timeLeft() < 8000) return;

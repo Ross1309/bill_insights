@@ -123,7 +123,7 @@ export function computeWeeks(votes, laws, billsById, { congress, onlyWeeks } = {
     if (onlyWeeks && !onlyWeeks.has(monday)) continue;
     const w = week(monday);
     w.laws.push({
-      id: b.id, label: billLabel(b), title: b.title || null, law_number: b.law_number || null, signed,
+      id: b.id, label: billLabel(b), title: b.title || null, law_number: b.law_number || null, law_type: b.law_type || null, signed,
       summary: b.ai_summary?.source === 'crs_summary' ? b.ai_summary.bullet_points || null : null,
       sponsor: b.sponsor ? { name: b.sponsor.name || null, party: b.sponsor.party || null, state: b.sponsor.state || null, bioguideId: b.sponsor.bioguideId || null } : null,
     });
@@ -179,7 +179,7 @@ export function recentLaws(laws, n = 4) {
     .sort((a, b) => b.signed.localeCompare(a.signed) || (b.b.law_number || '').localeCompare(a.b.law_number || '', undefined, { numeric: true }))
     .slice(0, n)
     .map(({ b, signed }) => ({
-      id: b.id, label: b.bill_number || null, title: b.title || null, law_number: b.law_number || null, signed,
+      id: b.id, label: b.bill_number || null, title: b.title || null, law_number: b.law_number || null, law_type: b.law_type || null, signed,
       summary: b.ai_summary?.source === 'crs_summary' ? (b.ai_summary.bullet_points || [])[0] || null : null,
     }));
 }

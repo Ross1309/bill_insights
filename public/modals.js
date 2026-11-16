@@ -2,10 +2,10 @@
 // Anything with data-open="member|bill|vote" data-id="…" opens one, so you can go
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
-import { fetchFunction, getBill, getFirestoreDoc, getMember, getVote, getVotesForBill, loadParticipation } from "./data.js";
+import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesForBill, loadParticipation } from "./data.js";
 import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
-import { voteCardHtml } from "./vote-card.js";
+import { tieLine, voteCardHtml } from "./vote-card.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
 import { voteHeadline, outcomeOf } from "./plain.js";
@@ -32,7 +32,7 @@ const memberModal = {
   load(e) {
     loadInto(e, "member", getMember(e.id));
     loadInto(e, "profile", fetchFunction("member-profile", e.id));
-    loadInto(e, "record", getFirestoreDoc("member_votes", e.id));
+    loadInto(e, "record", getMemberVotes(e.id));
     loadInto(e, "participation", loadParticipation());
     if (e.financeRequested) loadInto(e, "finance", fetchFunction("member-finance", e.id)); // Retry
   },
@@ -317,6 +317,7 @@ const voteModal = {
         ${voteBillLine(v)}
         ${v.vote_type ? `<p class="text-xs text-gray-400 mt-1">${termize(escapeHtml(v.vote_type))}</p>` : ""}
         ${voteTalliesHtml(v)}
+        ${tieLine({ ...v, yea: v.tallies?.yea, nay: v.tallies?.nay })}
         <div class="flex flex-wrap gap-4 mt-4 text-sm">${externalLink(v.source_url, sourceLabel(v))}</div>`;
     }],
     ["members", "How members voted", e => {
@@ -358,7 +359,7 @@ function openModal(kind, id, { push = true } = {}) {
   const top = modalStack.at(-1);
   if (top && top.kind === kind && top.id === id) return;
   if (push) pushDetail(kind, id);
-  if (!modalStack.length) lastFocused = document.activeElement;
+  if (!modalStack.length) lastFocused = { el: document.activeElement, open: document.activeElement?.dataset?.open, id: document.activeElement?.dataset?.id };
   const entry = { kind, id, tab: def.tabs[0][0], data: {}, errors: {}, filter: {} };
   modalStack.push(entry);
   renderModal();
@@ -371,7 +372,12 @@ function closeModals() {
   modalStack = [];
   modalRoot.innerHTML = "";
   document.body.classList.remove("overflow-hidden");
-  lastFocused?.focus?.();
+  // The page may have re-rendered meanwhile (Home fills in positions): then focus the same
+  // control in its new form, found by what it opens.
+  const f = lastFocused;
+  const again = f?.el?.isConnected ? f.el
+    : f?.open && f.id ? document.querySelector(`[data-open="${CSS.escape(f.open)}"][data-id="${CSS.escape(f.id)}"]`) : null;
+  again?.focus?.();
 }
 
 // The router's view of details: show this one (popping back to it if it's already
@@ -460,10 +466,10 @@ function renderModal() {
         </div>
         <div role="tablist" class="shrink-0 flex gap-5 sm:gap-4 px-4 sm:px-5 border-b border-gray-200 overflow-x-auto">
           ${def.tabs.map(([key, label]) => `
-            <button type="button" role="tab" data-tab="${key}" aria-selected="${key === e.tab}"
+            <button type="button" role="tab" id="modal-tab-${key}" aria-controls="modal-panel" tabindex="${key === e.tab ? 0 : -1}" data-tab="${key}" aria-selected="${key === e.tab}"
               class="py-3 text-sm font-semibold whitespace-nowrap border-b-2 ${key === e.tab ? "text-gray-900 border-pink" : "text-gray-500 border-transparent hover:text-gray-700"}">${tabLabel(label)}</button>`).join("")}
         </div>
-        <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" class="p-4 sm:p-5 overflow-y-auto flex-1">${renderTab(e)}
+        <div data-panel data-view="${escapeHtml(`${modalStack.length}:${e.kind}:${e.id}:${e.tab}`)}" role="tabpanel" id="modal-panel" aria-labelledby="modal-tab-${e.tab}" class="p-4 sm:p-5 overflow-y-auto flex-1">${renderTab(e)}
           <p class="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-500">Something wrong here? <a href="#" data-report-error="${escapeHtml(detailHash(e.kind, e.id))}" class="text-accent hover:underline">Report an error</a> · <a href="#methodology" class="text-accent hover:underline">How we count</a></p></div>
       </div>
     </div>`;
@@ -523,9 +529,13 @@ export function setupModals() {
       return;
     }
     if (ev.target.closest("[data-retry]")) {
+      // Reload only what failed: the kind's load() re-requests every key, so keep the ones
+      // that already arrived (their loaders are cached or cheap; the results are kept).
       const e = modalStack.at(-1);
+      const kept = { ...e.data };
       e.errors = {};
       MODAL_KINDS[e.kind].load(e);
+      Object.assign(e.data, kept);
       renderModal();
     }
   });
@@ -542,6 +552,15 @@ export function setupModals() {
   document.addEventListener("keydown", ev => {
     if (ev.key === "Escape" && modalStack.length) userClose();
     else if (ev.key === "Tab" && modalStack.length) trapFocus(ev);
+    else if ((ev.key === "ArrowRight" || ev.key === "ArrowLeft") && ev.target.closest?.('#modal-root [role="tab"]')) {
+      // Tabs pattern: arrow keys move between tabs (and open them).
+      const tabs = [...modalRoot.querySelectorAll('[role="tab"]')];
+      const i = tabs.indexOf(ev.target.closest('[role="tab"]'));
+      const next = tabs[(i + (ev.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
+      ev.preventDefault();
+      next?.click();
+      modalRoot.querySelector(`#${next?.id}`)?.focus();
+    }
   });
   setRouteHandlers({
     showDetail: showModalFromRoute,

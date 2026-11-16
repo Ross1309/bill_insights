@@ -217,7 +217,7 @@ function laws(s) {
       <p class="text-sm text-gray-500">${esc(s.label)} bills signed into law this Congress, with how each chamber voted.</p>
       ${s.laws.length ? `<div class="grid gap-4 md:grid-cols-2 mt-4">${s.laws.map((b, i) => `
         <article class="bg-surface border border-gray-200 rounded-xl p-5 ${i >= 6 ? "hidden" : ""}" data-law-card>
-          <div class="flex flex-wrap items-center gap-2">${billLink(b)} ${stageChip(b)}${b.law_number ? `<span class="text-[11px] text-gray-500">Public Law ${esc(b.law_number)}</span>` : ""}</div>
+          <div class="flex flex-wrap items-center gap-2">${billLink(b)} ${stageChip(b)}${b.law_number ? `<span class="text-[11px] text-gray-500">${esc(b.law_type || "Public Law")} ${esc(b.law_number)}</span>` : ""}</div>
           <h4 class="font-serif text-lg font-bold text-gray-900 mt-2 leading-snug">${esc(b.title)}</h4>
           <div class="mt-2">${summary(b)}</div>
           <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-0.5">

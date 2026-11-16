@@ -97,10 +97,10 @@ export default async (req) => {
       crsSummary,
       actionsCount: detail.actions?.count ?? null,
       actions: actionsRes ? shapeActions(actionsRes.actions || []) : null,
-    }, 200, { 'Cache-Control': 'public, max-age=3600', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=21600, stale-while-revalidate=86400' });
+    }, 200, { 'Cache-Control': 'public, max-age=3600', 'Netlify-Vary': 'query=id', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=21600, stale-while-revalidate=86400' });
   } catch (err) {
     console.error(`bill-detail ${billId}:`, err);
-    if (err.status === 404) return json({ error: 'Bill not found.' }, 404, { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
+    if (err.status === 404) return json({ error: 'Bill not found.' }, 404, { 'Netlify-Vary': 'query=id', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=3600' });
     return json({ error: 'Could not load bill details.' }, 502);
   }
 };

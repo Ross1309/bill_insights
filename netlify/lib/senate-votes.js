@@ -67,10 +67,20 @@ async function fetchMenu(congress, session) {
 }
 
 export function parseVote(xml, { congress, session, number }, lisToBioguide) {
-  const docType = (tag(xml, 'document_type') || '').replace(/\./g, '').replace(/\s+/g, '').toUpperCase();
-  const docNumber = tag(xml, 'document_number');
+  let docType = (tag(xml, 'document_type') || '').replace(/\./g, '').replace(/\s+/g, '').toUpperCase();
+  let docNumber = tag(xml, 'document_number');
   const docCongress = Number(tag(xml, 'document_congress')) || congress;
+  // An amendment vote's document is the amendment ("S.Amdt. 2856"); the bill it amends is
+  // <amendment_to_document_number> ("H.R. 4366"), which links the vote to that bill.
+  const amendedDoc = /^([A-Za-z.\s]+?)\s*(\d+)$/.exec(tag(xml, 'amendment_to_document_number') || '');
+  if (!BILL_TYPES.has(docType) && amendedDoc) {
+    docType = amendedDoc[1].replace(/[.\s]/g, '').toUpperCase();
+    docNumber = amendedDoc[2];
+  }
   const isBill = BILL_TYPES.has(docType) && /^\d+$/.test(docNumber || '');
+  // A Vice President's tie-breaking vote isn't among the <member>s: kept apart, so the
+  // senators' tallies stay as recorded (the page says who broke the tie).
+  const tieBy = tag(xml, 'by_whom'), tieVote = tag(xml, 'tie_breaker_vote');
 
   let unmapped = 0;
   const individual_votes = blocks(xml, 'member').map(mb => {
@@ -106,6 +116,7 @@ export function parseVote(xml, { congress, session, number }, lisToBioguide) {
       legislation: docType && docNumber ? `${docType} ${docNumber}` : null,
       document_title: tag(xml, 'document_title') || tag(xml, 'vote_document_text'),
       amendment: tag(xml, 'amendment_number'),
+      tie_breaker: tieBy && tieVote ? { by: tieBy.replace(/ of the United States$/, ''), vote: tieVote } : null,
       chamber: 'Senate',
       congress,
       session,
@@ -127,10 +138,13 @@ export function parseVote(xml, { congress, session, number }, lisToBioguide) {
 // The first session listed is the current one: if its menu can't be read, throw (a
 // silent empty list would report a healthy run while missing every new vote). An
 // earlier session's menu is optional.
-export async function listSenateVotes(congress, sessions = [2, 1]) {
+// newSession: the first session list may not exist yet (a new Congress before its first
+// Senate roll call): a 404 then means "no votes yet", not a failure.
+export async function listSenateVotes(congress, sessions = [2, 1], { newSession = false } = {}) {
   const entries = [];
   for (const [i, session] of sessions.entries()) {
     entries.push(...await fetchMenu(congress, session).catch(err => {
+      if (i === 0 && newSession && err.status === 404) { console.log(`Senate vote menu ${congress}-${session} not published yet (no votes)`); return []; }
       if (i === 0) throw new Error(`Senate vote menu ${congress}-${session} unavailable: ${err.message}`);
       console.warn(`Senate vote menu ${congress}-${session} unavailable: ${err.message}`);
       return [];

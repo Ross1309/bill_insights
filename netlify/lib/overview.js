@@ -19,7 +19,7 @@ const RECENT_WEEKS = 3;
 
 const VOTE_FIELDS = ['chamber', 'date', 'question', 'result', 'party_breakdown', 'tallies', 'bill_id', 'roll_call_number', 'session', 'legislation', 'document_title'];
 const BILL_FIELDS = ['type', 'number', 'congress', 'title', 'stage', 'passed_house', 'passed_senate', 'failed_house', 'failed_senate',
-  'law_number', 'law_date', 'sponsor', 'cosponsors_count', 'subject_count', 'topics', 'topic_focus', 'ai_summary', 'crs_summary_available', 'latestAction'];
+  'law_number', 'law_type', 'law_date', 'sponsor', 'cosponsors_count', 'subject_count', 'topics', 'topic_focus', 'ai_summary', 'crs_summary_available', 'latestAction'];
 
 // `congress` is the current Congress. Until it has MIN_VOTES_TO_DISPLAY votes (early
 // January of odd years), the stats describe the previous Congress instead, and say so.
@@ -87,7 +87,7 @@ async function writeDigest(db, now, votes, congress, allWeeks) {
   const inScope = v => v.date && (!onlyWeeks || onlyWeeks.has(weekStart(easternDate(v.date))));
 
   const lawSnap = await db.collection('bills').where('stage', '==', 'law')
-    .select('bill_number', 'title', 'law_number', 'law_date', 'latestAction', 'ai_summary', 'sponsor', 'congress').get();
+    .select('bill_number', 'title', 'law_number', 'law_type', 'law_date', 'latestAction', 'ai_summary', 'sponsor', 'congress').get();
   const laws = lawSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => Number(b.congress) === congress);
 
   const billIds = [...new Set(votes.filter(inScope).map(v => v.bill_id).filter(Boolean))];

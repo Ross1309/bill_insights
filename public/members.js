@@ -50,11 +50,11 @@ export function memberRole(m) {
 
 export function memberPhoto(m) {
   if (!m.imageUrl) {
-    return `<div class="w-16 h-20 rounded-lg bg-gray-100 border flex items-center justify-center text-xs text-gray-400 shrink-0">No photo</div>`;
+    return `<span class="w-16 h-20 rounded-lg bg-gray-100 border flex items-center justify-center text-xs text-gray-400 shrink-0">No photo</span>`;
   }
   return `<img src="${escapeHtml(m.imageUrl)}" alt="${escapeHtml(m.name || "")}" loading="lazy"
     class="w-16 h-20 object-cover rounded-lg bg-gray-100 border shrink-0"
-    onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'w-16 h-20 rounded-lg bg-gray-100 border shrink-0'}))" />`;
+    onerror="this.replaceWith(Object.assign(document.createElement('span'), {className: 'block w-16 h-20 rounded-lg bg-gray-100 border shrink-0'}))" />`;
 }
 
 // --- Directory: all current members from one `directory/members` doc ----------
@@ -126,16 +126,16 @@ function membersSummary(shownCount, list) {
 
 function memberCard(m) {
   return `
-    <button type="button" data-open="member" data-id="${escapeHtml(m.id)}" aria-label="View profile of ${escapeHtml(m.name || "member")}"
+    <button type="button" data-open="member" data-id="${escapeHtml(m.id)}"
       class="member-card text-left bg-surface border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md hover:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent transition">
       ${memberPhoto(m)}
-      <div class="min-w-0">
+      <span class="block min-w-0">
         ${m.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[m.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(m.party)}</span>` : ""}
-        <h3 class="font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</h3>
-        <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}${memberFilters.state ? "" : ` · ${escapeHtml(m.state || "")}`}</p>
+        <span class="block font-bold text-gray-900 text-base mt-1">${escapeHtml(m.name || "Name not available")}</span>
+        <span class="block text-xs text-gray-500 mt-0.5">${escapeHtml(memberRole(m))}${memberFilters.state ? "" : ` · ${escapeHtml(m.state || "")}`}</span>
         ${missedShort(m, participation)}
-        <p class="text-xs text-accent mt-1">View profile →</p>
-      </div>
+        <span class="block text-xs text-accent mt-1" aria-hidden="true">View profile →</span>
+      </span>
     </button>`;
 }
 

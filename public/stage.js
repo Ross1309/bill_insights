@@ -95,7 +95,9 @@ export function stageSteps(bill) {
     status = chambers.length === 1 ? `Agreed to in the ${origin}` : "Agreed to by both chambers";
     final = true;
   } else if (amendment && passedIn.length === 2) { status = "Passed both chambers; goes to the states for ratification"; final = true; }
-  else if (passedIn.length === 2) status = "Passed both chambers";
+  // Each chamber passed a version; the texts may still differ until one agrees to the
+  // other's (so not "ready for the President").
+  else if (passedIn.length === 2) status = "Passed both chambers; not yet sent to the President";
   else if (passedIn.length === 1) {
     const next = chambers.find(c => !passed[c]);
     status = `${resolution ? "Agreed to" : "Passed"} in the ${passedIn[0]}; next: the ${next}`;

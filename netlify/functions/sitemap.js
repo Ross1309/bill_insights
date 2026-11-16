@@ -5,7 +5,10 @@
 import { getDb } from '../lib/firebase.js';
 
 export default async req => {
-  const origin = new URL(req.url).origin;
+  const u = new URL(req.url);
+  // ~2,600 reads per build: a query string (a CDN miss every time) goes to the clean URL.
+  if (u.search) return new Response(null, { status: 301, headers: { Location: '/sitemap.xml', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400' } });
+  const origin = u.origin;
   const db = getDb();
   const [bills, dir] = await Promise.all([
     db.collection('bills').select('update_date').get(),

@@ -90,9 +90,17 @@ export async function handler(event, context) {
       }
     }
 
+    // Work owed from earlier runs (sync_state/ingest): bills still to enrich, and stats
+    // still to rebuild. A run cut off between steps (Netlify stops functions at 30 s)
+    // would otherwise lose that work: the next run sees no new votes and skips it.
+    const owedRef = db.collection("sync_state").doc("ingest");
+    const owed = (await owedRef.get()).data() || {};
+    if (applied.votes || memberChanges) await owedRef.set({ stats_dirty: true }, { merge: true });
+    const statsOwed = Boolean(applied.votes || memberChanges || owed.stats_dirty || !lastRun?.ok);
+
     // 4b. Missed votes per member (stats/participation): after new votes were counted, or
     //     when members changed (a new member, someone leaving).
-    if (applied.votes || memberChanges || !lastRun?.ok) {
+    if (statsOwed) {
       try {
         const p = await writeParticipation(db, admin, CONGRESS_NUM);
         console.log(`Participation: ${p.members} members`);
@@ -104,22 +112,25 @@ export async function handler(event, context) {
 
     // 5. Issue tracker: enrich the bills these votes are on (sync-bills summarizes them).
     let enriched = 0;
+    const billIds = [...new Set([...results.filter(r => r.status === "fulfilled").flatMap(r => r.value || []), ...(owed.pending_enrich || [])])];
+    if (billIds.length) await owedRef.set({ pending_enrich: billIds }, { merge: true });
     try {
-      const billIds = results.filter(r => r.status === "fulfilled").flatMap(r => r.value || []);
       const n = enriched = await enrichVotedBills(billIds);
       if (n) console.log(`Enriched ${n} newly voted-on bills`);
+      await owedRef.set({ pending_enrich: [] }, { merge: true });
     } catch (err) {
+      // pending_enrich keeps every id (enriched ones are skipped next time).
       failures.push(`enrich: ${err.message}`);
       console.error("Bill enrichment failed:", err);
     }
 
     // 6. Rebuild the precomputed stats, only when something they show changed (most
     //    nights in a recess nothing did) or the last run didn't finish cleanly.
-    const changed = applied.votes || enriched || memberChanges;
-    if (!changed && lastRun?.ok) console.log("No new votes, bills or member changes; stats left as they are.");
+    if (!statsOwed && !enriched) console.log("No new votes, bills or member changes; stats left as they are.");
     else try {
       const stats = await writeOverviewStats(db, admin, { congress: CONGRESS_NUM });
       console.log(`stats rebuilt for the ${stats.congress}th Congress from ${stats.votes} votes`);
+      if (!failures.some(f => f.startsWith("participation"))) await owedRef.set({ stats_dirty: false }, { merge: true });
     } catch (err) {
       failures.push(`stats: ${err.message}`);
       console.error("Stats rebuild failed:", err);
@@ -172,7 +183,9 @@ export async function syncSenateVotes(congress, sessions, legislators, indexed) 
     .filter(l => l.id?.lis && l.id?.bioguide)
     .map(l => [l.id.lis, l.id.bioguide]));
 
-  const entries = await listSenateVotes(congress, sessions); // newest first
+  // In a session's first weeks the vote list may not be published yet.
+  const sessionStart = Date.UTC(1787 + 2 * congress + (sessions[0] === 2 ? 1 : 0), 0, 3);
+  const entries = await listSenateVotes(congress, sessions, { newSession: today() - sessionStart < 45 * 86400e3 }); // newest first
   const unstored = await unstoredIds(entries.map(senateVoteId), indexed);
   const missing = entries.filter(e => unstored.has(senateVoteId(e)));
   const todo = missing.slice(0, MAX_NEW_VOTES_PER_CHAMBER);

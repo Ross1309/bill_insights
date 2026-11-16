@@ -45,13 +45,13 @@
   </header>
 
   <nav class="sticky top-0 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar" role="tablist">
-      <button id="nav-overview" role="tab" class="nav-tab">Home</button>
-      <button id="nav-congress" role="tab" class="nav-tab">This Congress</button>
-      <button id="nav-issues" role="tab" class="nav-tab">Issues</button>
-      <button id="nav-bills" role="tab" class="nav-tab">Bills</button>
-      <button id="nav-votes" role="tab" class="nav-tab">Votes</button>
-      <button id="nav-members" role="tab" class="nav-tab">Members</button>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar">
+      <button type="button" id="nav-overview" class="nav-tab">Home</button>
+      <button type="button" id="nav-congress" class="nav-tab">This Congress</button>
+      <button type="button" id="nav-issues" class="nav-tab">Issues</button>
+      <button type="button" id="nav-bills" class="nav-tab">Bills</button>
+      <button type="button" id="nav-votes" class="nav-tab">Votes</button>
+      <button type="button" id="nav-members" class="nav-tab">Members</button>
     </div>
   </nav>
 
@@ -64,7 +64,7 @@
         <h1 class="font-serif text-3xl sm:text-4xl font-bold text-gray-900">What is Congress doing?</h1>
         <p class="text-gray-600 mt-2 max-w-2xl">This week's key votes, new laws and your own members, in plain language from the official record. Non-partisan; every AI summary is labeled.</p>
         <div id="home-hero" class="grid gap-4 lg:grid-cols-3 mt-6">
-          <div class="lg:col-span-3 text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
+          <div class="lg:col-span-3 text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
         </div>
       </div>
       <section id="home-keyvotes" class="empty:hidden"></section>
@@ -77,7 +77,7 @@
     <section id="view-charts" class="tab-view hidden">
       <div id="congress-container" class="min-h-[300px] mb-12">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading...</p>
         </div>
       </div>
@@ -87,7 +87,7 @@
       </div>
       <div id="overview-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading charts...</p>
         </div>
       </div>
@@ -111,7 +111,7 @@
       </div>
       <div id="issue-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading...</p>
         </div>
       </div>
@@ -149,7 +149,7 @@
       </div>
       <div id="bills-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading bills...</p>
         </div>
       </div>
@@ -176,7 +176,7 @@
       <p id="vote-scope-note" class="text-xs text-gray-500 mb-6"></p>
       <div id="votes-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading vote records...</p>
         </div>
       </div>
@@ -228,7 +228,7 @@
       </div>
       <div id="members-container" class="min-h-[300px]">
         <div class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+          <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading members...</p>
         </div>
       </div>
@@ -363,7 +363,7 @@
             <h3>This Congress so far</h3>
             <ul>
               <li><strong>Same point in the term:</strong> a Congress starts on January 3 of an odd year; "day N" is N days after that, so each Congress is compared with the last two at the same stage of their two-year terms.</li>
-              <li><strong>Bills</strong> are measures that can become law (H.R., S., H.J.Res., S.J.Res.), counted by introduction date. <strong>Passed a chamber / both:</strong> the first "Passed/agreed to in House" or "in Senate" action. <strong>Laws:</strong> the "Became Public/Private Law" action, including bills signed after a term ended.</li>
+              <li><strong>Bills</strong> are measures that can become law (H.R., S., H.J.Res., S.J.Res.), counted by introduction date. <strong>Passed a chamber / both:</strong> the first "Passed/agreed to in House" or "in Senate" action. "Both" means each chamber passed a version; if the second changed the text, the two still have to agree before the bill goes to the President. <strong>Laws:</strong> the "Became Public/Private Law" action, including bills signed after a term ended.</li>
               <li><strong>Parties split:</strong> most Democrats voted the opposite way from most Republicans (Yea vs Nay); ties, quorum calls and Speaker elections are left out.</li>
               <li><strong>Sources:</strong> GovInfo's bill status files (the bulk record of every bill's actions) and Congress.gov for bills; the House Clerk and senate.gov for votes and party totals. The current Congress is updated nightly from Congress.gov.</li>
             </ul>

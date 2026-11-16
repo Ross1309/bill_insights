@@ -7,21 +7,29 @@
 
 import { officialLabel } from "./util.js";
 
-const RULE = /^Providing for consideration of the bills? \(([^)]+)\)/i;
+// A House rule's title names the measure it sets debate terms for in its first parentheses:
+// "the bill (H.R. 1)", "the joint resolution (H.J. Res. 60)", "the Senate amendment to ... (H.R. 4)".
+const RULE = /^Providing for consideration of [^(]*\(([^)]+)\)/i;
 const short = title => String(title || "").replace(/ of \d{4}$/, "");
+// Long descriptive titles ("Providing for congressional disapproval under chapter 8 …") are
+// cut in headlines; the full title is on the card and the bill page.
+const clip = (t, n = 110) => (t.length > n ? `${t.slice(0, n).replace(/\s+\S*$/, "")}…` : t);
 
 // What kind of question a vote was, from its official wording (most specific first).
 // Only "passage" decides a measure; the rest are steps on the way, and their headlines
 // say so (a cloture vote on a bill is not the bill passing).
 export function questionKind(question = "") {
   const q = String(question).toLowerCase();
+  // "Table" first: "On Motion to Table the Motion to Discharge" sets the discharge aside
+  // (the bill stays in committee), the opposite of a discharge vote.
+  if (/\btable\b/.test(q)) return "table";
   if (/cloture/.test(q)) return "cloture";
   if (/nomination/.test(q)) return "nomination";
+  if (/election of the speaker/.test(q)) return "speaker";
   if (/motion to proceed/.test(q)) return "proceed";
   if (/previous question/.test(q)) return "previous_question";
   if (/\b(re)?commit\b/.test(q)) return "recommit";
   if (/discharge/.test(q)) return "discharge";
-  if (/\btable\b/.test(q)) return "table";
   if (/objections of the president|overrid/.test(q)) return "override";
   if (/\bconcur(rence)?\b/.test(q)) return "concur";   // not "concurrent resolution"
   if (/amendment/.test(q)) return "amendment";
@@ -36,16 +44,19 @@ export function voteHeadline(v) {
   if (!v.bill) {
     const who = String(v.document_title || v.legislation || "a nominee").split(",")[0];
     if (kind === "nomination") return `${ch} ${ok ? "confirmed" : "rejected"} ${who}`;
+    if (kind === "speaker") return `${ch} elected the Speaker`;
     if (kind === "cloture" && v.document_title) return `${ch} ${ok ? "voted to end debate" : "voted not to end debate"} on the nomination of ${who}`;
     return `${ch}: ${v.question || "vote"}`;
   }
   const label = officialLabel(v.bill.label || v.bill.id);
+  const isResolution = /^[hs](con|j)?res/i.test(String(v.bill.id || v.bill.label || "").replace(/[.\s]/g, ""));
   const title = short(v.bill.title);
   const rule = RULE.exec(v.bill.title || "");
   // A short title ("Major Richard Star Act") reads as a name; a descriptive one ("To amend
   // title 10...", "Condemning ...", "A joint resolution ...") reads better after the label.
-  const descriptive = /^(to |an? (act|bill|joint|concurrent|resolution)\b|[a-z]+ing\b)/i.test(title);
-  const subject = rule ? `the rule for ${rule[1]}` : title && !descriptive ? `the ${title}` : label;
+  const descriptive = /^(to |an? \w|[a-z]+ing\b)/i.test(title);   // "To amend…", "A bill…", "An executive resolution…", "Condemning…"
+  const ruleFor = rule ? officialLabel(rule[1]) : null;
+  const subject = rule ? `the rule for ${ruleFor}` : title && !descriptive ? `the ${title}` : label;
   const other = ch === "House" ? "Senate" : "House";
   switch (kind) {
     case "cloture": return `${ch} ${ok ? "voted to end debate" : "voted not to end debate"} on ${subject}`;
@@ -53,19 +64,34 @@ export function voteHeadline(v) {
     case "previous_question": return `${ch} ${ok ? "voted to end debate" : "voted not to end debate"} on ${subject}`;
     case "recommit": return `${ch} ${ok ? "sent" : "voted not to send"} ${subject} back to committee`;
     case "discharge": return `${ch} ${ok ? "voted to take" : "voted not to take"} ${subject} out of committee`;
-    case "table": return `${ch} ${ok ? "voted to table" : "voted not to table"} a motion on ${subject}`;
+    case "table": {
+      // Name what was set aside when the question says.
+      const q = String(v.question || "").toLowerCase();
+      const what = /discharge/.test(q) ? `a motion to take ${subject} out of committee`
+        : /recommit|\bcommit\b/.test(q) ? `a motion to send ${subject} back to committee`
+        : /reconsider/.test(q) ? `a motion to reconsider the vote on ${subject}`
+        : /appeal|ruling of the chair/.test(q) ? `an appeal of the chair's ruling on ${subject}`
+        : /^on (the )?motion to table$/.test(q.trim()) && isResolution ? subject   // tabling the resolution itself
+        : `a motion on ${subject}`;
+      return `${ch} ${ok ? "set aside" : "voted not to set aside"} ${what}`;
+    }
     case "override": return `${ch} ${ok ? "voted to override" : "failed to override"} the veto of ${subject}`;
     case "concur": return `${ch} ${ok ? "agreed to" : "rejected"} the ${other}'s changes to ${subject}`;
     case "amendment": return `${ch} ${ok ? "adopted" : "rejected"} an amendment to ${subject}`;
     case "passage": break;
     default: return `${ch}: ${v.question || "vote"} (${label})`;
   }
-  if (rule) return `${ch} ${ok ? "agreed to" : "rejected"} the terms of debate for ${rule[1]}`;
-  // Resolutions (H.Res., S.J.Res., H.Con.Res. ...) are adopted; bills are passed.
-  const isRes = /^[hs](con|j)?res/i.test(String(v.bill.id || v.bill.label || "").replace(/[.\s]/g, ""));
+  if (rule) return `${ch} ${ok ? "agreed to" : "rejected"} the terms of debate for ${ruleFor}`;
+  // Simple and concurrent resolutions (H.Res., S.Con.Res. ...) are adopted; bills and
+  // joint resolutions are passed (as the official result says).
+  const isRes = /^[hs](con)?res/i.test(String(v.bill.id || v.bill.label || "").replace(/[.\s]/g, ""));
+  // A suspension vote needs two-thirds: a majority that falls short isn't a rejection.
+  if (!ok && /suspend the rules/i.test(v.question || "") && v.yea != null && v.yea > v.nay) {
+    return `${title && !descriptive ? `The ${title}` : label} fell short of the two-thirds needed in the ${ch}`;
+  }
   const verb = isRes ? (ok ? "adopted" : "rejected") : (ok ? "passed" : "rejected");
   if (!title) return `${ch} ${verb} ${label}`;
-  if (descriptive) return `${ch} ${verb} ${label}: ${title}`;
+  if (descriptive) return `${ch} ${verb} ${label}: ${clip(title)}`;
   return `${ch} ${verb} the ${title}`;
 }
 
@@ -79,11 +105,18 @@ export function resultWord(v) {
   const kind = questionKind(v.question);
   if (kind === "nomination" && !v.bill) return ok ? "Confirmed" : "Rejected";
   if (kind === "override") return ok ? "Veto overridden" : "Veto sustained";
-  if ((v.bill && isRule(v)) || (kind !== "passage" && kind !== "other")) return ok ? "Agreed to" : "Rejected";
-  return ok ? "Passed" : "Failed";
+  if (kind === "speaker") return "Speaker elected";
+  if (kind === "passage" && !(v.bill && isRule(v))) {
+    if (!ok && /suspend the rules/i.test(v.question || "") && v.yea != null && v.yea > v.nay) return "Short of two-thirds";
+    return ok ? "Passed" : "Failed";
+  }
+  // Steps and other questions (motions, quorum calls, points of order): nothing passed.
+  if (ok) return "Agreed to";
+  if (v.outcome === "failed") return "Rejected";
+  return String(v.result || "Recorded");
 }
 // "H.R. 1013" from a rule's title, or null.
-export const ruleTarget = v => RULE.exec(v.bill?.title || "")?.[1] || null;
+export const ruleTarget = v => { const r = RULE.exec(v.bill?.title || "")?.[1]; return r ? officialLabel(r) : null; };
 
 // "Most Democrats and most Republicans voted Yea" / "Most Democrats voted Nay; most Republicans voted Yea".
 export function partyWords(p) {
@@ -98,6 +131,9 @@ export function partyWords(p) {
 // server's voteOutcome in netlify/lib/vote-stats.js; negatives checked first).
 export function outcomeOf(result = "") {
   const r = String(result).toLowerCase();
+  // On an override vote, "Veto Sustained" means the override failed; "Veto Overridden" that it passed.
+  if (/veto sustained/.test(r)) return "failed";
+  if (/veto overridden/.test(r)) return "succeeded";
   if (/failed|rejected|defeated|not sustained|not agreed|not well taken/.test(r)) return "failed";
   if (/passed|agreed|confirmed|adopted|sustained|well taken/.test(r)) return "succeeded";
   return "other";

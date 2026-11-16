@@ -1,5 +1,5 @@
 // Issue tracker backfill: store + enrich (CRS subjects, stage, sponsor, topic tags)
-// every bill that became law this congress and every bill that got a recorded vote.
+// every bill that became law this congress, got a recorded vote, or passed a chamber.
 // Resumable: bills already enriched are skipped unless --force.
 //
 //   node scripts/import-topic-bills.js            # dry run
@@ -26,13 +26,16 @@ async function main() {
   const { congress } = currentCongress();
   const lawIds = await listLawBillIds(congress, CONGRESS_API_KEY);
   const votedIds = (await db.collection('votes').select('bill_id').get()).docs.map(d => d.data().bill_id).filter(Boolean);
-  const ids = [...new Set([...lawIds, ...votedIds])].filter(id => parseBillId(id));
+  // Every bill that passed a chamber (many without a recorded vote: unanimous consent,
+  // voice vote), from the This Congress upkeep state, so "Moving or passed" has them all.
+  const passedIds = Object.keys((await db.collection('sync_state').doc(`congress-${congress}`).get()).data()?.bills || {}).map(k => `${k}-${congress}`);
+  const ids = [...new Set([...lawIds, ...votedIds, ...passedIds])].filter(id => parseBillId(id));
 
   const stored = new Map((await db.collection('bills').select('enriched_at', 'crs_summary_available').get()).docs
     .map(d => [d.id, d.data()]));
   const enriched = new Set([...stored].filter(([, d]) => d.enriched_at).map(([id]) => id));
   const todo = FORCE ? ids : ids.filter(id => !enriched.has(id));
-  console.log(`${WRITE ? 'WRITING' : 'DRY RUN'}: ${lawIds.length} laws + ${new Set(votedIds).size} voted bills = ${ids.length}; ${todo.length} to enrich`);
+  console.log(`${WRITE ? 'WRITING' : 'DRY RUN'}: ${lawIds.length} laws + ${new Set(votedIds).size} voted bills + ${passedIds.length} passed a chamber = ${ids.length}; ${todo.length} to enrich`);
   if (!WRITE) return console.log('Nothing was written. Re-run with --write.');
 
   const writer = bulkWriter(db);

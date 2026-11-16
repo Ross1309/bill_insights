@@ -57,7 +57,7 @@ async function loadBills({ reset = false } = {}) {
     billsError = null;
     billsContainer.innerHTML = `
       <div class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
+        <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
         <p class="text-gray-500">Loading bills...</p>
       </div>`;
     billsMore.innerHTML = "";

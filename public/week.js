@@ -53,7 +53,7 @@ export function renderWeekPage(el, w, list) {
 
   const lawCards = w.laws.map(l => `
     <article class="bg-surface border border-gray-200 rounded-xl p-4">
-      <p class="text-xs text-gray-500">Public Law ${esc(l.law_number || "")} · signed ${esc(day(l.signed, { month: "short", day: "numeric", year: "numeric" }))}${l.sponsor?.name ? ` · sponsor ${l.sponsor.bioguideId ? `<button type="button" data-open="member" data-id="${esc(l.sponsor.bioguideId)}" class="text-accent hover:underline">${esc(l.sponsor.name)}</button>` : esc(l.sponsor.name)}${l.sponsor.party ? ` (${esc(l.sponsor.party)}-${esc(l.sponsor.state || "")})` : ""}` : ""}</p>
+      <p class="text-xs text-gray-500">${esc(l.law_type || "Public Law")} ${esc(l.law_number || "")} · signed ${esc(day(l.signed, { month: "short", day: "numeric", year: "numeric" }))}${l.sponsor?.name ? ` · sponsor ${l.sponsor.bioguideId ? `<button type="button" data-open="member" data-id="${esc(l.sponsor.bioguideId)}" class="text-accent hover:underline">${esc(l.sponsor.name)}</button>` : esc(l.sponsor.name)}${l.sponsor.party ? ` (${esc(l.sponsor.party)}-${esc(l.sponsor.state || "")})` : ""}` : ""}</p>
       <p class="mt-1 text-sm">${billLink(l)} <span class="text-gray-900 font-semibold">${esc(l.title || "")}</span></p>
       ${l.summary?.length
         ? `<ul class="list-disc pl-5 mt-2 text-sm text-gray-700 space-y-1">${l.summary.map(b => `<li>${esc(b)}</li>`).join("")}</ul><p class="text-[11px] text-gray-400 mt-1">AI summary of the official CRS summary</p>`

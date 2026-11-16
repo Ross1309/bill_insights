@@ -190,7 +190,9 @@ test('resultWord: rules are agreed to, nominations confirmed, bills passed', asy
   assert.equal(resultWord(rule), 'Agreed to');
   assert.equal(resultWord({ ...rule, outcome: 'failed' }), 'Rejected');
   assert.equal(resultWord({ outcome: 'succeeded', kind: 'rule', bill: { id: 'hres1-119' } }), 'Agreed to');
-  assert.equal(resultWord({ outcome: 'succeeded', bill: { id: 'hr1-119', title: 'An Act' } }), 'Passed');
+  assert.equal(resultWord({ outcome: 'succeeded', question: 'On Passage', bill: { id: 'hr1-119', title: 'An Act' } }), 'Passed');
+  assert.equal(resultWord({ outcome: 'succeeded', question: 'On Motion to Adjourn', bill: { id: 'hr1-119' } }), 'Agreed to');   // not a passage
+  assert.equal(resultWord({ outcome: 'other', question: 'Election of the Speaker', result: 'Elected', bill: null }), 'Speaker elected');
   assert.equal(resultWord({ outcome: 'succeeded', bill: null, question: 'On the Nomination' }), 'Confirmed');
 });
 
@@ -238,6 +240,16 @@ test('voteHeadline: only final votes say a measure passed', async () => {
   assert.equal(h('House', 'On Overriding the Veto', 'failed'), 'House failed to override the veto of the Rescissions Act');
   assert.equal(h('House', 'On Motion to Suspend the Rules and Pass, as Amended', 'succeeded'), 'House passed the Rescissions Act');
   assert.equal(h('Senate', 'On Passage of the Bill', 'failed'), 'Senate rejected the Rescissions Act');
+  // Tabling a motion sets it aside: tabling a discharge motion keeps the bill in committee.
+  assert.equal(h('House', 'On Motion to Table the Motion to Discharge Committee', 'succeeded'), 'House set aside a motion to take the Rescissions Act out of committee');
+  assert.equal(voteHeadline({ chamber: 'House', question: 'On Motion to Table', outcome: 'succeeded', bill: { id: 'hres537-119', label: 'HRES 537', title: 'Impeaching X' } }), 'House set aside H.Res. 537');
+  // A suspension vote with a majority that falls short of two-thirds.
+  assert.equal(voteHeadline({ chamber: 'House', question: 'On Motion to Suspend the Rules and Pass', outcome: 'failed', yea: 264, nay: 133, bill }), 'The Rescissions Act fell short of the two-thirds needed in the House');
+  // Joint resolutions pass (official wording); descriptive "An …" titles follow the label.
+  assert.match(voteHeadline({ chamber: 'Senate', question: 'On the Joint Resolution', outcome: 'succeeded', bill: { id: 'sjres37-119', label: 'SJRES 37', title: 'Providing for congressional disapproval' } }), /^Senate passed S\.J\.Res\. 37/);
+  assert.equal(voteHeadline({ chamber: 'Senate', question: 'On the Resolution', outcome: 'succeeded', bill: { id: 'sres377-119', label: 'SRES 377', title: 'An executive resolution authorizing en bloc consideration' } }), 'Senate adopted S.Res. 377: An executive resolution authorizing en bloc consideration');
+  // A rule on a joint resolution.
+  assert.equal(voteHeadline({ chamber: 'House', question: 'On Agreeing to the Resolution', outcome: 'succeeded', bill: { id: 'hres354-119', label: 'HRES 354', title: 'Providing for consideration of the joint resolution (H.J. Res. 60) providing for disapproval' } }), 'House agreed to the terms of debate for H.J.Res. 60');
   // A concurrent resolution's own vote is final passage, not "concurring".
   assert.equal(voteHeadline({ chamber: 'Senate', question: 'On the Concurrent Resolution', outcome: 'succeeded', bill: { id: 'hconres86-119', label: 'HCONRES 86', title: 'Establishing the budget' } }),
     'Senate adopted H.Con.Res. 86: Establishing the budget');
@@ -308,4 +320,14 @@ test('topics: Immigration and Defense tags; categories follow the topics; slugs 
   const slugs = Object.entries(TOPICS).flatMap(([s, t]) => [s, ...Object.keys(t.watchlists)]);
   assert.equal(new Set(slugs).size, slugs.length);
   assert.ok(slugs.length <= 30);   // stats query uses array-contains-any (max 30)
+});
+
+test('veto override votes: "Veto Sustained" means the override failed', async () => {
+  const { voteOutcome, voteCategory } = await import('../netlify/lib/vote-stats.js');
+  const { outcomeOf } = await import('../public/plain.js');
+  assert.equal(voteOutcome('Veto Sustained'), 'failed');
+  assert.equal(voteOutcome('Veto Overridden'), 'succeeded');
+  assert.equal(outcomeOf('Veto Sustained'), 'failed');
+  assert.equal(voteOutcome('Point of Order Sustained'), 'succeeded');   // other "sustained" unchanged
+  assert.equal(voteCategory('On Overriding the Veto'), 'passage');
 });

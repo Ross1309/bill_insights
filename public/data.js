@@ -89,12 +89,22 @@ export function getVote(id) {
   return voteCache.get(id);
 }
 
-export async function getVotesForBill(billId) {
+// Cached per page view (reopening a bill or member, Back/Forward): a failed read isn't kept.
+const memo = (cache, key, load) => {
+  if (!cache.has(key)) cache.set(key, load().catch(err => { cache.delete(key); throw err; }));
+  return cache.get(key);
+};
+const billVotesCache = new Map(), memberVotesCache = new Map();
+export function getVotesForBill(billId) {
   // Summaries are enough for the bill's Votes tab (tallies + party table).
-  const snap = await getDocs(query(collection(db, "vote_summaries"), where("bill_id", "==", billId), limit(50)));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  return memo(billVotesCache, billId, async () => {
+    const snap = await getDocs(query(collection(db, "vote_summaries"), where("bill_id", "==", billId), limit(50)));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  });
 }
+// A member's voting record (member_votes/<id>).
+export const getMemberVotes = id => memo(memberVotesCache, id, () => getFirestoreDoc("member_votes", id));
 
 // Missed votes per member + chamber medians (stats/participation), one read, cached.
 let participationDoc = null;

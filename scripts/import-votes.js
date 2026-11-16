@@ -113,6 +113,9 @@ async function main() {
     pool(house, 4, async ({ item }) => {
       try {
         const doc = await buildHouseVoteDoc(item, CONGRESS, CONGRESS_API_KEY);
+        // Same guard as the nightly ingest: an incomplete record isn't stored (a stored one is
+        // never re-fetched), so it's picked up by a later run once published in full.
+        if (!doc.individual_votes.length) { console.warn(`  … House ${doc.vote_id}: member positions not published yet; skipped`); counts.failed++; progress(); return; }
         writer.set(db.collection('votes').doc(doc.vote_id), { ...doc, members_applied: false, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         counts.House++;
       } catch (err) {
@@ -124,6 +127,7 @@ async function main() {
     pool(senate, 2, async ({ entry }) => {
       try {
         const { doc, unmapped } = await fetchSenateVote(entry, lisToBioguide);
+        if (!doc.individual_votes.length || !doc.date) { console.warn(`  … Senate ${doc.vote_id}: record not complete yet; skipped`); counts.failed++; progress(); return; }
         writer.set(db.collection('votes').doc(doc.vote_id), { ...doc, members_applied: false, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         counts.Senate++;
         counts.unmapped += unmapped;

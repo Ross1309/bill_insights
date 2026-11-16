@@ -27,6 +27,7 @@ function compactBill(b) {
     failed_house: !!b.failed_house,
     failed_senate: !!b.failed_senate,
     law_number: b.law_number || null,
+    law_type: b.law_type || null,
     sponsor: b.sponsor || null,
     cosponsors_count: b.cosponsors_count ?? null,
     subject_count: b.subject_count ?? null,

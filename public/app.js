@@ -34,7 +34,7 @@ async function loadIssue(slug) {
   setChipGroup("issue-topics", "topic", slug);
   try {
     if (!issueCache.has(slug)) {
-      container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>`;
+      container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>`;
       const snap = await getDoc(doc(db, "stats", `topic-${slug}`));
       if (!snap.exists()) throw new Error("This issue page hasn't been built yet.");
       issueCache.set(slug, snap.data());
@@ -96,9 +96,9 @@ function setupCopyLinks() {
     const btn = ev.target.closest("[data-copy-link]");
     if (!btn) return;
     const url = shareUrl(btn.dataset.copyLink || location.hash);
-    const label = btn.textContent;
+    btn.dataset.label ??= btn.textContent;   // the original, even after a double click
     btn.textContent = await copyText(url) ? "Link copied" : "Copy failed";
-    setTimeout(() => { btn.textContent = label; }, 2000);
+    setTimeout(() => { btn.textContent = btn.dataset.label; }, 2000);
   });
 }
 
@@ -119,7 +119,7 @@ let weekRequest = 0;
 async function loadWeek(monday) {
   const container = document.getElementById("week-container");
   const request = ++weekRequest;
-  container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading the week…</p></div>`;
+  container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading the week…</p></div>`;
   try {
     weeksPromise ??= getDoc(doc(db, "stats", "weeks")).then(s => s.data()?.weeks || []).catch(err => { weeksPromise = null; throw err; });
     const list = await weeksPromise;
@@ -167,8 +167,11 @@ async function loadHome() {
   }
 }
 
-// Render, then fill in how "your members" voted on the key votes (their member_votes
-// docs: one read each, only once an address was given).
+// Render, then fill in how "your members" voted on the key votes: from each key vote's
+// own record (every member's position; one read each, cached), only once an address was
+// given. Not from member_votes.recent: that holds only the latest 50 votes, so an older
+// key vote would wrongly read "none of your members voted". A vote that can't be read
+// shows "not available", never "didn't vote".
 let positionsRequest = 0;
 async function showHome(stats) {
   const reps = myReps();
@@ -177,15 +180,13 @@ async function showHome(stats) {
   renderHome(stats, { reps, participation });
   if (reps?.stale || !reps?.members?.length || !stats.this_week?.key_votes?.length) return;
   const request = ++positionsRequest;
-  const keyIds = new Set(stats.this_week.key_votes.map(v => v.id));
+  const mine = new Map(reps.members.map(m => [m.id, m]));
   const positions = new Map();
-  await Promise.all(reps.members.map(async m => {
-    const rec = await getFirestoreDoc("member_votes", m.id).catch(() => null);
-    for (const e of rec?.recent || []) {
-      if (!keyIds.has(e.id)) continue;
-      if (!positions.has(e.id)) positions.set(e.id, []);
-      positions.get(e.id).push({ id: m.id, name: m.name, position: e.position || "Not recorded" });
-    }
+  await Promise.all(stats.this_week.key_votes.map(async kv => {
+    const vote = await getVote(kv.id).catch(() => null);
+    if (!vote?.individual_votes) { positions.set(kv.id, null); return; }   // unavailable
+    positions.set(kv.id, vote.individual_votes.filter(iv => mine.has(iv.bioguideId))
+      .map(iv => ({ id: iv.bioguideId, name: mine.get(iv.bioguideId).name, position: iv.position || "Not recorded" })));
   }));
   if (request === positionsRequest) renderHome(stats, { reps, positions, participation });
 }

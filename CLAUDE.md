@@ -450,6 +450,36 @@ per-state `members` query and says nationwide search is unavailable.
 stats/health); Bills loads on its tab, the 100 KB directory on Legislators. Nightly runs
 cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting day).
 
+### Review round 1 (2026-11-15): four parallel reviewers (backend, frontend, data, product)
+Data reconciled exactly everywhere (all 556 member records, 85 weeks, 5 topics, congress-
+117/118/119 vs Congress.gov). Fixed:
+- **sync-congress-stats ran 28-59 s in production** (killed at 30 s, retried 3x, window
+  stuck at Nov 10, health "ok"): one listing page per run (`list_offset` paging, 25 overlap),
+  per-request deadlines, passage first, `state.checked` skip, "passage" fails when work was
+  waiting and nothing got done. Production is far slower than local: budget for it.
+- Headlines: "table" before discharge/recommit (a tabled discharge read as "took it out of
+  committee"); suspension short of 2/3 says so; Speaker election; joint resolutions "pass";
+  rules on joint resolutions; "An executive resolution" titles; unknown procedural votes
+  "Agreed to"/"Rejected", never Passed/Failed. Veto Sustained = override failed.
+- Senate parser: Vice President tie-breaks (`tie_breaker`, shown on cards) and amendment
+  votes linked to their bill (`amendment_to_document_number`). **Stored 119th votes still
+  need `node scripts/repair-senate-votes.js --write`** (then build-member-votes, import-topic-
+  bills, build-stats) once senate.gov accepts this machine again (it 403s after backfills).
+- law_type (Private Law 119-1/119-2 were shown as Public Law) + law_date on all 144 laws
+  (`scripts/backfill-law-fields.js`).
+- 592 bills that passed a chamber (mostly without a roll call) weren't stored/enriched, so
+  "Moving or passed" missed them: import-topic-bills covers sync_state/congress-<n> bills;
+  nightly, newly passed bills go to `sync_state/ingest.pending_enrich`.
+- Ingest keeps owed work in `sync_state/ingest` (pending_enrich, stats_dirty) so a run cut off
+  between steps doesn't lose it. sync-bills: a failed detail fetch no longer nulls a bill's
+  fields; never-checked CRS bills that fail 3x become `false` (stop blocking the queue).
+- Cost: share/sitemap redirect query strings to the clean URL; id functions send
+  `Netlify-Vary: query=id`. Optional owner step: a separate FEC_API_KEY.
+- Home "your members" positions now come from each key vote's own record (member_votes.recent
+  holds only 50: older key votes read "none of your members voted"); stale reps after Jan 3;
+  search race; member cards valid markup; Key-votes loop capped; detail caches; focus
+  restore; tabs pattern (modal) / aria-current (nav); reduced motion.
+
 ### Code review (2026-11-12)
 Three parallel reviews (backend, frontend, ops/data) found no data damage (every derived
 collection reconciled exactly) but fixed: non-idempotent member apply + silent BulkWriter

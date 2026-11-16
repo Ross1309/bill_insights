@@ -47,7 +47,7 @@ export function voteCategory(question = '') {
   const q = question.toLowerCase();
   if (q.includes('cloture')) return 'cloture';
   if (q.includes('nomination')) return 'nomination';
-  if (/passage|suspend the rules and (pass|agree|concur)|agreeing to the resolution|^on the (joint |concurrent )?resolution|concur in|objections of the president/.test(q)) return 'passage';
+  if (/passage|suspend the rules and (pass|agree|concur)|agreeing to the resolution|^on the (joint |concurrent )?resolution|concur in|objections of the president|overrid(e|ing) the veto/.test(q)) return 'passage';
   if (q.includes('amendment')) return 'amendment';
   if (/motion|previous question|point of order|decision of the chair|consideration of|call of the house|call by states/.test(q)) return 'procedural';
   return 'other';
@@ -56,6 +56,9 @@ export function voteCategory(question = '') {
 // 'succeeded' | 'failed' | 'other', from the official result text.
 export function voteOutcome(result = '') {
   const r = result.toLowerCase();
+  // On an override vote, "Veto Sustained" means the override failed; "Veto Overridden" that it passed.
+  if (/veto sustained/.test(r)) return 'failed';
+  if (/veto overridden/.test(r)) return 'succeeded';
   if (/failed|rejected|defeated|not sustained|not agreed|not well taken/.test(r)) return 'failed';
   if (/passed|agreed|confirmed|adopted|sustained|well taken/.test(r)) return 'succeeded';
   return 'other';

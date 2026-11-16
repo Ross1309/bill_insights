@@ -47,7 +47,7 @@ export const POSITION_BADGES = {
 // --- modal building blocks
 
 export function spinner(text) {
-  return `<div class="text-center py-10"><div class="inline-block animate-spin rounded-full h-6 w-6 border-4 border-accent border-t-transparent mb-3"></div><p class="text-sm text-gray-500">${escapeHtml(text)}</p></div>`;
+  return `<div class="text-center py-10"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-6 w-6 border-4 border-accent border-t-transparent mb-3"></div><p class="text-sm text-gray-500">${escapeHtml(text)}</p></div>`;
 }
 
 export function errorBlock(message, lead = "Couldn't load this from Congress.gov right now.") {

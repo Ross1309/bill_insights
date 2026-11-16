@@ -53,13 +53,14 @@ export function makeBillId(type, number, congress) {
 // Bills updated since an ISO time, OLDEST first: { bills: [{ id, updateDate }], truncated }.
 // `updateDate` is a date ("2026-11-12"; the list has no time). Oldest first so a capped
 // list is a prefix of the window, which callers can advance past.
-export async function listBillsUpdatedSince(sinceIso, apiKey, max = 1000) {
+// fetchOpts: getJson options (timeoutMs, retries) for callers on a tight time budget.
+export async function listBillsUpdatedSince(sinceIso, apiKey, max = 1000, fetchOpts = undefined, startOffset = 0) {
   const since = new Date(sinceIso).toISOString().replace(/\.\d{3}Z$/, 'Z');
   const bills = [];
   let truncated = false;
-  for (let offset = 0; ; offset += 250) {
-    if (offset >= max) { truncated = true; break; }
-    const data = await getJson(`${API}/bill?api_key=${apiKey}&format=json&limit=250&offset=${offset}&sort=updateDate+asc&fromDateTime=${since}`);
+  for (let offset = startOffset; ; offset += 250) {
+    if (offset - startOffset >= max) { truncated = true; break; }
+    const data = await getJson(`${API}/bill?api_key=${apiKey}&format=json&limit=250&offset=${offset}&sort=updateDate+asc&fromDateTime=${since}`, fetchOpts);
     const items = data.bills || [];
     bills.push(...items.filter(b => b.type && b.number && b.congress)
       .map(b => ({ id: makeBillId(b.type, b.number, b.congress), updateDate: b.updateDate || null, latestAction: b.latestAction || null, originChamber: b.originChamber || null })));
@@ -255,12 +256,16 @@ export async function fetchBillEnrichment(detail, apiKey) {
   ]);
   const subjectNames = (subjects.subjects?.legislativeSubjects || []).map(s => s.name).filter(Boolean);
   const lawNumber = detail.laws?.[0]?.number || null;
+  // "Public Law" or "Private Law" (private laws are numbered separately: Private Law 119-1
+  // is not Public Law 119-1).
+  const lawType = detail.laws?.[0]?.type || null;
   const sponsor = detail.sponsors?.[0];
   const policyArea = detail.policyArea?.name || subjects.subjects?.policyArea?.name || null;
   return {
     subjects: subjectNames,
     subject_count: subjectNames.length,
     law_number: lawNumber,
+    law_type: lawType,
     sponsor: sponsor
       ? { bioguideId: sponsor.bioguideId || null, name: [sponsor.firstName, sponsor.lastName].filter(Boolean).join(' ') || null, party: sponsor.party || null, state: sponsor.state || null }
       : null,
