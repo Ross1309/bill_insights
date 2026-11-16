@@ -1,7 +1,7 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { escapeHtml, ordinal, PARTY_NAMES, partyChip } from "./util.js";
+import { escapeHtml, loadErrorHtml, ordinal, PARTY_NAMES, partyChip } from "./util.js";
 import { voteCardHtml, isKeyVote } from "./vote-card.js";
 import { billLabel } from "./bills.js";
 import { setChipGroup } from "./members.js";
@@ -95,7 +95,7 @@ async function loadVotes({ reset = false } = {}) {
     if (generation !== st.generation) return;
     st.loading = false;
     console.error("Error fetching votes:", err);
-    votesContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load votes: ${escapeHtml(err.message)}</p>`;
+    votesContainer.innerHTML = loadErrorHtml("votes", err);
     votesMore.innerHTML = "";
   }
 }

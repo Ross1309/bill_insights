@@ -138,7 +138,7 @@ function timeline(focused) {
           const level = [0, 1].find(l => x - lastAt[l] >= LABEL_GAP);
           if (level !== undefined) lastAt[level] = x;
           const tip = `${day(v.date)} · ${ch} · ${v.bill.label}: ${v.result} ${v.yea}–${v.nay}`;
-          return `<button type="button" data-open="vote" data-id="${esc(v.id)}" data-tip="${esc(tip)}" aria-label="${esc(tip)}" class="absolute bottom-0 -translate-x-1/2 flex flex-col items-center" style="left:${Math.min(98, Math.max(2, x))}%">
+          return `<button type="button" data-open="vote" data-id="${esc(v.id)}" data-tip="${esc(tip)}" aria-label="${esc(tip)}" class="absolute bottom-0 -translate-x-1/2 flex flex-col items-center justify-end min-w-6 min-h-6" style="left:${Math.min(98, Math.max(2, x))}%">
             <span class="hidden ${level === undefined ? "" : "sm:block"} text-[10px] tabular-nums text-gray-500 ${level === 1 ? "mb-4" : "mb-0.5"}">${v.yea}–${v.nay}</span>
             <span class="w-3 h-3 rounded-full ring-2 ring-surface" style="background:${v.passed ? C.succeeded : C.failed}"></span>
           </button>`;

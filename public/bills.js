@@ -116,7 +116,9 @@ async function loadBills({ reset = false } = {}) {
     }
     billsError = err.code === "failed-precondition" && activeCategory !== "all"
       ? "Category filtering isn't available yet: the Firestore index in firestore.indexes.json hasn't been created."
-      : `Failed to load bills: ${err.message}`;
+      : err.code === "permission-denied"
+        ? "Couldn't load bills: this browser didn't pass the site's check that requests come from a regular web browser (Google reCAPTCHA). Ad or tracker blockers and strict privacy settings can stop it."
+        : `Failed to load bills: ${err.message}`;
     applyBillFilters();
   }
 }

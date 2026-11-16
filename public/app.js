@@ -4,7 +4,7 @@ import { renderIssue } from "./issues.js";
 import { renderOverview } from "./overview.js";
 import { db, getBill, getFirestoreDoc, getMember, getMemberVotes, getOverviewDoc, getVote, loadParticipation } from "./data.js";
 import { billBaseline, billChange, followButtonHtml, followCount, isFollowing, LIMITS, loadFollows, memberBaseline, memberChange, setFollow, topicBaseline, topicChange } from "./follow.js";
-import { escapeHtml, store } from "./util.js";
+import { escapeHtml, loadErrorHtml, store } from "./util.js";
 import { activeTab, navBills, navCongress, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
 import { renderCongressPage } from "./congress-page.js";
 import { glossaryHtml, setupGlossary } from "./glossary.js";
@@ -53,7 +53,7 @@ async function loadIssue(slug) {
   } catch (err) {
     if (request !== issueRequest) return;
     console.error("Error loading issue:", err);
-    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load this issue: ${escapeHtml(err.message)}</p>`;
+    container.innerHTML = loadErrorHtml("this topic", err);
   }
 }
 
@@ -142,7 +142,7 @@ async function loadWeek(monday) {
   } catch (err) {
     if (request !== weekRequest) return;
     console.error("Error loading the week:", err);
-    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load this week: ${escapeHtml(err.message)}</p>`;
+    container.innerHTML = loadErrorHtml("this week", err);
   }
 }
 
@@ -163,7 +163,7 @@ async function loadHome() {
     await showHome(snap.data());
   } catch (err) {
     console.error("Error loading home:", err);
-    hero.innerHTML = `<p class="lg:col-span-3 text-center text-red-500 py-12">Failed to load: ${escapeHtml(err.message)}</p>`;
+    hero.innerHTML = loadErrorHtml("the home page", err, "lg:col-span-3");
   } finally {
     homeLoading = false;
   }
@@ -337,7 +337,7 @@ async function loadCharts() {
     });
   } catch (err) {
     console.error("Error loading charts:", err);
-    container.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load the charts: ${escapeHtml(err.message)}</p>`;
+    container.innerHTML = loadErrorHtml("the charts", err);
   }
 }
 
@@ -351,7 +351,7 @@ async function loadCongressPage(overview) {
     renderCongressPage(el, { docs, cur, overview });
   } catch (err) {
     console.error("Error loading This Congress:", err);
-    el.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load: ${escapeHtml(err.message)}</p>`;
+    el.innerHTML = loadErrorHtml("this page", err);
   }
 }
 

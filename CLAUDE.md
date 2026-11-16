@@ -489,9 +489,10 @@ Data reconciled exactly everywhere (all 556 member records, 85 weeks, 5 topics, 
   rules on joint resolutions; "An executive resolution" titles; unknown procedural votes
   "Agreed to"/"Rejected", never Passed/Failed. Veto Sustained = override failed.
 - Senate parser: Vice President tie-breaks (`tie_breaker`, shown on cards) and amendment
-  votes linked to their bill (`amendment_to_document_number`). **Stored 119th votes still
-  need `node scripts/repair-senate-votes.js --write`** (then build-member-votes, import-topic-
-  bills, build-stats) once senate.gov accepts this machine again (it 403s after backfills).
+  votes linked to their bill (`amendment_to_document_number`). Stored 119th votes repaired
+  2026-11-16 (`repair-senate-votes.js --write` + rebuilds): 177 updated, every non-nomination
+  Senate vote now has its bill, 8 tie-breaks (e.g. vote 15, Hegseth). senate.gov 403s this
+  machine for about a day after a backfill; the script caches records, so re-runs are free.
 - law_type (Private Law 119-1/119-2 were shown as Public Law) + law_date on all 144 laws
   (`scripts/backfill-law-fields.js`).
 - 592 bills that passed a chamber (mostly without a roll call) weren't stored/enriched, so
@@ -904,6 +905,19 @@ filtered or listed as a ranking (footer promise); neutral gray text, no warning 
 - Home `#home-follows`: a tip when nothing is followed, else what changed (1 read per bill /
   member, cached; topics free), "Everything you follow" with unfollow, "Mark all as seen".
   A new Congress counts every member vote as new. Explained on How we count.
+
+## Speed and accessibility (2026-11-16)
+
+Audited at phone size (Lighthouse + axe-core on 11 views, debug token). Page weight ~920 KB
+over the wire: reCAPTCHA (App Check) ~415 KB, Firestore SDK 183 KB, fonts 167 KB, our code +
+CSS ~100 KB, Netlify badge script 11 KB. Fixed: layout shift 0.27-0.43 -> 0 (`main` and
+`#congress-container` are `min-h-screen`, so the footer / More charts start below the fold),
+inline text links underlined (src/styles.css; accent vs gray text was 1.4:1), Issues timeline
+dots have 24 px targets, the site name is the page's h1 on every page but Home (tabs.js),
+Firebase SDK `modulepreload`, plain load errors (`loadErrorHtml`: a failed App Check reads
+as "a blocker or strict privacy setting stopped reCAPTCHA", not "insufficient permissions").
+Known: headless browsers without a debug token fail App Check (Lighthouse sees the error
+page); dots in crowded timeline stretches overlap (each vote is also listed below them).
 
 ## Votes paging (frontend)
 

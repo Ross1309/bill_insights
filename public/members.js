@@ -2,7 +2,7 @@
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { collection, doc, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { db, loadParticipation, memberById } from "./data.js";
-import { PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, ordinal, store } from "./util.js";
+import { PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, loadErrorHtml, ordinal, store } from "./util.js";
 import { activeTab } from "./tabs.js";
 import { currentCongress } from "./congress.js";
 import { missedShort } from "./participation.js";
@@ -283,7 +283,7 @@ async function showStateFallback() {
   } catch (err) {
     if (request !== directoryFallbackRequest) return;
     console.error("Error fetching members:", err);
-    membersContainer.innerHTML = `<p class="text-center text-red-500 py-12">Failed to load members: ${escapeHtml(err.message)}</p>`;
+    membersContainer.innerHTML = loadErrorHtml("members", err);
   }
 }
 

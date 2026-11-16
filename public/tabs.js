@@ -43,6 +43,11 @@ export function switchTab(tabName, { push = true } = {}) {
     }
     view?.classList.toggle("hidden", !active);
   }
+  // Home's own title is the page's h1; on every other page the site name is (their page
+  // titles are h2s with h3 sections below).
+  const siteName = document.getElementById("site-name");
+  if (tabName === "overview") { siteName?.removeAttribute("role"); siteName?.removeAttribute("aria-level"); }
+  else { siteName?.setAttribute("role", "heading"); siteName?.setAttribute("aria-level", "1"); }
   // History first: a loader may update the URL in place (Issues writes its topic), and
   // doing that before the push would overwrite the *previous* tab's history entry.
   if (push) pushTab(tabName);

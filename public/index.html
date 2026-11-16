@@ -21,6 +21,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet" />
   <!-- Built by `npm run build:css` from src/styles.css + tailwind.config.js (theme and palette notes there). -->
   <link rel="stylesheet" href="/styles.css" />
+  <!-- Fetch the Firebase SDK with the page instead of after app.js -> data.js asks for it. -->
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/13.2.0/firebase-app-check.js" />
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js" />
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-800 font-sans antialiased flex flex-col">
 
@@ -31,7 +35,7 @@
           <rect width="32" height="32" rx="7" fill="#3a3a3a" />
           <path d="M7 12h18l-9-5zM9 14h2.5v9H9zM14.75 14h2.5v9h-2.5zM20.5 14H23v9h-2.5zM7 24.5h18V26H7z" fill="#b39cd0" />
         </svg>
-        <span class="font-serif text-xl sm:text-2xl font-bold tracking-tight">Congress Watcher</span>
+        <span id="site-name" class="font-serif text-xl sm:text-2xl font-bold tracking-tight">Congress Watcher</span>
       </a>
       <div id="site-search" class="relative order-3 sm:order-none w-full sm:w-auto sm:flex-1 max-w-xl">
         <label for="site-search-input" class="sr-only">Search members, bills or topics</label>
@@ -55,7 +59,7 @@
     </div>
   </nav>
 
-  <main class="max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8 flex-1">
+  <main class="max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8 flex-1 min-h-screen">
     <div id="data-stale" class="hidden mb-6 rounded-lg border border-yellow-100 bg-yellow-50 text-yellow-800 text-sm px-4 py-3" role="status"></div>
 
     <!-- VIEW 0: HOME -->
@@ -76,7 +80,7 @@
     <!-- VIEW 0a: THIS CONGRESS (#congress; old #charts links land here): the Congress so
          far next to the last two at the same point (congress-page.js), then the charts. -->
     <section id="view-charts" class="tab-view hidden">
-      <div id="congress-container" class="min-h-[300px] mb-12">
+      <div id="congress-container" class="min-h-screen mb-12">
         <div class="text-center py-12">
           <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
           <p class="text-gray-500">Loading...</p>

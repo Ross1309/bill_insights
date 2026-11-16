@@ -61,6 +61,17 @@ export function errorBlock(message, lead = "Couldn't load this from Congress.gov
     </div>`;
 }
 
+// A section that couldn't load. App Check refusals (Firestore "permission-denied") get a
+// plain explanation: the browser didn't pass Google's reCAPTCHA check, usually because a
+// blocker or strict privacy setting stopped it.
+export function loadErrorHtml(what, err, cls = "") {
+  const blocked = err?.code === "permission-denied" || /insufficient permissions|app ?check/i.test(String(err?.message || ""));
+  const why = blocked
+    ? "This site checks that requests come from a regular web browser (Google reCAPTCHA), and that check didn't pass. Ad or tracker blockers and strict privacy settings can stop it: allow www.google.com/recaptcha for this site, or try another browser."
+    : "Check your connection and reload the page.";
+  return `<div class="text-center py-12 ${cls}" role="alert"><p class="text-red-500">Couldn't load ${escapeHtml(what)}.</p><p class="text-sm text-gray-500 mt-1 max-w-xl mx-auto">${escapeHtml(why)}</p></div>`;
+}
+
 export function factList(facts) {
   return `<dl>${facts.filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v, raw]) =>
     `<div class="flex gap-3 py-1.5 border-b border-gray-100 text-sm"><dt class="w-36 shrink-0 text-gray-500">${escapeHtml(k)}</dt><dd class="text-gray-900 min-w-0">${raw ? v : escapeHtml(String(v))}</dd></div>`).join("")}</dl>`;

@@ -3,5 +3,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Links inside running text are underlined: the accent color alone is too close to the
+   gray text around it (WCAG 1.4.1). Buttons styled as links and block links are unaffected. */
+:is(p, li, dd, .lead) > a.text-accent:not([class*="px-"]) {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
