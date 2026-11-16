@@ -64,11 +64,14 @@ export async function getFirestoreDoc(collectionName, id) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// Directory entries (members.js) are a compact subset: the member window needs the full
+// record (committees, contact), so only a full doc (it has bioguideId) counts as cached.
 export async function getMember(id) {
-  if (memberById.has(id)) return memberById.get(id);
-  const m = await getFirestoreDoc("members", id);
-  if (m) memberById.set(id, m);
-  return m;
+  const cached = memberById.get(id);
+  if (cached?.bioguideId) return cached;
+  const m = await getFirestoreDoc("members", id).catch(err => { if (cached) return null; throw err; });
+  if (m) memberById.set(id, { ...cached, ...m });
+  return m ? memberById.get(id) : cached || null;
 }
 
 export async function getBill(id) {
