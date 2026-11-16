@@ -1,7 +1,7 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db, getOverviewDoc, loadBillIndex } from "./data.js";
-import { escapeHtml, officialLabel, ordinal, safeHref } from "./util.js";
+import { billName, escapeHtml, officialLabel, ordinal, safeHref } from "./util.js";
 import { isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
 import { setChipGroup } from "./members.js";
 
@@ -198,7 +198,8 @@ function renderBills(bills, term = "") {
               <span>${bill.congress ? `${escapeHtml(ordinal(Number(bill.congress)))} Congress` : ''}</span>
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
-            <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(bill.title || 'Untitled Bill')}</button></h3>
+            <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(billName(bill) || 'Untitled Bill')}</button></h3>
+            ${bill.short_title && bill.title ? `<p class="text-xs text-gray-500 -mt-2 mb-3">${escapeHtml(bill.title)}</p>` : ""}
             ${stageTrackerHtml(bill, { compact: true })}
             ${renderSummary(bill)}
           </div>
@@ -303,7 +304,7 @@ function applyBillFilters() {
     if (activeCategory !== "all" && bill.category !== activeCategory) return false;
     if (!anyStage && billScope === "moving" && (!MOVING_STAGES.includes(bill.stage) || isRuleBill(bill))) return false;
     if (!term) return true;
-    const title = (bill.title || "").toLowerCase();
+    const title = `${bill.short_title || ""} ${bill.title || ""}`.toLowerCase();
     const policyArea = (bill.policy_area || "").toLowerCase();
     const label = billLabel(bill).toLowerCase().replace(/[\s.]/g, "");
     return title.includes(term) || policyArea.includes(term) || label.includes(compactTerm);

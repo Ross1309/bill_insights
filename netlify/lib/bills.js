@@ -262,14 +262,38 @@ export async function summaryUpdate(bill, existingSummary, keys) {
 
 // Extra fields for the issue tracker (3 Congress.gov requests: detail is passed in,
 // plus subjects and actions). `detail` is the bill-detail response's `bill`.
+// The bill's common name from Congress.gov's titles list ("One Big Beautiful Bill Act" for
+// H.R. 1, whose display title is "An act to provide for reconciliation …"), or null when
+// it has none. Only for display titles that are a sentence ("To …", "An act …"): when
+// Congress.gov already displays a name ("PROOF Act"), that's kept, not swapped for the
+// spelled-out version. The latest stage's short title wins;
+// short titles of only part of a bill ("… for portions of this bill") and CRS's informal
+// "Popular Titles" are never used.
+const SHORT_TITLE_ORDER = [/as Enacted/i, /\bENR\b|Enrolled/i, /as Passed/i, /as Reported/i, /\bPCS\b|Placed on/i, /as Introduced/i, /./];
+const SENTENCE_TITLE = /^(to|an act|a bill|a joint resolution|a concurrent resolution|a resolution|making|providing for|authorizing)\b/i;
+export function pickShortTitle(titles, displayTitle) {
+  if (!SENTENCE_TITLE.test(String(displayTitle || '').trim())) return null;
+  const short = (titles || []).filter(t => /^Short Title/i.test(t.titleType || '') && !/portion/i.test(t.titleType || '') && String(t.title || '').trim());
+  for (const re of SHORT_TITLE_ORDER) {
+    const hit = short.find(t => re.test(t.titleType));
+    if (hit) {
+      const name = hit.title.trim().replace(/\s+/g, ' ');
+      return name.toLowerCase() === String(displayTitle || '').trim().toLowerCase() ? null : name;
+    }
+  }
+  return null;
+}
+
 export async function fetchBillEnrichment(detail, apiKey) {
   const congress = detail.congress;
   const type = String(detail.type || '').toLowerCase();
   const number = detail.number;
   const base = `${API}/bill/${congress}/${type}/${number}`;
-  const [subjects, actions] = await Promise.all([
+  const [subjects, actions, titles] = await Promise.all([
     getJson(`${base}/subjects?api_key=${apiKey}&format=json&limit=250`),
     getJson(`${base}/actions?api_key=${apiKey}&format=json&limit=250`),
+    // Optional: a failed titles fetch leaves the stored short title alone.
+    getJson(`${base}/titles?api_key=${apiKey}&format=json&limit=250`).catch(() => null),
   ]);
   const subjectNames = (subjects.subjects?.legislativeSubjects || []).map(s => s.name).filter(Boolean);
   const lawNumber = detail.laws?.[0]?.number || null;
@@ -289,6 +313,7 @@ export async function fetchBillEnrichment(detail, apiKey) {
     cosponsors_count: detail.cosponsors?.count ?? null,
     ...stageFromActions(actions.actions || [], { isLaw: Boolean(lawNumber) }),
     ...topicTags({ policy_area: policyArea, subjects: subjectNames, title: detail.title || '' }),
+    ...(titles ? { short_title: pickShortTitle(titles.titles, detail.title) } : {}),
     enriched_at: new Date().toISOString(),
   };
 }

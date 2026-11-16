@@ -16,6 +16,7 @@
 // here when they become law.
 
 import { easternDate, weekStart, addDays, voteCategory, voteOutcome, partyAlignment } from './vote-stats.js';
+import { billName } from '../../public/util.js';
 
 const CLOSE_CATEGORIES = new Set(['passage', 'cloture', 'nomination', 'amendment']);
 export const CLOSEST_N = 3;
@@ -44,7 +45,7 @@ function voteItem(v, billsById) {
     nay: v.tallies?.nay ?? null,
     parties: parties(v.party_breakdown),
     alignment: partyAlignment(v.party_breakdown),
-    bill: v.bill_id ? { id: v.bill_id, label: billLabel(bill, v.legislation), title: bill?.title || null } : null,
+    bill: v.bill_id ? { id: v.bill_id, label: billLabel(bill, v.legislation), title: billName(bill) } : null,
     legislation: v.legislation || null,
     document_title: v.document_title || null,
   };
@@ -123,7 +124,7 @@ export function computeWeeks(votes, laws, billsById, { congress, onlyWeeks } = {
     if (onlyWeeks && !onlyWeeks.has(monday)) continue;
     const w = week(monday);
     w.laws.push({
-      id: b.id, label: billLabel(b), title: b.title || null, law_number: b.law_number || null, law_type: b.law_type || null, signed,
+      id: b.id, label: billLabel(b), title: billName(b), law_number: b.law_number || null, law_type: b.law_type || null, signed,
       summary: b.ai_summary?.source === 'crs_summary' ? b.ai_summary.bullet_points || null : null,
       sponsor: b.sponsor ? { name: b.sponsor.name || null, party: b.sponsor.party || null, state: b.sponsor.state || null, bioguideId: b.sponsor.bioguideId || null } : null,
     });
@@ -180,7 +181,7 @@ export function recentLaws(laws, n = 4) {
     .sort((a, b) => b.signed.localeCompare(a.signed) || (b.b.law_number || '').localeCompare(a.b.law_number || '', undefined, { numeric: true }))
     .slice(0, n)
     .map(({ b, signed }) => ({
-      id: b.id, label: b.bill_number || null, title: b.title || null, law_number: b.law_number || null, law_type: b.law_type || null, signed,
+      id: b.id, label: b.bill_number || null, title: billName(b), law_number: b.law_number || null, law_type: b.law_type || null, signed,
       summary: b.ai_summary?.source === 'crs_summary' ? (b.ai_summary.bullet_points || [])[0] || null : null,
     }));
 }

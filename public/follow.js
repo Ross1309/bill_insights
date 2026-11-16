@@ -7,7 +7,7 @@
 //                 members: { id: { label, chamber, state, votes, missed, last } },
 //                 topics: { slug: { label, law, measures } } }
 
-import { escapeHtml as esc, officialLabel, store } from "./util.js";
+import { billName, escapeHtml as esc, officialLabel, store } from "./util.js";
 import { stageSteps } from "./stage.js";
 import { voteHeadline, outcomeOf } from "./plain.js";
 
@@ -25,7 +25,7 @@ export const followCount = (f = loadFollows()) => Object.keys(f.bills).length + 
 export const isFollowing = (kind, id) => Boolean(loadFollows()[kind]?.[id]);
 
 // Baselines: the state to compare against later.
-export const billBaseline = b => ({ label: b.bill_number ? `${officialLabel(b.bill_number)}${b.title ? `: ${b.title}` : ""}` : b.id,
+export const billBaseline = b => ({ label: b.bill_number ? `${officialLabel(b.bill_number)}${billName(b) ? `: ${billName(b)}` : ""}` : b.id,
   stage: b.stage || null, date: b.latest_action_date || b.latestAction?.actionDate || null, action: b.latestAction?.text || null });
 export const memberBaseline = (m, rec) => ({ label: String(m?.name || rec?.name || "").split(", ").reverse().join(" "), chamber: m?.chamber || rec?.chamber || null,
   state: m?.state || rec?.state || null, votes: rec?.totals?.votes ?? 0, missed: rec?.totals?.not_voting ?? 0, last: rec?.recent?.[0]?.date || null, congress: rec?.congress ?? null });

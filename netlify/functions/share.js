@@ -6,7 +6,7 @@
 // the path into its #route). Cached at the CDN for a day.
 
 import { getDb } from '../lib/firebase.js';
-import { officialLabel, escapeHtml as esc, ordinal, STATE_NAMES } from '../../public/util.js';
+import { billName, officialLabel, escapeHtml as esc, ordinal, STATE_NAMES } from '../../public/util.js';
 import { voteHeadline, resultWord, outcomeOf } from '../../public/plain.js';
 import { stageSteps } from '../../public/stage.js';
 import { missedVotes } from '../../public/participation.js';
@@ -25,7 +25,7 @@ async function billMeta(db, id) {
   const status = stageSteps(b)?.status;
   const bullet = b.ai_summary?.bullet_points?.[0];
   return {
-    title: `${label}: ${clip(b.title || '', 110)} — ${SITE}`,
+    title: `${label}: ${clip(billName(b) || '', 110)} — ${SITE}`,
     description: clip([status && `${status}.`, bullet || (b.crs_summary_available === false ? 'No official summary published yet.' : '')].filter(Boolean).join(' ')
       || `Status, actions and votes for ${label}.`),
   };

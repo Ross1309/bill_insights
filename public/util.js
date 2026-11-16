@@ -153,6 +153,10 @@ export function wireTooltip(root, { signal } = {}) {
   root.addEventListener("pointerleave", () => tip.classList.add("hidden"), { signal });
 }
 
+// A bill's name as people know it: its short title when it has one ("One Big Beautiful
+// Bill Act"), else the official title. Server stats store this as their `title`.
+export const billName = b => b?.short_title || b?.title || null;
+
 // --- Bill and nomination labels in the official style -----------------------------------
 // Accepts "HR 2102", "hr2102-119", "H.R. 2102", "HRES 1247", "PN 1181-1", "PN1181-7";
 // returns "H.R. 2102", "H.Res. 1247", "Nomination PN 1181". Unknown input comes back as is.

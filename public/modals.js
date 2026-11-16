@@ -3,7 +3,7 @@
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
 import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesForBill, loadParticipation } from "./data.js";
-import { contactLinks, errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
+import { billName, contactLinks, errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
@@ -165,7 +165,8 @@ const billModal = {
   header(e) {
     const b = e.data.bill, d = e.data.detail;
     const label = b ? billLabel(b) : d?.bill_number || e.id.toUpperCase();
-    const title = b?.title || d?.title || (e.errors.detail ? "" : "Loading…");
+    const title = billName(b) || d?.short_title || d?.title || (e.errors.detail ? "" : "Loading…");
+    const official = b?.short_title ? b.title : d?.short_title ? d.title : null;
     const policy = b?.policy_area || d?.policy_area;
     const congress = b?.congress || d?.congress;
     return `
@@ -176,6 +177,7 @@ const billModal = {
           ${policy ? `<span class="text-gray-500">· ${escapeHtml(policy)}</span>` : ""}
         </div>
         <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(title || label)}</h2>
+        ${official ? `<p class="text-xs text-gray-500 mt-0.5">Official title: ${escapeHtml(official)}</p>` : ""}
       </div>`;
   },
   tabs: [

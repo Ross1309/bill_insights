@@ -5,10 +5,10 @@
 //   { count, entries: [[id, "HR 1234", title, stage, "YYYY-MM-DD"]], generated_at }
 
 export async function writeBillIndex(db, admin) {
-  const snap = await db.collection('bills').select('bill_number', 'title', 'stage', 'latest_action_date').get();
+  const snap = await db.collection('bills').select('bill_number', 'title', 'short_title', 'stage', 'latest_action_date').get();
   const entries = snap.docs.map(d => {
     const b = d.data();
-    return [d.id, b.bill_number || '', String(b.title || '').slice(0, 140), b.stage || '', b.latest_action_date || ''];
+    return [d.id, b.bill_number || '', String(b.short_title ? `${b.short_title} (${b.title || ''})` : b.title || '').slice(0, 140), b.stage || '', b.latest_action_date || ''];
   });
   await db.collection('stats').doc('bill-titles').set({ count: entries.length, entries, generated_at: admin.firestore.FieldValue.serverTimestamp() });
   return entries.length;

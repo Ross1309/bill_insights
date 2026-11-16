@@ -9,6 +9,7 @@ import { TOPICS } from './topics.js';
 import { easternDate, partyAlignment } from './vote-stats.js';
 import { lawSigning } from './digest.js';
 import { ordinal } from './congress.js';
+import { billName } from '../../public/util.js';
 
 const LABELS = { HR: 'H.R.', S: 'S.', HRES: 'H.Res.', SRES: 'S.Res.', HJRES: 'H.J.Res.', SJRES: 'S.J.Res.', HCONRES: 'H.Con.Res.', SCONRES: 'S.Con.Res.' };
 const PASSAGE_Q = /passage|pass the bill|suspend the rules and (pass|agree|concur)|agreeing to the resolution|^on the (joint |concurrent )?resolution|concur in/i;
@@ -20,7 +21,7 @@ function compactBill(b) {
   return {
     id: b.id,
     label: billLabel(b),
-    title: b.title || null,
+    title: billName(b),
     stage: b.stage || null,
     passed_house: !!b.passed_house,
     passed_senate: !!b.passed_senate,
@@ -96,7 +97,7 @@ export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { 
     ...compactVote(v),
     tallies: v.tallies || null,
     party_breakdown: v.party_breakdown || null,
-    bill: { id: v.bill_id, label: billLabel(billOf.get(v.bill_id)), title: billOf.get(v.bill_id)?.title || null },
+    bill: { id: v.bill_id, label: billLabel(billOf.get(v.bill_id)), title: billName(billOf.get(v.bill_id)) },
   }));
 
   const watchlists = {};
@@ -119,7 +120,7 @@ export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { 
       focused: focused.sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)))
         .map(b => ({ ...compactBill(b), why: why(b), votes: (votesByBill.get(b.id) || []).map(compactVote) })),
       broad: broad.sort((a, b) => (b.subject_count || 0) - (a.subject_count || 0)).map(b => ({
-        id: b.id, label: billLabel(b), title: b.title || null, stage: b.stage || null, subject_count: b.subject_count ?? null, why: why(b),
+        id: b.id, label: billLabel(b), title: billName(b), stage: b.stage || null, subject_count: b.subject_count ?? null, why: why(b),
         passed_house: !!b.passed_house, passed_senate: !!b.passed_senate, failed_house: !!b.failed_house, failed_senate: !!b.failed_senate,
       })),
     };

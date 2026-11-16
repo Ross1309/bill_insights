@@ -123,6 +123,7 @@ scripts/build-member-votes.js      Rebuild member_votes + vote_index from full v
 scripts/build-stats.js             Rebuild stats/overview [--backfill party_breakdown]
 scripts/import-votes.js            Backfill all House + Senate votes of a congress (resumable)
 scripts/repair-house-legislation.js Link House votes without a measure via the Clerk XML [--write]
+scripts/backfill-short-titles.js   short_title on stored bills [--write] [--recheck] (then rebuilds)
 scripts/import-bills.js            Backfill the N most recently updated bills (resumable)
 scripts/summarize-bills.js         CRS-based AI summaries for stored bills (resumable)
 netlify/functions/member-profile.js  GET /api/member-profile?id={bioguideId}: Congress.gov member detail +
@@ -196,7 +197,9 @@ accepts, so `member-finance` uses `FEC_API_KEY` if set, else `CONGRESS_API_KEY` 
 **`bills`** — doc id `{type}{number}-{congress}` lowercase, e.g. `hr1234-119`
 ```
 bill_id, congress (number), type ("HR"), number ("1234"), bill_number ("HR 1234"),
-title, chamber, policy_area (CRS name or null),
+title, short_title (common name when Congress.gov's display title is a sentence, e.g. H.R. 1
+"One Big Beautiful Bill Act"; null = none; `pickShortTitle`, `billName(b)` in util.js; stats,
+vote_summaries.bill_title and the search index use billName), chamber, policy_area (CRS name or null),
 category ("Economy" | "Healthcare" | "Foreign Affairs" | "Other" | "Uncategorized"),
 introduced_date, update_date, latestAction { actionDate, text },
 latest_action_date (= latestAction.actionDate, top-level for ordering; null if none),
