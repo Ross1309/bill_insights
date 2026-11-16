@@ -358,7 +358,10 @@ party ("Democratic" | "Republican" | "Independent"), chamber ("House" | "Senate"
 district (number, null/0 for senators and at-large), imageUrl (Congress.gov depiction or null),
 fec_ids (FEC candidate ids, from the public-domain unitedstates/congress-legislators
 dataset; 537/539 have one), contact { phone, url, form, office } (same dataset, current
-term; `form` for 88/539; memberContact in netlify/lib/member-contact.js), current (bool), updatedAt
+term; `form` for 88/539; memberContact in netlify/lib/member-contact.js),
+committees [{ id ("HSJU"), name, title (Chair/Ranking Member/… or null), subcommittees [{ name,
+title }] }] (congress-legislators committee files, netlify/lib/committees.js; titled seats first;
+member window Overview), current (bool), updatedAt
 ```
 Synced from `/member?currentMember=true` (3 pages, ~539 incl. 6 delegates). Members no
 longer in that list are set `current: false`, never deleted; the UI queries

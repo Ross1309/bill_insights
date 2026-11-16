@@ -1,4 +1,5 @@
 import { memberContact } from '../lib/member-contact.js';
+import { fetchMemberCommittees } from '../lib/committees.js';
 import { createHash } from 'node:crypto';
 import { getDb, admin } from '../lib/firebase.js';
 import { getJson } from '../lib/http.js';
@@ -38,7 +39,7 @@ export async function handler(event, context) {
     console.log("Starting Congressional backend data ingestion...");
 
     // congress-legislators: bioguide -> FEC ids and Senate LIS ids. Optional.
-    const legislators = await fetchLegislators();
+    const [legislators, committees] = await Promise.all([fetchLegislators(), fetchMemberCommittees()]);
 
     // Last run's health: a failed stats rebuild is retried even on a quiet night.
     const lastRun = (await db.collection("stats").doc("health").get()).data()?.ingest_votes;
@@ -48,7 +49,7 @@ export async function handler(event, context) {
     const failures = [];
     let memberChanges = 0;
     try {
-      memberChanges = await syncCurrentMembers(legislators);
+      memberChanges = await syncCurrentMembers(legislators, committees);
     } catch (err) {
       failures.push(`members: ${err.message}`);
       console.error("Member sync failed:", err);
@@ -318,7 +319,7 @@ const fingerprint = value => createHash("sha1").update(JSON.stringify(value)).di
 
 const MIN_CURRENT_MEMBERS = 500;
 
-async function syncCurrentMembers(legislators) {
+async function syncCurrentMembers(legislators, committees = null) {
   const members = [];
   for (let offset = 0; ; offset += 250) {
     const page = await getJson(`${API}/member?api_key=${CONGRESS_API_KEY}&format=json&currentMember=true&limit=250&offset=${offset}`);
@@ -380,6 +381,8 @@ async function syncCurrentMembers(legislators) {
       // Only written when the mapping loaded, so a failed fetch never wipes it.
       ...(fecIds ? { fec_ids: fecIds.get(m.bioguideId) || [] } : {}),
       ...(legislators ? { contact: contacts.get(m.bioguideId) || null } : {}),
+      // Committee seats (members window); only written when the dataset loaded.
+      ...(committees ? { committees: committees.get(m.bioguideId) || [] } : {}),
       current: true,
     }]);
   }

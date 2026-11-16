@@ -72,6 +72,7 @@ const memberModal = {
       return `
         ${votes}
         ${factList(facts)}
+        ${m && m.current !== false ? committeesHtml(m.committees) : ""}
         ${p ? `
           <div class="grid grid-cols-2 gap-3 mt-4">
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center"><p class="text-xs text-gray-500 uppercase font-semibold">Bills sponsored</p><p class="text-xl font-bold text-gray-900">${p.sponsoredCount ?? "—"}</p></div>
@@ -351,6 +352,22 @@ const voteModal = {
 };
 
 // --- modal shell
+
+// The member's committee seats (members.committees, from congress-legislators). Absent on
+// records synced before committees were stored: then nothing is shown.
+function committeesHtml(list) {
+  if (!Array.isArray(list)) return "";
+  const role = t => (t ? ` <span class="text-xs font-semibold text-gray-700 bg-gray-100 rounded px-1.5 py-0.5">${escapeHtml(t)}</span>` : "");
+  return `
+    <section class="mt-4">
+      <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Committees</h3>
+      ${list.length ? `<ul class="mt-2 space-y-2 text-sm">${list.map(c => `
+        <li><span class="text-gray-900">${escapeHtml(c.name)}</span>${role(c.title)}
+          ${c.subcommittees?.length ? `<p class="text-xs text-gray-500 mt-0.5">Subcommittees: ${c.subcommittees.map(s => `${escapeHtml(s.name)}${s.title ? ` (${escapeHtml(s.title)})` : ""}`).join("; ")}</p>` : ""}</li>`).join("")}</ul>`
+        : `<p class="text-sm text-gray-500 mt-1">No committee seats listed (party leaders and new members often have none).</p>`}
+      <p class="text-[11px] text-gray-500 mt-2">Committees write and change bills in their area before the full House or Senate votes; most bills never leave committee. From the public congress-legislators dataset.</p>
+    </section>`;
+}
 
 const MODAL_KINDS = { member: memberModal, bill: billModal, vote: voteModal };
 
