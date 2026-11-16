@@ -757,6 +757,8 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - **Vote** (id = vote doc id): Results (tallies, party table, bill link, Clerk record) /
   How members voted (grouped by position; filter by name, a bare state code like "WA",
   or party; names open member modals). Unsynced roll calls say so.
+- Dates in bills/actions are written by hand with `formatDay` (util.js): "May 20, 2025". The
+  vote window also reads the bill (cached) for its name; labels go through officialLabel.
 - Functions are cached per id in the page and for 1h via `Cache-Control`. If they fail,
   modals still show Firestore data plus a Retry button.
 - Voting Record = the member's `member_votes` doc: participation and party agreement over

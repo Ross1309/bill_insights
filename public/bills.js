@@ -1,7 +1,7 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db, getOverviewDoc, loadBillIndex } from "./data.js";
-import { billName, escapeHtml, officialLabel, ordinal, safeHref } from "./util.js";
+import { billName, escapeHtml, formatDay, officialLabel, ordinal, safeHref } from "./util.js";
 import { isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
 import { setChipGroup } from "./members.js";
 
@@ -204,7 +204,7 @@ function renderBills(bills, term = "") {
             ${renderSummary(bill)}
           </div>
           <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
-            ${bill.latestAction?.text ? `<p><strong class="text-gray-700">Latest action${bill.latestAction.actionDate ? ` (${escapeHtml(bill.latestAction.actionDate)})` : ''}:</strong> ${escapeHtml(bill.latestAction.text)}</p>` : ''}
+            ${bill.latestAction?.text ? `<p><strong class="text-gray-700">Latest action${bill.latestAction.actionDate ? `, ${escapeHtml(formatDay(bill.latestAction.actionDate))}` : ''}:</strong> ${escapeHtml(bill.latestAction.text)}</p>` : ''}
             <div class="flex flex-wrap gap-4 pt-1">
               <button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="font-semibold text-accent hover:underline">Details, actions &amp; votes →</button>
               ${safeHref(bill.congress_gov_url) ? `<a href="${safeHref(bill.congress_gov_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">Congress.gov →</a>` : ''}

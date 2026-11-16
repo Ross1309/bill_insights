@@ -29,6 +29,7 @@ export function questionKind(question = "") {
   if (/motion to proceed/.test(q)) return "proceed";
   if (/previous question/.test(q)) return "previous_question";
   if (/\b(re)?commit\b/.test(q)) return "recommit";
+  if (/motion to refer\b/.test(q)) return "refer";
   if (/discharge/.test(q)) return "discharge";
   if (/objections of the president|overrid/.test(q)) return "override";
   if (/\bconcur(rence)?\b/.test(q)) return "concur";   // not "concurrent resolution"
@@ -63,6 +64,8 @@ export function voteHeadline(v) {
     case "proceed": return `${ch} ${ok ? "agreed to take up" : "voted not to take up"} ${subject}`;
     case "previous_question": return `${ch} ${ok ? "voted to end debate" : "voted not to end debate"} on ${subject}`;
     case "recommit": return `${ch} ${ok ? "sent" : "voted not to send"} ${subject} back to committee`;
+    // Usually a privileged resolution (censure, impeachment) sent to committee instead of voted on.
+    case "refer": return `${ch} ${ok ? "sent" : "voted not to send"} ${subject} to committee`;
     case "discharge": return `${ch} ${ok ? "voted to take" : "voted not to take"} ${subject} out of committee`;
     case "table": {
       // Name what was set aside when the record says: the question in the House; in the

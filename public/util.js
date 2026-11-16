@@ -23,6 +23,13 @@ export function formatVoteDate(iso) {
   // like the next day, and dates elsewhere on the site are Eastern).
   return `${d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" })} ET`;
 }
+// "2025-05-20" -> "May 20, 2025" (built by hand: Intl's short forms differ between Node and
+// browser versions). Anything else comes back as it was.
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function formatDay(ymd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || ""));
+  return m && MONTH_ABBR[Number(m[2]) - 1] ? `${MONTH_ABBR[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : String(ymd || "");
+}
 export const STATE_NAMES = Object.fromEntries([...STATES, ...DELEGATE_JURISDICTIONS]);
 
 // Outlined pastel chips: deliberately a different shape from the filled Yea/Nay

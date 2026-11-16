@@ -152,10 +152,12 @@ try {
   await waitText('#issue-title', /Foreign Affairs/, 'Topic switching (errors would fail the console check)');
 
   await page.click('#nav-bills');
-  await waitText('#bills-container', /Latest action \(\d{4}-\d{2}-\d{2}\)/, 'Bills tab lists bills');
+  await waitText('#bills-container', /Latest action, [A-Z][a-z]{2} \d{1,2}, \d{4}:/, 'Bills tab lists bills');
   await waitText('#bills-container', /Became law|Passed in the|Agreed to|Sent to the President|Passed both|Vetoed|Failed in the/, 'Bills tab: Moving or passed with stage trackers');
   check(await page.$eval('#bill-scope-filters [data-scope="moving"]', el => el.getAttribute('aria-pressed') === 'true'), 'Moving or passed is the default');
-  const dates = await page.$$eval('#bills-container', els => [...els[0].innerText.matchAll(/Latest action \((\d{4}-\d{2}-\d{2})\)/g)].map(m => m[1]));
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dates = (await page.$$eval('#bills-container', els => [...els[0].innerText.matchAll(/Latest action, ([A-Z][a-z]{2}) (\d{1,2}), (\d{4}):/g)].map(m => [m[1], m[2], m[3]])))
+    .map(([mon, d, y]) => `${y}-${String(MON.indexOf(mon) + 1).padStart(2, '0')}-${d.padStart(2, '0')}`);
   check(dates.length > 0 && dates.every((d, i) => !i || dates[i - 1] >= d), `Bills are newest first (${dates.length} checked)`);
   await page.fill('#search-input', 'HR 1');
   await waitText('#bills-container', /H\.?R\.? ?1\b/, 'Bill-number search finds H.R. 1');

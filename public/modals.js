@@ -3,7 +3,7 @@
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
 import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesForBill, loadParticipation } from "./data.js";
-import { billName, contactLinks, errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
+import { billName, contactLinks, errorBlock, escapeHtml, externalLink, factList, formatDay, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
@@ -142,11 +142,11 @@ const memberModal = {
                   ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-accent hover:underline">${escapeHtml(officialLabel(item.label))}</button>`
                   : safeHref(item.url) ? `<a href="${safeHref(item.url)}" target="_blank" rel="noopener" class="font-semibold text-accent hover:underline">${escapeHtml(officialLabel(item.label))}</a>`
                   : `<span class="font-semibold">${escapeHtml(officialLabel(item.label))}</span>`}
-                ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(new Date(`${item.introducedDate}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }))}</span>` : ""}
+                ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(formatDay(item.introducedDate))}</span>` : ""}
                 ${item.policyArea ? `<span class="text-gray-500">· ${escapeHtml(item.policyArea)}</span>` : ""}
               </div>
               ${item.title ? `<p class="text-sm text-gray-900 mt-1">${escapeHtml(item.title)}</p>` : ""}
-              ${item.latestAction?.text ? `<p class="text-xs text-gray-500 mt-1"><strong class="text-gray-600">Latest action${item.latestAction.actionDate ? ` (${escapeHtml(item.latestAction.actionDate)})` : ""}:</strong> ${escapeHtml(item.latestAction.text)}</p>` : ""}
+              ${item.latestAction?.text ? `<p class="text-xs text-gray-500 mt-1"><strong class="text-gray-600">Latest action${item.latestAction.actionDate ? `, ${escapeHtml(formatDay(item.latestAction.actionDate))}` : ""}:</strong> ${escapeHtml(item.latestAction.text)}</p>` : ""}
             </li>`).join("")}
         </ul>`;
     }],
@@ -190,10 +190,10 @@ const billModal = {
       const facts = [
         ["Sponsor", sponsor ? memberLink(sponsor.bioguideId, sponsor.label || sponsor.name) : null, true],
         ["Cosponsors", d?.cosponsorsCount],
-        ["Introduced", bill.introduced_date],
+        ["Introduced", bill.introduced_date ? formatDay(bill.introduced_date) : null],
         ["Origin chamber", bill.chamber],
         ["Policy area", bill.policy_area || (d ? "Not yet assigned by CRS" : null)],
-        ["Latest action", latest?.text ? `${latest.actionDate ? `${escapeHtml(latest.actionDate)}: ` : ""}${termize(escapeHtml(latest.text))}` : null, true],
+        ["Latest action", latest?.text ? `${latest.actionDate ? `${escapeHtml(formatDay(latest.actionDate))}: ` : ""}${termize(escapeHtml(latest.text))}` : null, true],
       ];
       const ai = b?.ai_summary?.bullet_points?.length ? `
         <section class="mt-5">
@@ -236,7 +236,7 @@ const billModal = {
           ${d.actions.map(a => `
             <li class="ml-4 pb-4">
               <span class="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-accent/60 border border-surface"></span>
-              <p class="text-xs text-gray-500">${escapeHtml(a.actionDate || "")}${a.source ? ` · ${escapeHtml(a.source)}` : ""}</p>
+              <p class="text-xs text-gray-500">${escapeHtml(formatDay(a.actionDate))}${a.source ? ` · ${escapeHtml(a.source)}` : ""}</p>
               <p class="text-sm text-gray-800">${termize(escapeHtml(a.text))}</p>
               ${a.recordedVotes.map(rv => {
                 const id = recordedVoteId(rv);
@@ -295,7 +295,10 @@ function voteMemberListHtml(e) {
 
 const voteModal = {
   load(e) {
-    loadInto(e, "vote", getVote(e.id));
+    const vote = getVote(e.id);
+    loadInto(e, "vote", vote);
+    // The bill's name for the header and Results line (one cached read; optional).
+    loadInto(e, "bill", vote.then(v => (v?.bill_id ? getBill(v.bill_id) : null)).catch(() => null));
   },
   header(e) {
     const v = e.data.vote;
@@ -404,9 +407,7 @@ function showModalFromRoute(kind, id) {
 // unanimous consent, which record no individual votes; most others never reach the floor.
 // Action dates are calendar days ("2026-09-23"); parsed as a Date they'd be UTC midnight,
 // which shows as the previous evening in US time zones.
-const actionDay = ymd => /^\d{4}-\d{2}-\d{2}$/.test(ymd || "")
-  ? new Date(`${ymd}T12:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" })
-  : ymd || "date not available";
+const actionDay = ymd => (ymd ? formatDay(ymd) : "date not available");
 const FLOOR_RESULT = /^(Passed\/agreed to|Failed of passage\/not agreed to) in (House|Senate):\s*/;
 
 function noRollCallHtml(e) {

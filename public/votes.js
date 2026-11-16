@@ -1,7 +1,7 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { escapeHtml, loadErrorHtml, ordinal, PARTY_NAMES, partyChip } from "./util.js";
+import { billName, escapeHtml, loadErrorHtml, officialLabel, ordinal, PARTY_NAMES, partyChip } from "./util.js";
 import { voteCardHtml, isKeyVote } from "./vote-card.js";
 import { billLabel } from "./bills.js";
 import { setChipGroup } from "./members.js";
@@ -142,8 +142,8 @@ export function voteBillInfo(vote) {
     ? `https://www.congress.gov/bill/${ordinal(Number(m[3]))}-congress/${BILL_TYPE_SLUGS[m[1]]}/${m[2]}`
     : null;
   return {
-    label: bill ? billLabel(bill) : (vote.legislation || vote.bill_id),
-    title: bill?.title || null,
+    label: bill ? billLabel(bill) : officialLabel(vote.legislation || vote.bill_id),
+    title: billName(bill) || vote.bill_title || null,
     url: bill?.congress_gov_url || fallbackUrl,
   };
 }
@@ -216,7 +216,7 @@ export function voteBillLine(vote) {
   if (!bill) {
     // Nominations (PN …) and other non-bill questions: show what was voted on.
     if (vote.legislation || vote.document_title) {
-      return `<p class="text-sm text-gray-600 mt-1">${vote.legislation ? `<span class="font-semibold">${escapeHtml(vote.legislation)}</span>` : ""}${vote.legislation && vote.document_title ? " — " : ""}${escapeHtml(vote.document_title || "")}</p>`;
+      return `<p class="text-sm text-gray-600 mt-1">${vote.legislation ? `<span class="font-semibold">${escapeHtml(officialLabel(vote.legislation))}</span>` : ""}${vote.legislation && vote.document_title ? " — " : ""}${escapeHtml(vote.document_title || "")}</p>`;
     }
     return `<p class="text-sm text-gray-400 mt-1">No bill associated with this vote</p>`;
   }

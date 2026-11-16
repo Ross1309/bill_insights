@@ -235,6 +235,7 @@ test('voteHeadline: only final votes say a measure passed', async () => {
   assert.equal(h('Senate', 'On the Motion to Proceed', 'failed'), 'Senate voted not to take up the Rescissions Act');
   assert.equal(h('Senate', 'On the Amendment', 'failed'), 'Senate rejected an amendment to the Rescissions Act');
   assert.equal(h('House', 'On Motion to Recommit', 'failed'), 'House voted not to send the Rescissions Act back to committee');
+  assert.equal(voteHeadline({ chamber: 'House', question: 'On Motion to Refer', outcome: 'succeeded', bill: { id: 'hres1655-119', label: 'H.Res. 1655', title: 'Censuring Representative X' } }), 'House sent H.Res. 1655 to committee');
   assert.equal(h('House', 'On Motion to Concur in the Senate Amendment', 'succeeded'), "House agreed to the Senate's changes to the Rescissions Act");
   assert.equal(h('Senate', 'On the Motion to Discharge', 'failed'), 'Senate voted not to take the Rescissions Act out of committee');
   assert.equal(h('House', 'On Overriding the Veto', 'failed'), 'House failed to override the veto of the Rescissions Act');

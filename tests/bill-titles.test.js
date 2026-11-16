@@ -47,3 +47,11 @@ test('disapproval resolutions read as what they overturn', () => {
   const rule = 'Providing for consideration of the joint resolution (H.J. Res. 60) providing for congressional disapproval under chapter 8 of title 5, United States Code, of the rule submitted by the National Park Service relating to "Glen Canyon"; and for other purposes';
   assert.equal(billName({ title: rule }), rule);
 });
+
+test('formatDay writes dates by hand', async () => {
+  const { formatDay } = await import('../public/util.js');
+  assert.equal(formatDay('2025-05-20'), 'May 20, 2025');
+  assert.equal(formatDay('2026-09-04T00:00:00Z'), 'Sep 4, 2026');
+  assert.equal(formatDay(''), '');
+  assert.equal(formatDay('not a date'), 'not a date');
+});
