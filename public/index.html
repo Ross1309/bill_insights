@@ -67,6 +67,7 @@
           <div class="lg:col-span-3 text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
         </div>
       </div>
+      <section id="home-follows" class="empty:hidden" aria-live="polite"></section>
       <section id="home-keyvotes" class="empty:hidden"></section>
       <section id="home-laws" class="empty:hidden"></section>
       <section id="home-numbers" class="empty:hidden"></section>
@@ -107,7 +108,10 @@
           <button type="button" role="tab" data-topic="immigration" class="filter-chip">Immigration</button>
           <button type="button" role="tab" data-topic="defense" class="filter-chip">Defense</button>
         </div>
-        <button type="button" data-copy-link="" class="self-start px-2.5 py-1 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
+        <div class="self-start flex gap-2">
+          <span id="issue-follow"></span>
+          <button type="button" data-copy-link="" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
+        </div>
       </div>
       <div id="issue-container" class="min-h-[300px]">
         <div class="text-center py-12">
@@ -438,6 +442,14 @@
             <h3>Your representatives</h3>
             <ul>
               <li>Your address is sent to the U.S. Census Bureau's geocoder to find your congressional district, using the district map of the Congress now in office. We don't store or log the address.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>Following and "Since you last looked"</h3>
+            <ul>
+              <li>Follow a bill, a member or an Issues topic (up to 20 bills, 10 members, 10 topics). What you follow is saved only in this browser; nothing is sent to us, and clearing your browser data removes it.</li>
+              <li>Following saves what the item looked like then. Home compares that with today's data: a bill's new stage or latest action, a member's new roll-call votes and how many they missed (with their latest positions), a topic's new laws and measures. "Mark all as seen" saves today's state instead.</li>
             </ul>
           </section>
 

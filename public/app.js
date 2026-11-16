@@ -2,7 +2,8 @@
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { renderIssue } from "./issues.js";
 import { renderOverview } from "./overview.js";
-import { db, getFirestoreDoc, getOverviewDoc, getVote, loadParticipation } from "./data.js";
+import { db, getBill, getFirestoreDoc, getMember, getMemberVotes, getOverviewDoc, getVote, loadParticipation } from "./data.js";
+import { billBaseline, billChange, followButtonHtml, followCount, isFollowing, LIMITS, loadFollows, memberBaseline, memberChange, setFollow, topicBaseline, topicChange } from "./follow.js";
 import { escapeHtml, store } from "./util.js";
 import { activeTab, navBills, navCongress, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
 import { renderCongressPage } from "./congress-page.js";
@@ -42,6 +43,7 @@ async function loadIssue(slug) {
     if (request !== issueRequest) return;
     const stats = issueCache.get(slug);
     document.getElementById("issue-title").textContent = stats.label;
+    document.getElementById("issue-follow").innerHTML = followButtonHtml("topics", slug);
     issueLoaded = true;
     renderIssue(container, stats, {
       state: store.get("cw-state", DEFAULT_STATE),
@@ -174,6 +176,7 @@ async function loadHome() {
 // shows "not available", never "didn't vote".
 let positionsRequest = 0;
 async function showHome(stats) {
+  showFollows(stats);
   const reps = myReps();
   // Missed votes of "your members" (one small doc), only once an address was given.
   const participation = reps?.members?.length && !reps.stale ? await loadParticipation().catch(() => null) : null;
@@ -192,6 +195,103 @@ async function showHome(stats) {
 }
 
 // The home page's address form (find your members) and "Change address".
+// --- Follow (follow.js): Home's "Since you last looked" + the Follow buttons -----------
+// Current data for every followed item: bills (1 read each, cached), members' voting records
+// (1 read each, cached), topics from stats/overview (no extra read).
+async function followedNow(stats) {
+  const f = loadFollows();
+  const topics = new Map((stats.topics_summary || []).map(t => [t.slug, t]));
+  const [bills, members] = await Promise.all([
+    Promise.all(Object.keys(f.bills).map(id => getBill(id).then(b => [id, b ? { id, ...b } : null]).catch(() => [id, null]))),
+    Promise.all(Object.keys(f.members).map(id => getMemberVotes(id).then(r => [id, r]).catch(() => [id, null]))),
+  ]);
+  return { f, bills: new Map(bills), members: new Map(members), topics };
+}
+
+const things = n => `${n} thing${n === 1 ? "" : "s"}`;
+let followsRequest = 0;
+async function showFollows(stats) {
+  const el = document.getElementById("home-follows");
+  if (!el) return;
+  if (!followCount()) {
+    el.innerHTML = `<p class="text-xs text-gray-500">Tip: use <strong>Follow</strong> on a bill, a member or an Issues topic, and this page will show what changed since your last visit. Saved in this browser only.</p>`;
+    return;
+  }
+  const request = ++followsRequest;
+  const now = await followedNow(stats);
+  if (request !== followsRequest) return;
+  const { f } = now;
+  const rows = [
+    ...Object.entries(f.bills).map(([id, base]) => ({ kind: "bills", id, base, open: "bill", change: billChange(base, now.bills.get(id)) })),
+    ...Object.entries(f.members).map(([id, base]) => ({ kind: "members", id, base, open: "member", change: memberChange(base, now.members.get(id)) })),
+    ...Object.entries(f.topics).map(([id, base]) => ({ kind: "topics", id, base, href: `#issues/${id}`, change: topicChange(base, now.topics.get(id)) })),
+  ];
+  const changed = rows.filter(r => r.change);
+  const link = r => (r.href ? `<a href="${escapeHtml(r.href)}" class="font-semibold text-accent hover:underline">${escapeHtml(r.base.label)}</a>`
+    : `<button type="button" data-open="${r.open}" data-id="${escapeHtml(r.id)}" class="font-semibold text-accent hover:underline text-left">${escapeHtml(r.base.label)}</button>`);
+  el.innerHTML = `
+    <div class="flex flex-wrap items-end justify-between gap-2">
+      <div>
+        <h2 class="font-serif text-2xl font-bold text-gray-900">Since you last looked</h2>
+        <p class="text-sm text-gray-500">${changed.length ? `${changed.length} of the ${things(rows.length)} you follow changed.` : `Nothing new for the ${things(rows.length)} you follow.`} Saved in this browser only.</p>
+      </div>
+      ${changed.length ? `<button type="button" data-follow-seen class="px-3 py-1.5 min-h-10 sm:min-h-0 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10">Mark all as seen</button>` : ""}
+    </div>
+    ${changed.length ? `<ul class="mt-4 grid gap-3 md:grid-cols-2">${changed.map(r => `
+      <li class="bg-surface border border-gray-200 rounded-xl p-4">
+        <p class="text-[11px] uppercase tracking-wide text-gray-500">${{ bills: "Bill", members: "Member", topics: "Topic" }[r.kind]}</p>
+        <p class="text-sm mt-0.5">${link(r)}</p>
+        <p class="text-sm text-gray-800 mt-1">${escapeHtml(r.change.what)}</p>
+        ${r.change.detail ? `<p class="text-xs text-gray-500 mt-0.5">${escapeHtml(r.change.detail)}</p>` : ""}
+        ${r.change.votes?.length ? `<ul class="mt-1.5 space-y-1 text-xs text-gray-600">${r.change.votes.map(v => `<li><button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="hover:underline text-left">${escapeHtml(v.headline)}</button>: <strong class="text-gray-800">${escapeHtml(v.position || "")}</strong></li>`).join("")}</ul>` : ""}
+      </li>`).join("")}</ul>` : ""}
+    <details class="mt-3 text-sm"><summary class="cursor-pointer text-accent">Everything you follow (${rows.length})</summary>
+      <ul class="mt-2 divide-y divide-gray-200">${rows.map(r => `<li class="py-2 flex items-center justify-between gap-3"><span class="min-w-0">${link(r)}${r.change ? "" : ` <span class="text-xs text-gray-500">· no change</span>`}</span>${followButtonHtml(r.kind, r.id)}</li>`).join("")}</ul>
+    </details>`;
+}
+
+// Follow / Unfollow anywhere (data-follow="bills|members|topics" data-id), and Home's
+// "Mark all as seen" (baselines move up to the current data).
+function setupFollow() {
+  const refresh = (kind, id) => document.querySelectorAll(`[data-follow="${kind}"][data-id="${CSS.escape(id)}"]`).forEach(b => { b.outerHTML = followButtonHtml(kind, id); });
+  const rerenderHome = async () => { const snap = await getOverviewDoc().catch(() => null); if (snap?.exists()) showFollows(snap.data()); };
+  document.addEventListener("click", async ev => {
+    if (ev.target.closest("[data-follow-seen]")) {
+      const snap = await getOverviewDoc().catch(() => null);
+      if (!snap?.exists()) return;
+      const now = await followedNow(snap.data());
+      for (const [id, b] of now.bills) if (b) setFollow("bills", id, billBaseline(b));
+      for (const [id, r] of now.members) {
+        const base = now.f.members[id];
+        if (r) setFollow("members", id, { ...memberBaseline(null, r), label: base.label, chamber: base.chamber, state: base.state });
+      }
+      for (const [slug, t] of now.topics) if (now.f.topics[slug]) setFollow("topics", slug, topicBaseline(t));
+      return showFollows(snap.data());
+    }
+    const btn = ev.target.closest("[data-follow]");
+    if (!btn) return;
+    const { follow: kind, id } = btn.dataset;
+    if (isFollowing(kind, id)) setFollow(kind, id, null);
+    else {
+      btn.disabled = true;
+      try {
+        let base = null;
+        if (kind === "bills") { const b = await getBill(id); base = billBaseline(b ? { id, ...b } : { id }); }
+        else if (kind === "members") { const [m, rec] = await Promise.all([getMember(id).catch(() => null), getMemberVotes(id).catch(() => null)]); base = memberBaseline(m, rec); }
+        else if (kind === "topics") { const t = (await getOverviewDoc()).data()?.topics_summary?.find(x => x.slug === id); if (t) base = topicBaseline(t); }
+        if (!base) throw new Error("not available");
+        if (!setFollow(kind, id, base)) { btn.textContent = `Limit: ${LIMITS[kind]}`; btn.disabled = false; return; }
+      } catch {
+        btn.textContent = "Try again";
+        btn.disabled = false;
+        return;
+      }
+    }
+    refresh(kind, id);
+    if (!document.getElementById("view-overview")?.classList.contains("hidden")) rerenderHome();
+  });
+}
+
 function setupHome() {
   const hero = document.getElementById("home-hero");
   hero.addEventListener("submit", async ev => {
@@ -322,6 +422,7 @@ async function init() {
   setupModals();
   setupIssues();
   setupHome();
+  setupFollow();
   setupSearch();
   setupGlossary();
   const glossary = document.getElementById("glossary-list");

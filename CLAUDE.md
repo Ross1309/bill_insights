@@ -81,6 +81,7 @@ netlify/lib/congress-stats.js      stats/congress-<n> daily series: GovInfo pars
 netlify/functions/sync-congress-stats.js  Nightly 11:00 UTC: new bills + passage for the current Congress
 scripts/build-congress-stats.js    Backfill stats/congress-<n> (GovInfo bulk + votes; seeds upkeep state)
 public/week.js                     Weekly digest: #week/<Monday> page (rendering only)
+public/follow.js                   Follow bills/members/topics on the device; what changed since
 public/home.js                     Home tab: your members, this week, issues, key votes, laws, numbers
 public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
 public/search.js                   Header search: members, bill numbers, topics, Bills-tab fallback
@@ -890,6 +891,19 @@ filtered or listed as a ranking (footer promise); neutral gray text, no warning 
   closest votes). "concurrent resolution" is not "concur". Generic Senate "On the Motion"
   (79 votes) stays generic: the record doesn't say more. Vote window: "What this vote was".
 - Page leads say what each page is for; headings match the tab names.
+
+## Follow + "Since you last looked" (2026-11-15)
+
+- `public/follow.js`: follow bills/members/Issues topics on the device (localStorage
+  `cw-follow`, limits 20/10/10; nothing leaves the browser). Following stores a baseline
+  (bill: stage + latest action date; member: member_votes totals + latest vote date + congress;
+  topic: law/measure counts from `stats/overview.topics_summary`). Pure change functions
+  (`billChange`, `memberChange`, `topicChange`; tests/follow.test.js) compare with current data.
+- Buttons (`followButtonHtml`, `data-follow`/`data-id`, aria-pressed) in the bill and member
+  window headers and on Issues topic pages; one click handler (`setupFollow` in app.js).
+- Home `#home-follows`: a tip when nothing is followed, else what changed (1 read per bill /
+  member, cached; topics free), "Everything you follow" with unfollow, "Mark all as seen".
+  A new Congress counts every member vote as new. Explained on How we count.
 
 ## Votes paging (frontend)
 

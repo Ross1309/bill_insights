@@ -293,6 +293,20 @@ try {
   check(page.url().endsWith('#votes') && !(await page.$('#modal-root [data-close]')), 'Browser Back closes the vote');
   await page.goForward();
   await waitText('#modal-root', /Yea|Nay|Aye/, 'Browser Forward reopens it');
+  await closeModal();
+
+  // Follow: a followed bill shows up on Home ("Since you last looked"); unfollowing clears it.
+  await page.goto(`${url}?follow=1#bill/${BILL}`, { waitUntil: 'domcontentloaded' });
+  await waitText('#modal-root', /H\.?R\.? ?1\b/, 'Bill opens (follow test)');
+  await page.click(`#modal-root [data-follow="bills"][data-id="${BILL}"]`);
+  await page.waitForSelector(`#modal-root [data-follow="bills"][aria-pressed="true"]`, { timeout: 10000 }).catch(() => {});
+  check(Boolean(await page.$(`#modal-root [data-follow="bills"][aria-pressed="true"]`)), 'Follow button on a bill turns to Following');
+  await closeModal();
+  await waitText('#home-follows', /Since you last looked[\s\S]*(Nothing new for the 1 thing you follow|changed)/, 'Home shows the followed items');
+  await page.click('#home-follows summary');
+  await waitText('#home-follows', /Everything you follow \(1\)[\s\S]*H\.R\. 1\b/, 'Home lists the followed bill');
+  await page.click(`#home-follows [data-follow="bills"][data-id="${BILL}"]`);
+  await waitText('#home-follows', /Tip: use Follow/, 'Unfollowing from Home empties the list');
 } catch (err) {
   check(false, `test crashed: ${err.message}`);
 } finally {

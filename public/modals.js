@@ -6,6 +6,7 @@ import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesFor
 import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { tieLine, voteCardHtml } from "./vote-card.js";
+import { followButtonHtml } from "./follow.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
 import { voteHeadline, outcomeOf } from "./plain.js";
@@ -465,6 +466,7 @@ function renderModal() {
           ${modalStack.length > 1 ? `<button type="button" data-back aria-label="Back" class="order-1 min-w-11 min-h-11 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">←</button>` : ""}
           <span class="order-2 flex-1 sm:hidden"></span>
           <div class="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 min-w-0 flex items-start gap-3 sm:gap-4">${def.header(e)}</div>
+          ${e.kind === "bill" || e.kind === "member" ? `<span class="order-2 sm:order-3 self-center sm:self-start sm:mt-1">${followButtonHtml(e.kind === "bill" ? "bills" : "members", e.id)}</span>` : ""}
           <button type="button" data-copy-link="${escapeHtml(detailHash(e.kind, e.id))}" class="order-2 sm:order-3 shrink-0 self-center sm:self-start sm:mt-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-accent border border-accent/40 hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent">Copy link</button>
           <button type="button" data-close aria-label="Close" class="order-2 sm:order-4 min-w-11 min-h-11 -mr-2 sm:mr-0 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">✕</button>
         </div>
