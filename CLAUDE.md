@@ -254,6 +254,16 @@ individual_votes[].lis_member_id
 - Congress.gov bill action histories lag senate.gov by about a day, so a brand-new Senate
   vote may not be linked from the bill's Actions tab yet.
 
+**`stats/floor`** — public, the House weekly floor schedule (netlify/lib/house-floor.js; fetched by
+ingest-votes alongside the votes, a failed fetch keeps the stored doc and isn't a failed run)
+```
+week (Monday), congress, updated, status ("published" | "none" = 404, usually recess),
+categories [{ kind (suspension|rule|other), label, items [{ label, bill_id|null, text, amended }] }],
+source_url, fetched_at
+```
+Home's "Coming up in the House" (`upcomingHtml` in home.js) shows it only for the current week
+(next week's on weekends, `floorWeek`), plus your representative's contact links.
+
 **`stats/overview`** — single doc (~12 KB), rebuilt by `ingest-votes.js` (only when votes,
 bills or members changed, or the last run failed), `sync-bills` (when it refreshed bills)
 and `scripts/build-stats.js`; read once per visit, shared by the Overview tab and header cards

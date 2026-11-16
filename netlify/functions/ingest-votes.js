@@ -1,5 +1,6 @@
 import { memberContact } from '../lib/member-contact.js';
 import { memberTerm } from '../lib/member-term.js';
+import { fetchFloorSchedule } from '../lib/house-floor.js';
 import { fetchMemberCommittees } from '../lib/committees.js';
 import { createHash } from 'node:crypto';
 import { getDb, admin } from '../lib/firebase.js';
@@ -74,9 +75,15 @@ export async function handler(event, context) {
       const tag = c === CONGRESS_NUM ? "" : ` (${c}th)`;
       jobs.push([`house votes${tag}`, syncHouseVotes(c, indexed)], [`senate votes${tag}`, syncSenateVotes(c, sessions, legislators, indexed)]);
     }
+    // House floor schedule for Home's "Coming up" (alongside the votes; optional: a failed
+    // fetch keeps the stored one and isn't a failed run, Home hides an out-of-date week).
+    const floorJob = fetchFloorSchedule(today())
+      .then(floor => db.collection("stats").doc("floor").set({ ...floor, fetched_at: new Date().toISOString() }))
+      .catch(err => console.warn(`House floor schedule unavailable: ${err.message}`));
     // 2 + 3. Latest House and Senate roll-call votes. Independent, so one source
     // failing doesn't block the other.
     const results = await Promise.allSettled(jobs.map(([, p]) => p));
+    await floorJob;
     results.forEach((r, i) => { if (r.status === "rejected") failures.push(`${jobs[i][0]}: ${r.reason?.message || r.reason}`); });
     failures.forEach(msg => console.error("Sync step failed:", msg));
 

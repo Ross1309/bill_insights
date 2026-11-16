@@ -13,7 +13,7 @@ import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
 import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, withContacts, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
 import { renderWeekPage } from "./week.js";
-import { renderHome } from "./home.js";
+import { renderHome, upcomingHtml } from "./home.js";
 import { setupSearch } from "./search.js";
 import { onTabArg, setRouteHandlers, shareUrl, startRouter, tabArg, replaceTab } from "./router.js";
 
@@ -178,6 +178,9 @@ let positionsRequest = 0;
 async function showHome(stats) {
   showFollows(stats);
   const reps = await withContacts(myReps());
+  // House floor schedule (stats/floor, one small read), rendered on its own.
+  getFirestoreDoc("stats", "floor").then(floor => { document.getElementById("home-upcoming").innerHTML = upcomingHtml(floor, reps); })
+    .catch(err => console.warn("Floor schedule unavailable:", err.message));
   // Missed votes of "your members" (one small doc), only once an address was given.
   const participation = reps?.members?.length && !reps.stale ? await loadParticipation().catch(() => null) : null;
   renderHome(stats, { reps, participation });

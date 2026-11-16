@@ -207,7 +207,7 @@ try {
     await waitText('#modal-root', /Your members \(WA-7\) on this bill[\s\S]*Cosponsor[\s\S]*House passed[^\n]*: Yea/, 'Bill window: your members (cosponsor + final vote)');
     await closeModal();
     await openDetail('member', 'J000298');
-    await waitText('#modal-root', /Committees[\s\S]*Committee on the Judiciary/, 'Member window lists committees');
+    await waitText('#modal-root', /Current term ends[\s\S]*Election for this seat[\s\S]*Committees[\s\S]*Committee on the Judiciary/, 'Member window: term, election date, committees');
     await closeModal();
     await page.click('#nav-members');
     await page.fill('#find-reps-address', '400 Broad St, Seattle, WA 98109');

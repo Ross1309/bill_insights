@@ -4,7 +4,7 @@
 // come from their member_votes docs (3 reads, only once an address was given).
 // Pure rendering: app.js loads the data and wires the address form.
 
-import { contactLinks, escapeHtml as esc, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
+import { contactLinks, escapeHtml as esc, formatDay, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
 import { voteHeadline, partyWords } from "./plain.js";
 import { voteCardHtml } from "./vote-card.js";
 import { weekRange } from "./week.js";
@@ -22,6 +22,57 @@ const sectionHead = (title, link, linkText, note) => `
     ${link ? `<a href="${link}" class="text-sm font-semibold text-accent hover:underline">${linkText} →</a>` : ""}
   </div>`;
 const billChip = b => b?.id ? `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="text-accent hover:underline">${esc(officialLabel(b.label || b.id))}</button>` : "";
+
+// --- Coming up in the House (stats/floor, the House's weekly floor schedule) -------
+// The week to show, in Congress's time zone: this Monday on weekdays; on weekends next
+// Monday (the House posts the coming week's schedule before it starts). YYYY-MM-DD.
+export function floorWeek(now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(now).map(x => [x.type, x.value]));
+  const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
+  const dow = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() + (dow === 0 ? 1 : dow === 6 ? 2 : 1 - dow));
+  return d.toISOString().slice(0, 10);
+}
+const FLOOR_GROUPS = {
+  suspension: ["Fast-track bills (suspension of the rules)", "Debate is short and no amendments are allowed; passing needs two-thirds of those voting. Usually less contested bills."],
+  rule: ["Bills under a rule", "The House first votes on a rule setting the terms of debate, then on the bill."],
+  other: ["Also listed", ""],
+};
+const FLOOR_SHOWN = 6;
+
+// Only the current week's schedule (or next week's on a weekend); "" otherwise.
+export function upcomingHtml(floor, reps, now = new Date()) {
+  if (!floor?.week) return "";
+  if (floor.week !== floorWeek(now)) return "";
+  const when = `week of ${formatDay(floor.week).replace(/, \d{4}$/, "")}`;
+  if (floor.status !== "published" || !floor.categories?.length) {
+    return `${sectionHead(`Coming up in the House`, null, null, `The House hasn't posted a floor schedule for the ${esc(when)}, which usually means it isn't in session.`)}`;
+  }
+  const item = it => `
+    <li class="py-1.5">
+      ${it.bill_id ? `<button type="button" data-open="bill" data-id="${esc(it.bill_id)}" class="font-semibold text-accent hover:underline">${esc(officialLabel(it.label))}</button>` : `<span class="font-semibold text-gray-700">${esc(it.label || "")}</span>`}
+      <span class="text-gray-700">${esc(it.text.length > 160 ? `${it.text.slice(0, 160).replace(/\s+\S*$/, "")}…` : it.text)}</span>${it.amended ? ` <span class="text-xs text-gray-500">(as amended)</span>` : ""}
+    </li>`;
+  const groups = floor.categories.map(c => {
+    const [title, note] = FLOOR_GROUPS[c.kind] || FLOOR_GROUPS.other;
+    const rest = c.items.slice(FLOOR_SHOWN);
+    return `
+      <div class="bg-surface border border-gray-200 rounded-xl p-4">
+        <h3 class="text-sm font-bold text-gray-900">${esc(title)} <span class="font-normal text-gray-500">· ${c.items.length}</span></h3>
+        ${note ? `<p class="text-xs text-gray-500 mt-0.5">${esc(note)}</p>` : ""}
+        <ul class="mt-2 text-sm divide-y divide-gray-200">${c.items.slice(0, FLOOR_SHOWN).map(item).join("")}</ul>
+        ${rest.length ? `<details class="text-sm mt-1"><summary class="cursor-pointer text-accent">${rest.length} more</summary><ul class="divide-y divide-gray-200">${rest.map(item).join("")}</ul></details>` : ""}
+      </div>`;
+  }).join("");
+  const rep = reps && !reps.stale ? reps.members?.find(m => m.chamber === "House") : null;
+  const contact = rep ? contactLinks(rep.contact) : "";
+  return `
+    ${sectionHead("Coming up in the House", null, null, `What the House has scheduled for floor consideration, ${esc(when)}. Not every item gets a vote, and items are added during the week.`)}
+    ${contact ? `<p class="text-sm mt-3">To share your view before a vote, your representative, ${esc(String(rep.name || "").split(", ").reverse().join(" "))}: ${contact}</p>` : ""}
+    <div class="grid gap-4 lg:grid-cols-2 mt-4">${groups}</div>
+    <p class="text-[11px] text-gray-500 mt-2">From the House floor schedule (<a href="https://docs.house.gov/floor/" target="_blank" rel="noopener" class="text-accent hover:underline">docs.house.gov</a>)${floor.updated ? `, updated ${esc(formatDay(floor.updated))}` : ""}; refreshed nightly. The Senate doesn't publish a comparable list: its votes appear here once they happen.</p>`;
+}
 
 // --- Card 1: your members --------------------------------------------------------
 function memberRow(m, participation) {
