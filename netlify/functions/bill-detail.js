@@ -51,7 +51,7 @@ export default async (req) => {
   const q = `api_key=${apiKey}&format=json`;
 
   try {
-    const [detailRes, actionsRes, summariesRes] = await Promise.all([
+    const [detailRes, actionsRes, summariesRes, cosponsorsRes] = await Promise.all([
       getJson(`${base}?${q}`),
       getJson(`${base}/actions?${q}&limit=${ACTIONS_LIMIT}`).catch(err => {
         console.error(`Actions fetch failed for ${billId}: ${err.message}`);
@@ -61,7 +61,19 @@ export default async (req) => {
         console.error(`Summaries fetch failed for ${billId}: ${err.message}`);
         return null;
       }),
+      getJson(`${base}/cosponsors?${q}&limit=250`).catch(err => {
+        console.error(`Cosponsors fetch failed for ${billId}: ${err.message}`);
+        return null;
+      }),
     ]);
+    // Who cosponsored (for "your members on this bill"): ids only. A second page when a
+    // bill has more than 250; `cosponsorsComplete` false if the list is still partial.
+    let cosponsorList = cosponsorsRes ? cosponsorsRes.cosponsors || [] : null;
+    const cosponsorTotal = cosponsorsRes?.pagination?.count ?? cosponsorList?.length ?? 0;
+    if (cosponsorList && cosponsorList.length < cosponsorTotal) {
+      const more = await getJson(`${base}/cosponsors?${q}&limit=250&offset=250`).catch(() => null);
+      if (more?.cosponsors) cosponsorList = cosponsorList.concat(more.cosponsors);
+    }
 
     const detail = detailRes.bill || {};
     const meta = billMetadata(detail, ids);
@@ -94,6 +106,10 @@ export default async (req) => {
           }
         : null,
       cosponsorsCount: detail.cosponsors?.count ?? null,
+      cosponsors: cosponsorList ? cosponsorList.filter(c => c.bioguideId).map(c => ({
+        id: c.bioguideId, original: Boolean(c.isOriginalCosponsor), withdrawn: c.sponsorshipWithdrawnDate || null,
+      })) : null,
+      cosponsorsComplete: cosponsorList ? cosponsorList.length >= cosponsorTotal : false,
       crsSummary,
       actionsCount: detail.actions?.count ?? null,
       actions: actionsRes ? shapeActions(actionsRes.actions || []) : null,

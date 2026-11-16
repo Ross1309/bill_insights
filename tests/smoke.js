@@ -202,6 +202,13 @@ try {
     await page.click('[data-home-find] button[type=submit]');
     await waitText('#home-hero', /Your members for WA-7[\s\S]*Jayapal/, 'Home: find your members by address');
     await waitText('#home-keyvotes', /Your members \(WA-7\)[\s\S]*(Yea|Nay|Not Voting|None of your members)/, 'Home: how your members voted');
+    await waitText('#home-hero', /Call 202-\d{3}-\d{4}/, 'Home: your members have a phone number');
+    await openDetail('bill', 'hr2102-119');
+    await waitText('#modal-root', /Your members \(WA-7\) on this bill[\s\S]*Cosponsor[\s\S]*House passed[^\n]*: Yea/, 'Bill window: your members (cosponsor + final vote)');
+    await closeModal();
+    await openDetail('member', 'J000298');
+    await waitText('#modal-root', /Committees[\s\S]*Committee on the Judiciary/, 'Member window lists committees');
+    await closeModal();
     await page.click('#nav-members');
     await page.fill('#find-reps-address', '400 Broad St, Seattle, WA 98109');
     await page.click('#find-reps button[type=submit]');

@@ -9,12 +9,12 @@ import { tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
-import { voteHeadline, outcomeOf } from "./plain.js";
+import { voteHeadline, outcomeOf, questionKind } from "./plain.js";
 import { explainQuestion } from "./issues.js";
 import { missedLong } from "./participation.js";
 import { memberTrendsHtml } from "./member-trends.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
-import { memberPhoto, memberRole } from "./members.js";
+import { memberPhoto, memberRole, myReps } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
 import { backDetail, closeAllDetails, detailHash, pushDetail, setRouteHandlers } from "./router.js";
 
@@ -162,6 +162,10 @@ const billModal = {
     loadInto(e, "bill", getBill(e.id));
     loadInto(e, "detail", fetchFunction("bill-detail", e.id));
     loadInto(e, "votes", getVotesForBill(e.id));
+    // "Your members on this bill": their positions on its final roll calls (full vote docs,
+    // cached; at most 4), only once an address was given on this device.
+    const reps = myReps();
+    if (reps?.members?.length && !reps.stale) loadInto(e, "mine", getVotesForBill(e.id).then(finalVotePositions));
   },
   header(e) {
     const b = e.data.bill, d = e.data.detail;
@@ -222,6 +226,7 @@ const billModal = {
         ${staged ? stageTrackerHtml(staged) : ""}
         ${factList(facts)}
         ${ai}
+        ${yourMembersHtml(e)}
         ${crs}
         <div class="flex flex-wrap gap-4 mt-5 text-sm">${externalLink(bill.congress_gov_url, "View on Congress.gov")}</div>`;
     }],
@@ -352,6 +357,63 @@ const voteModal = {
 };
 
 // --- modal shell
+
+// --- "Your members on this bill" (bill window, Summary) -------------------------------
+// Final roll calls only (passage, accepting the other chamber's changes, veto overrides),
+// newest first: steps like cloture or amendments aren't a stand on the bill itself.
+const FINAL_KINDS = new Set(["passage", "concur", "override"]);
+async function finalVotePositions(votes) {
+  const finals = (votes || []).filter(v => FINAL_KINDS.has(questionKind(v.question))).slice(0, 4);
+  return Promise.all(finals.map(async v => {
+    const full = await getVote(v.id).catch(() => null);
+    const positions = full?.individual_votes ? new Map(full.individual_votes.map(iv => [iv.bioguideId, iv.position || "Not recorded"])) : null;
+    return { vote: v, positions };
+  }));
+}
+
+function yourMembersHtml(e) {
+  const reps = myReps();
+  if (!reps?.members?.length || reps.stale) {
+    return `<p class="text-xs text-gray-500 mt-5">Where do your own senators and representative stand on this? <a href="#" class="text-accent hover:underline">Enter your address on Home</a> and it shows here.</p>`;
+  }
+  const b = e.data.bill, d = e.data.detail, mine = e.data.mine;
+  const billRef = { id: e.id, label: b ? billLabel(b) : d?.bill_number || e.id, title: billName(b) || billName(d) };
+  const rows = reps.members.map(m => {
+    const name = String(m.name || "").split(", ").reverse().join(" ");
+    const co = d?.cosponsors?.find(c => c.id === m.id);
+    // Only members of the bill's own chamber can sponsor or cosponsor it.
+    const sameChamber = (/^h/i.test(e.id) ? "House" : "Senate") === m.chamber;
+    const role = !d || !sameChamber ? ""
+      : d.sponsor?.bioguideId === m.id ? "Sponsor of this bill"
+      : co ? (co.withdrawn ? `Withdrew as a cosponsor (${formatDay(co.withdrawn)})` : co.original ? "Original cosponsor" : "Cosponsor")
+      : d.cosponsors && d.cosponsorsComplete ? "Not a sponsor or cosponsor" : "";
+    const chamberVotes = (mine || []).filter(x => x.vote.chamber === m.chamber);
+    const votes = mine === undefined ? `<li class="text-gray-400">Loading votes…</li>`
+      : chamberVotes.length ? chamberVotes.map(({ vote: v, positions }) => {
+        const raw = positions?.get(m.id);
+        const pos = !positions ? "position not available right now" : raw ? POSITION_LABEL[POSITION_GROUPS[raw.toLowerCase()]] || raw : "Not recorded on this vote";
+        const tie = v.tie_breaker ? `; the Vice President voted ${v.tie_breaker.vote} to break the tie` : "";
+        const head = voteHeadline({ chamber: v.chamber, question: v.question, outcome: outcomeOf(v.result), result: v.result, yea: v.tallies?.yea, nay: v.tallies?.nay, bill: billRef });
+        return `<li><button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-left hover:underline">${escapeHtml(head)}</button> <span class="text-gray-500">(${escapeHtml(formatDay(v.date))}, ${v.tallies?.yea ?? "?"}–${v.tallies?.nay ?? "?"}${escapeHtml(tie)})</span>: <strong class="text-gray-900">${escapeHtml(pos)}</strong></li>`;
+      }).join("")
+      : `<li class="text-gray-500">No recorded final vote in the ${escapeHtml(m.chamber || "chamber")} on it${mine === null ? " (votes unavailable right now)" : ""}.</li>`;
+    const contact = contactLinks(m.contact);
+    return `
+      <li class="py-2.5">
+        <button type="button" data-open="member" data-id="${escapeHtml(m.id)}" class="font-semibold text-accent hover:underline text-left">${escapeHtml(name)}</button>
+        <span class="text-xs text-gray-500">${escapeHtml(m.chamber === "Senate" ? "Senator" : "Representative")}${m.party ? ` · ${escapeHtml(m.party)}` : ""}</span>
+        ${role ? `<p class="text-xs text-gray-600 mt-0.5">${escapeHtml(role)}</p>` : ""}
+        <ul class="mt-1 space-y-0.5 text-xs text-gray-700">${votes}</ul>
+        ${contact ? `<p class="text-xs mt-1">${contact}</p>` : ""}
+      </li>`;
+  }).join("");
+  return `
+    <section class="mt-5 bg-gray-50 border border-gray-200 rounded-lg p-3">
+      <h3 class="text-sm font-bold text-gray-900">Your members (${escapeHtml(reps.code)}) on this bill</h3>
+      <ul class="divide-y divide-gray-200">${rows}</ul>
+      <p class="text-[11px] text-gray-500 mt-1">Sponsors and cosponsors from Congress.gov; votes are the final roll calls on the bill itself (not procedural steps). A bill passed by voice vote has no recorded positions.</p>
+    </section>`;
+}
 
 // The member's committee seats (members.committees, from congress-legislators). Absent on
 // records synced before committees were stored: then nothing is shown.
