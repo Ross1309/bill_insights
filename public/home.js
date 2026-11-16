@@ -82,14 +82,16 @@ const isThisWeek = monday => Date.now() - new Date(`${monday}T00:00:00-05:00`).g
 function weekCard(tw) {
   if (!tw) return `<article class="bg-surface border border-gray-200 rounded-2xl p-5"><p class="text-sm text-gray-500">The weekly summary isn't available yet.</p></article>`;
   const stat = (n, label) => `<div class="bg-gray-50/60 rounded-lg py-2 text-center"><p class="font-serif text-2xl font-bold text-gray-900 tabular-nums">${num(n)}</p><p class="text-[11px] text-gray-600">${label}</p></div>`;
-  const items = (tw.passed_items || []).map(v => ({ ...v, outcome: "succeeded" }));
+  // Passage votes that succeeded (older stats docs lack the question: it was a passage).
+  const items = (tw.passed_items || []).map(v => ({ ...v, question: v.question || "On Passage", outcome: "succeeded" }));
   return `
     <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col" aria-labelledby="home-week-title">
       <h2 id="home-week-title" class="text-xs font-semibold uppercase tracking-wide text-pink">${isThisWeek(tw.week) ? "This week" : "Latest week"} in Congress · ${esc(weekRange(tw))}</h2>
       <div class="grid grid-cols-3 gap-2 mt-3">${stat(tw.votes.House + tw.votes.Senate, "roll-call votes")}${stat(tw.passed, "passed by roll call")}${stat(tw.law_count, "became law")}</div>
       ${items.length ? `<ul class="mt-4 space-y-2.5 text-sm">${items.map(v => `
         <li><span class="text-gray-900">${esc(voteHeadline(v))}</span>
-          <span class="block text-xs text-gray-500">${billChip(v.bill)} · ${v.yea}–${v.nay}${v.parties ? ` · ${esc(partyWords(v.parties))}` : ""}</span></li>`).join("")}</ul>`
+          <span class="block text-xs text-gray-500">${billChip(v.bill)} · ${v.yea}–${v.nay}${v.parties ? ` · ${esc(partyWords(v.parties))}` : ""}</span></li>`).join("")}</ul>
+      ${tw.passed > items.length ? `<p class="text-xs text-gray-500 mt-2">The latest ${items.length} of ${tw.passed}; all of them are on the week page.</p>` : ""}`
         : `<p class="text-sm text-gray-500 mt-4">No bills passed by roll call this week.</p>`}
       <a href="#week/${esc(tw.week)}" class="mt-auto pt-4 text-sm font-semibold text-accent hover:underline">The full week →</a>
     </article>`;
@@ -120,7 +122,7 @@ function keyVoteCard(v, reps, positions) {
   const yours = reps?.members?.length && !reps.stale
     ? `<div class="mt-3 pt-3 border-t border-gray-200"><p class="text-xs text-gray-500 mb-1.5">Your members (${esc(reps.code)})</p>
         <div class="flex flex-wrap gap-1.5">${mine?.length ? mine.map(m => `<button type="button" data-open="member" data-id="${esc(m.id)}" class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200 hover:border-accent/60"><span class="text-gray-800">${esc(String(m.name || "").split(",")[0])}</span><span class="font-bold px-1 rounded ${posBadge(m.position)}">${esc(m.position)}</span></button>`).join("")
-          : `<span class="text-xs text-gray-500">${!positions ? "Loading…" : !known || mine === null ? "How your members voted isn't available right now." : `None of your members are in the ${esc(v.chamber)}.`}</span>`}</div></div>`
+          : `<span class="text-xs text-gray-500">${!positions ? "Loading…" : !known || mine === null ? "How your members voted isn't available right now." : "None of your members were recorded on this vote."}</span>`}</div></div>`
     : `<p class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">Enter your address above to see how your members voted.</p>`;
   return voteCardHtml(v, { yours });
 }

@@ -32,7 +32,7 @@ export function months(monthly) {
 // text around it, so they stay readable at any width. The scale is labeled, so small
 // values aren't exaggerated: 0-100% for party votes, 0 to a round ceiling for missed votes.
 export function bars(keys, valueOf, { max, title, label, unit = "%" }) {
-  const n = keys.length, step = Math.max(1, Math.ceil(n / 8));
+  const n = keys.length, step = Math.max(1, Math.ceil(n / 6));   // ≤ 6 labels: room on a phone
   const y = v => 100 - Math.min(v, max) / max * 100;
   return `
     <div class="relative pl-10 mt-1">

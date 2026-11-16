@@ -162,8 +162,9 @@ export function thisWeek(w) {
     ...weekSummary(w),
     laws: w.laws.slice(0, 3).map(l => ({ id: l.id, label: l.label, title: l.title })),
     law_count: w.counts.laws,
-    passed_items: w.passage.filter(p => p.outcome === 'succeeded' && !isRuleVote(p)).slice(-3).reverse()
-      .map(p => ({ id: p.id, chamber: p.chamber, bill: p.bill, yea: p.yea, nay: p.nay, parties: p.parties, alignment: p.alignment })),
+    // The question is needed for the plain headline ("House passed the … Act").
+    passed_items: w.passage.filter(p => p.outcome === 'succeeded' && !isRuleVote(p)).slice(-4).reverse()
+      .map(p => ({ id: p.id, chamber: p.chamber, question: p.question, bill: p.bill, yea: p.yea, nay: p.nay, parties: p.parties, alignment: p.alignment })),
     key_votes: finals.slice(0, KEY_VOTES_N).map(v => ({
       id: v.id, chamber: v.chamber, date: v.date, question: v.question, result: v.result, outcome: v.outcome,
       yea: v.yea, nay: v.nay, parties: v.parties, alignment: v.alignment, bill: v.bill,

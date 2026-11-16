@@ -96,7 +96,7 @@ try {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
   // Home: three ways in, key votes in plain language, recent laws, numbers.
-  await waitText('#home-hero', /Who represents me\?[\s\S]*This week in Congress[\s\S]*Issues/i, 'Home: the three starting cards');
+  await waitText('#home-hero', /Who represents me\?[\s\S]*(This|Latest) week in Congress[\s\S]*Issues/i, 'Home: the three starting cards');
   await waitText('#home-keyvotes', /Key votes[\s\S]*(Yea|Nay)/, 'Home: key votes with party Yea/Nay');
   await waitText('#home-laws', /Recently became law[\s\S]*Signed/, 'Home: recent laws');
   await waitText('#home-numbers', /by the numbers[\s\S]*roll-call votes/, 'Home: by the numbers');

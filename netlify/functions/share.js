@@ -54,7 +54,7 @@ async function memberMeta(db, id) {
 async function voteMeta(db, id) {
   const v = (await db.collection('vote_summaries').doc(id).get()).data();
   if (!v) return null;
-  const item = { chamber: v.chamber, question: v.question, outcome: outcomeOf(v.result), document_title: v.document_title,
+  const item = { chamber: v.chamber, question: v.question, title: v.title || null, outcome: outcomeOf(v.result), result: v.result, yea: v.tallies?.yea, nay: v.tallies?.nay, document_title: v.document_title,
     bill: v.bill_id ? { id: v.bill_id, label: v.legislation || v.bill_id, title: v.bill_title || null } : null };
   const p = v.party_breakdown || {};
   const parties = ['D', 'R'].filter(k => p[k]).map(k => `${k === 'D' ? 'Democrats' : 'Republicans'} ${p[k].yea}–${p[k].nay}`).join(', ');
@@ -96,10 +96,11 @@ export default async req => {
   const url = new URL(req.url);
   const [, kind, raw] = url.pathname.split('/');
   const id = decodeURIComponent(raw || '');
-  if (!KINDS[kind] || !VALID[kind].test(id)) return new Response('Not found', { status: 404 });
   shell ??= await fetch(new URL('/index.html', url)).then(r => (r.ok ? r.text() : Promise.reject(new Error(`index.html ${r.status}`))));
+  // A malformed id: still the site (status 404, no reads), not a bare error page.
+  const valid = KINDS[kind] && VALID[kind].test(id);
   let meta = null;
-  try { meta = await KINDS[kind](getDb(), id); } catch (err) { console.error(`${kind} ${id}:`, err.message); }
+  if (valid) try { meta = await KINDS[kind](getDb(), id); } catch (err) { console.error(`${kind} ${id}:`, err.message); }
   const found = Boolean(meta);
   meta ||= { title: SITE, description: 'Non-partisan tracking of what the US Congress is doing, in plain language from official sources.' };
   const html = withMeta(shell, { ...meta, url: `${url.origin}/${kind}/${encodeURIComponent(id)}`, image: `${url.origin}/og.png` });
@@ -110,7 +111,7 @@ export default async req => {
       // The cache key ignores query strings (fbclid=…, cache-busters): every variant is one
       // cached page, so they can't force Firestore reads. (A redirect to the clean URL loops:
       // Netlify carries the query string over.)
-      'Netlify-Vary': 'query=_',
+      'Netlify-Vary': 'query=cw-no-param',
       'Cache-Control': 'public, max-age=300',
       'Netlify-CDN-Cache-Control': found ? 'public, durable, s-maxage=86400, stale-while-revalidate=604800' : 'public, durable, s-maxage=3600',
     },

@@ -9,10 +9,13 @@
 //   node scripts/summarize-bills.js --write          # check CRS + summarize all
 //   node scripts/summarize-bills.js --write --limit 200
 //   node scripts/summarize-bills.js --write --recheck-days 0   # re-check everyone
+//   node scripts/summarize-bills.js --write --redo-long        # also redo laws/bills that passed
+//                                                  # both chambers whose CRS summary is long (>4,000
+//                                                  # characters: many subjects), with the current prompt
 
 import 'dotenv/config';
 import { getDb, admin } from '../netlify/lib/firebase.js';
-import { summaryUpdate } from '../netlify/lib/bills.js';
+import { checkCrsSummary, summaryFromCrs, summaryUpdate } from '../netlify/lib/bills.js';
 import { pool } from '../netlify/lib/pool.js';
 
 const args = process.argv.slice(2);
@@ -21,6 +24,7 @@ const opt = (name, fallback) => {
   return i >= 0 && args[i + 1] !== undefined ? Number(args[i + 1]) : fallback;
 };
 const WRITE = args.includes('--write');
+const REDO_LONG = args.includes('--redo-long');
 const LIMIT = opt('limit', Infinity);
 const RECHECK_MS = opt('recheck-days', 3) * 24 * 60 * 60 * 1000;
 const { CONGRESS_API_KEY, OPENAI_API_KEY } = process.env;
@@ -34,6 +38,7 @@ async function main() {
 
   const candidates = snap.docs.filter(d => {
     const b = d.data();
+    if (REDO_LONG && b.ai_summary?.source === 'crs_summary') return ['law', 'passed_both', 'to_president'].includes(b.stage);
     if (b.ai_summary?.source === 'crs_summary') return false;
     if (b.crs_summary_available === false && Date.now() - Date.parse(b.crs_checked_at || 0) < RECHECK_MS) return false;
     return b.type && b.number && b.congress;
@@ -49,7 +54,13 @@ async function main() {
   const counts = { generated: 0, no_crs: 0, error: 0, removed_title_only: 0 };
   await pool(todo, 4, async d => {
     const b = d.data();
-    const result = await summaryUpdate(b, b.ai_summary, keys);
+    let result;
+    if (REDO_LONG && b.ai_summary?.source === 'crs_summary') {
+      // Only when the CRS summary is long enough to cover many subjects.
+      const crs = await checkCrsSummary(b, keys.congressKey).catch(() => null);
+      if (!crs || crs.length <= 4000) { counts.kept = (counts.kept || 0) + 1; return; }
+      result = await summaryFromCrs(b, crs, b.ai_summary, keys);
+    } else result = await summaryUpdate(b, b.ai_summary, keys);
     if (Object.keys(result.fields).length) await d.ref.set(result.fields, { merge: true });
     if (result.status === 'no_crs' && b.ai_summary) counts.removed_title_only++;
     counts[result.status] = (counts[result.status] || 0) + 1;

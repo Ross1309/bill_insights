@@ -150,11 +150,15 @@ export function billMetadata(detail = {}, fallback = {}) {
 export async function generateSummary({ title, crsSummary }, openaiKey) {
   if (!crsSummary) return null;
   const source = 'crs_summary';
-  const context = `Official Congressional Research Service summary:\n${crsSummary.slice(0, 6000)}`;
+  const long = crsSummary.length > 6000;
+  const context = `Official Congressional Research Service summary${long ? ' (the first part of a longer summary)' : ''}:\n${crsSummary.slice(0, 6000)}`;
 
   const prompt = [
     'You write neutral, non-partisan, plain-language explanations of U.S. legislation.',
     'Using only the information below, give exactly 3 concise bullet points on what this bill would do and who it would affect.',
+    // Big bills (reconciliation, appropriations, defense) cover many subjects: three bullets
+    // about one section would mislead by omission (H.R. 1 of the 119th read as a SNAP bill).
+    'If the bill covers several major subjects, the bullets together must cover the most significant ones across the whole bill (start with the overview), not details of a single section.',
     'Do not speculate beyond the text, and do not describe the bill as good or bad.',
     'Respond with one bullet per line in plain text, with no markdown formatting.',
     '',

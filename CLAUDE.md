@@ -450,6 +450,27 @@ per-state `members` query and says nationwide search is unavailable.
 stats/health); Bills loads on its tab, the 100 KB directory on Legislators. Nightly runs
 cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting day).
 
+### Review round 2 (2026-11-16): a fresh reviewer on the round-1 diff + the product review
+- sync-congress-stats window redesigned again: lists `/bill/{congress}` (this Congress only),
+  pages while time allows (stops at 60 candidates or < 16 s), a bill counts as checked only
+  if checked on a LATER day than its update (dates are day-only: a same-day passage must be
+  re-checked), 3 failures -> given up (counted), window = start of the earliest open date,
+  page position kept only while that date is unchanged (50-row overlap). Budget 25 s; listing
+  pages get a 15 s deadline (Netlify is slow).
+- Ingest enrichment queue bounded: <= 25 bills per run within 20 s, bills tracked as they're
+  enriched (and ones a cut-off run enriched), 5 failed runs -> dropped (logged).
+- Senate "On the Motion to Table" is always bare: what was tabled is in the vote `title`
+  (point of order, appeal, reconsider); the House bare form on a resolution tables the
+  resolution itself. Quorum calls read "Quorum call".
+- Share links with a query string (fbclid) looped after a 301 (Netlify keeps the query):
+  never redirect; `Netlify-Vary: query=cw-no-param` instead. Live smoke checks it.
+- Product: Home items lost their question (headline regression); cloture on a nomination
+  needs a simple majority (not 60); vote times in ET; member vote list uses headlines and
+  Yea/Nay; counts add up (votes by name); watchlists leave out House rules and impeachment
+  resolutions and say why each bill is listed; AI summary prompt covers big bills' main
+  subjects (H.R. 1 read as a SNAP bill; `summarize-bills.js --redo-long`).
+- Netlify's "Powered by Netlify" badge is injected by Netlify (owner setting), not our code.
+
 ### Review round 1 (2026-11-15): four parallel reviewers (backend, frontend, data, product)
 Data reconciled exactly everywhere (all 556 member records, 85 weeks, 5 topics, congress-
 117/118/119 vs Congress.gov). Fixed:

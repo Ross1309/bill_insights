@@ -92,7 +92,7 @@ const memberModal = {
       const cast = t.yea + t.nay + t.present;
       const stat = (label, value, cls) => `<div class="${cls} border rounded-lg p-2 text-center"><p class="text-[11px] font-semibold uppercase">${label}</p><p class="text-lg font-bold tabular-nums">${value}</p></div>`;
       return `
-        <p class="text-sm text-gray-800">In the ${escapeHtml(ordinal(r.congress))} Congress, voted on <strong>${cast} of ${t.votes}</strong> ${escapeHtml(r.chamber || "")} roll calls they were eligible for (${Math.round((cast / t.votes) * 100)}%).</p>
+        <p class="text-sm text-gray-800">In the ${escapeHtml(ordinal(r.congress))} Congress, voted on <strong>${cast} of ${t.votes}</strong> ${escapeHtml(r.chamber || "")} roll calls they were eligible for (${Math.round((cast / t.votes) * 100)}%).${t.votes - cast - (t.not_voting || 0) > 0 ? ` <span class="text-gray-600">${t.votes - cast - (t.not_voting || 0)} more ${t.votes - cast - (t.not_voting || 0) === 1 ? "was a vote" : "were votes"} by name, such as the Speaker election.</span>` : ""}</p>
         ${e.data.member && e.data.member.current !== false ? `<div class="mt-1">${missedLong(e.data.member, e.data.participation, t)}</div>` : ""}
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
           ${stat("Yea", t.yea, "bg-green-50 border-green-200 text-green-700")}
@@ -109,7 +109,9 @@ const memberModal = {
             return `
             <li class="py-3 flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(v.question || "Question not available")}</button>
+                <button type="button" data-open="vote" data-id="${escapeHtml(v.id)}" class="text-sm font-semibold text-gray-900 hover:text-accent-light hover:underline text-left">${escapeHtml(voteHeadline({ chamber: v.chamber, question: v.question, outcome: outcomeOf(v.result), result: v.result,
+                  bill: v.bill_id ? { id: v.bill_id, label: bill?.label || v.legislation || v.bill_id, title: bill?.title || null } : null, legislation: v.legislation }))}</button>
+                <p class="text-xs text-gray-500 mt-0.5">${termize(escapeHtml(v.question || ""))}</p>
                 <p class="text-xs text-gray-500 mt-0.5">
                   Roll call #${escapeHtml(String(v.roll ?? "?"))} · ${escapeHtml(formatVoteDate(v.date))}
                   ${bill ? ` · <button type="button" data-open="bill" data-id="${escapeHtml(v.bill_id)}" class="text-accent hover:underline">${escapeHtml(officialLabel(bill.label))}</button>` : v.legislation ? ` · ${escapeHtml(officialLabel(v.legislation))}` : ""}
@@ -117,7 +119,7 @@ const memberModal = {
                 </p>
                 ${v.party_majority && v.group !== v.party_majority ? `<p class="text-[11px] text-gray-500 mt-0.5">Voted differently from most of their party</p>` : ""}
               </div>
-              <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${POSITION_BADGES[v.group] || "bg-gray-100 text-gray-700"}">${escapeHtml(v.position || "Not recorded")}</span>
+              <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${POSITION_BADGES[v.group] || "bg-gray-100 text-gray-700"}">${escapeHtml(POSITION_LABEL[v.group] || v.position || "Not recorded")}</span>
             </li>`;
           }).join("")}
         </ul>`;
@@ -254,6 +256,8 @@ const billModal = {
 
 // --- vote
 
+// Aye/No (some House votes) are shown as Yea/Nay, as in the tallies.
+const POSITION_LABEL = { yea: "Yea", nay: "Nay", present: "Present", not_voting: "Not Voting" };
 const POSITION_ORDER = ["yea", "nay", "present", "not_voting", "other"];
 const POSITION_HEADINGS = { yea: "Yea", nay: "Nay", present: "Present", not_voting: "Not voting", other: "Other" };
 
@@ -297,7 +301,7 @@ const voteModal = {
     return `
       <div class="min-w-0 flex-1">
         <span class="text-xs font-semibold px-2 py-0.5 rounded bg-accent/10 text-accent ring-1 ring-accent/30">${voteHeadingBadge(v)}</span>
-        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(voteHeadline({ chamber: v.chamber, question: v.question, outcome: outcomeOf(v.result), document_title: v.document_title,
+        <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(voteHeadline({ chamber: v.chamber, question: v.question, title: v.title || null, outcome: outcomeOf(v.result), result: v.result, yea: v.tallies?.yea, nay: v.tallies?.nay, document_title: v.document_title,
           bill: v.bill_id ? { id: v.bill_id, label: voteBillInfo(v)?.label || v.legislation || v.bill_id, title: voteBillInfo(v)?.title || null } : null }))}</h2>
         ${v.question ? `<p class="text-sm text-gray-600 mt-0.5">${termize(escapeHtml(v.question))}</p>` : ""}
         <p class="text-sm text-gray-500 mt-0.5">
@@ -313,7 +317,7 @@ const voteModal = {
       if (v === undefined) return spinner("Loading vote…");
       if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This roll call isn't in our records yet. New votes are added nightly, and only the current Congress's votes are stored.</p>`;
       return `
-        ${v.question ? `<p class="text-sm text-gray-700 mb-3"><span class="font-semibold text-gray-900">What this vote was:</span> ${escapeHtml(/nomination/i.test(v.question) && !v.bill_id ? "A Senate vote on whether to confirm the President's nominee." : explainQuestion(v.question))}</p>` : ""}
+        ${v.question ? `<p class="text-sm text-gray-700 mb-3"><span class="font-semibold text-gray-900">What this vote was:</span> ${escapeHtml(/nomination/i.test(v.question) && !v.bill_id ? "A Senate vote on whether to confirm the President's nominee." : explainQuestion(v.question, { nomination: !v.bill_id && /^PN/i.test(v.legislation || "") }))}</p>` : ""}
         ${voteBillLine(v)}
         ${v.vote_type ? `<p class="text-xs text-gray-400 mt-1">${termize(escapeHtml(v.vote_type))}</p>` : ""}
         ${voteTalliesHtml(v)}

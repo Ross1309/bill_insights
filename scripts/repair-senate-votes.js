@@ -43,7 +43,8 @@ async function record(e) {
 async function main() {
   const db = getDb();
   const index = (await loadVoteIndex(db, CONGRESS)) || [];
-  const todo = index.filter(v => v.chamber === 'Senate' && (!v.bill_id || v.tallies?.yea === v.tallies?.nay));
+  // Nominations (PN …) can't gain a bill: only re-read them for a possible tie-break.
+  const todo = index.filter(v => v.chamber === 'Senate' && ((!v.bill_id && !/^PN/i.test(v.legislation || '')) || v.tallies?.yea === v.tallies?.nay));
   console.log(`${CONGRESS}th: ${todo.length} Senate votes to re-read (no linked bill, or a tie)${WRITE ? '' : ' (dry run)'}`);
   const changes = [];
   for (const v of todo) {

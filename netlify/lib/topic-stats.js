@@ -105,15 +105,21 @@ export function computeTopicStats(slug, bills, votesByBill, overallAlignment, { 
     const focused = inList.filter(b => b.topic_focus?.[wslug]);
     const broad = inList.filter(b => !b.topic_focus?.[wslug]);
     const lastActivity = b => (votesByBill.get(b.id) || []).at(-1)?.date || b.latestAction?.actionDate || '';
+    // Why a bill is listed: the CRS subjects that matched, or its title naming the topic.
+    const titleRe = new RegExp(w.titlePattern, 'i');
+    const why = b => {
+      const matched = w.subjects.filter(s => (b.subjects || []).includes(s));
+      return matched.length ? { subjects: matched } : titleRe.test(b.title || '') ? { title: true } : null;
+    };
     watchlists[wslug] = {
       label: w.label,
       intro: w.intro,
       subjects: w.subjects,
       counts: { ...stageCounts(focused), broad: broad.length, votes: focused.reduce((n, b) => n + (votesByBill.get(b.id) || []).length, 0) },
       focused: focused.sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)))
-        .map(b => ({ ...compactBill(b), votes: (votesByBill.get(b.id) || []).map(compactVote) })),
+        .map(b => ({ ...compactBill(b), why: why(b), votes: (votesByBill.get(b.id) || []).map(compactVote) })),
       broad: broad.sort((a, b) => (b.subject_count || 0) - (a.subject_count || 0)).map(b => ({
-        id: b.id, label: billLabel(b), title: b.title || null, stage: b.stage || null, subject_count: b.subject_count ?? null,
+        id: b.id, label: billLabel(b), title: b.title || null, stage: b.stage || null, subject_count: b.subject_count ?? null, why: why(b),
         passed_house: !!b.passed_house, passed_senate: !!b.passed_senate, failed_house: !!b.failed_house, failed_senate: !!b.failed_senate,
       })),
     };

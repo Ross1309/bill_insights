@@ -255,9 +255,11 @@ export default async request => {
       // A failed check still gets crs_checked_at, so it moves to the back of the queue.
       // A never-checked (null) bill is picked by an unordered query, so after 3 failures
       // it becomes "no summary yet" (false) and joins the stale queue, ordered by check date.
-      const failed = d => {
+      // crsCheck: the CRS request itself failed (only then is "no summary yet" a fair default;
+      // an OpenAI failure means a CRS summary exists, so it must never be marked false).
+      const failed = (d, { crsCheck = false } = {}) => {
         summaryErrors++;
-        const giveUp = d.data().crs_summary_available == null && (d.data().crs_check_errors || 0) + 1 >= 3;
+        const giveUp = crsCheck && d.data().crs_summary_available == null && (d.data().crs_check_errors || 0) + 1 >= 3;
         return d.ref.set({ crs_checked_at: new Date().toISOString(), crs_check_errors: FieldValue.increment(1), ...(giveUp ? { crs_summary_available: false } : {}) }, { merge: true });
       };
       const ready = [];
@@ -267,7 +269,7 @@ export default async request => {
         try {
           crs = await checkCrsSummary(d.data(), CONGRESS_API_KEY);
         } catch {
-          return failed(d);
+          return failed(d, { crsCheck: true });
         }
         rechecked++;
         if (crs) ready.push({ d, crs });

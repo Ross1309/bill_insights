@@ -331,3 +331,14 @@ test('veto override votes: "Veto Sustained" means the override failed', async ()
   assert.equal(voteOutcome('Point of Order Sustained'), 'succeeded');   // other "sustained" unchanged
   assert.equal(voteCategory('On Overriding the Veto'), 'passage');
 });
+
+test('Senate tabling: what was tabled comes from the vote title; quorum calls', async () => {
+  const { voteHeadline, resultWord } = await import('../public/plain.js');
+  const sres = { id: 'sres377-119', label: 'SRES 377', title: 'An executive resolution authorizing en bloc consideration' };
+  const t = (title, outcome = 'succeeded') => voteHeadline({ chamber: 'Senate', question: 'On the Motion to Table', title, outcome, bill: sres });
+  assert.equal(t('Motion to Table Schumer Point of Order Re: S. Res. 377'), 'Senate set aside a point of order on S.Res. 377');   // not the resolution
+  assert.equal(t('Motion to Table the Motion to Reconsider the Vote'), 'Senate set aside a motion to reconsider the vote on S.Res. 377');
+  assert.equal(t('Motion to Table the Appeal that Two Points of Order are Not Well Taken'), "Senate set aside an appeal of the chair's ruling on S.Res. 377");
+  assert.equal(t(null), 'Senate set aside a motion on S.Res. 377');   // unknown: never "the resolution"
+  assert.equal(resultWord({ question: 'Call of the House', outcome: 'succeeded', bill: null }), 'Quorum call');
+});

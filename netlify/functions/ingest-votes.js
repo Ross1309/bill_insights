@@ -32,6 +32,7 @@ const isScheduled = event => {
 };
 
 export async function handler(event, context) {
+  const started = Date.now();
   try {
     console.log("Starting Congressional backend data ingestion...");
 
@@ -111,15 +112,23 @@ export async function handler(event, context) {
     }
 
     // 5. Issue tracker: enrich the bills these votes are on (sync-bills summarizes them).
+    // Queue: this run's voted bills + what earlier runs (and sync-congress-stats) left. At
+    // most 25 per run within the time left; a bill failing 5 runs in a row is dropped (logged).
     let enriched = 0;
     const billIds = [...new Set([...results.filter(r => r.status === "fulfilled").flatMap(r => r.value || []), ...(owed.pending_enrich || [])])];
     if (billIds.length) await owedRef.set({ pending_enrich: billIds }, { merge: true });
     try {
-      const n = enriched = await enrichVotedBills(billIds);
-      if (n) console.log(`Enriched ${n} newly voted-on bills`);
-      await owedRef.set({ pending_enrich: [] }, { merge: true });
+      const r = await enrichVotedBills(billIds, { deadline: started + 20_000 });
+      enriched = r.done.length;
+      if (enriched) console.log(`Enriched ${enriched} bills (voted on or newly passed)`);
+      const attempts = { ...(owed.enrich_attempts || {}) };
+      for (const id of r.done) delete attempts[id];
+      const dropped = [];
+      for (const id of r.failed) if ((attempts[id] = (attempts[id] || 0) + 1) >= 5) { dropped.push(id); delete attempts[id]; }
+      if (dropped.length) console.error(`Enrichment gave up after 5 runs: ${dropped.join(", ")}`);
+      await owedRef.set({ pending_enrich: [...r.left, ...r.failed.filter(id => !dropped.includes(id))], enrich_attempts: attempts }, { merge: true });
+      if (r.failed.length) failures.push(`enrich: ${r.failed.length} bill(s) failed (retried next run)`);
     } catch (err) {
-      // pending_enrich keeps every id (enriched ones are skipped next time).
       failures.push(`enrich: ${err.message}`);
       console.error("Bill enrichment failed:", err);
     }
@@ -248,15 +257,19 @@ async function unstoredIds(ids, indexed) {
 // for a CRS summary is marked crs_summary_available: null, and sync-bills summarizes
 // those first. Already-enriched bills get their stage refreshed by sync-bills when
 // they show up as recently updated.
-async function enrichVotedBills(ids) {
+// Up to `max` bills per run and only until `deadline` (the scheduled function has 30 s).
+// Bills already enriched (e.g. by a run cut off before tracking them) are tracked here too.
+// Returns { done, failed, left } (ids): left = not reached this run.
+async function enrichVotedBills(ids, { max = 25, deadline = Infinity } = {}) {
   const unique = [...new Set(ids)].filter(id => parseBillId(id));
-  const snaps = await Promise.all(unique.map(id => db.collection("bills").doc(id).get()));
+  const snaps = unique.length ? await db.getAll(...unique.map(id => db.collection("bills").doc(id))) : [];
+  const already = unique.map((id, i) => [id, snaps[i]]).filter(([, s]) => s.exists && s.data().enriched_at);
   const todo = unique.map((id, i) => [id, snaps[i]]).filter(([, s]) => !s.exists || !s.data().enriched_at);
-  // One failure mustn't drop the others from the tracker (they'd be enriched but never
-  // refreshed), so failures are collected and reported after the rest are tracked.
-  const done = [];
-  const errors = [];
-  await pool(todo, 5, async ([id, snap]) => {
+  const batch = todo.slice(0, max);
+  const done = [], failed = [], reached = new Set();
+  await pool(batch, 5, async ([id, snap]) => {
+    if (Date.now() > deadline) return;
+    reached.add(id);
     try {
       const { congress, type, number } = parseBillId(id);
       const fields = await fetchEnrichedBill(congress, type, number, CONGRESS_API_KEY);
@@ -269,12 +282,13 @@ async function enrichVotedBills(ids) {
       }, { merge: true });
       done.push({ id, stage: fields.stage });
     } catch (err) {
-      errors.push(`${id}: ${err.message}`);
+      console.error(`Enrich ${id}: ${err.message}`);
+      failed.push(id);
     }
   });
-  await markTracked(db, admin, done);
-  if (errors.length) throw new Error(`${errors.length} bill(s) failed (retried next run): ${errors.slice(0, 3).join("; ")}`);
-  return todo.length;
+  // Track what was enriched now and what an earlier, cut-off run enriched but never tracked.
+  await markTracked(db, admin, [...done, ...already.map(([id, s]) => ({ id, stage: s.data().stage }))]);
+  return { done: done.map(d => d.id), failed, left: todo.map(([id]) => id).filter(id => !reached.has(id)) };
 }
 
 const CHAMBERS = { 'House of Representatives': 'House', 'Senate': 'Senate' };

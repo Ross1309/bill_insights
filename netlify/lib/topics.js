@@ -156,11 +156,18 @@ export const TOPICS = {
 export const FOCUSED_MAX_SUBJECTS = 10;
 
 // Topic + watchlist slugs for one bill, from its policy area and subjects.
+// Never in a watchlist: House rules (they only schedule debate on another bill, which
+// is listed itself) and impeachment resolutions (CRS tags them with the subjects of the
+// charges, so they'd appear under issues like border security, which reads as editorial).
+const NOT_IN_WATCHLISTS = /^(providing for consideration of|impeaching)\b/i;
+
 export function topicTags({ policy_area, subjects = [], title = '' }) {
   const tags = [];
   const focus = {};
+  const watchable = !NOT_IN_WATCHLISTS.test(String(title).trim());
   for (const [slug, t] of Object.entries(TOPICS)) {
     if (policy_area && t.policyAreas.includes(policy_area)) tags.push(slug);
+    if (!watchable) continue;
     for (const [wslug, w] of Object.entries(t.watchlists)) {
       const titled = new RegExp(w.titlePattern, 'i').test(title);
       if (!titled && !w.subjects.some(s => subjects.includes(s))) continue;

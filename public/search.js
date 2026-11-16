@@ -74,7 +74,7 @@ export function setupSearch() {
   if (!input || !box) return;
   let timer, request = 0;
   // Closing also cancels a search still running, so it can't show results for an old term.
-  const close = () => { request++; results = []; active = -1; render(box, input); };
+  const close = () => { clearTimeout(timer); request++; results = []; active = -1; render(box, input); };
 
   input.addEventListener("input", () => {
     clearTimeout(timer);

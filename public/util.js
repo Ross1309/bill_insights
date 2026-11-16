@@ -19,7 +19,9 @@ export function formatVoteDate(iso) {
   if (!iso) return "Date not available";
   const d = new Date(iso);
   if (isNaN(d)) return iso;
-  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  // Congress's own time zone, labeled (the visitor's zone would make an evening vote look
+  // like the next day, and dates elsewhere on the site are Eastern).
+  return `${d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" })} ET`;
 }
 export const STATE_NAMES = Object.fromEntries([...STATES, ...DELEGATE_JURISDICTIONS]);
 

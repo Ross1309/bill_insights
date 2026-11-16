@@ -222,7 +222,7 @@ export function renderCongressPage(el, { docs, cur, overview }) {
       ${card("congress-split", "How often the parties split",
         `Roll calls where most Democrats and most Republicans voted opposite ways (Yea vs Nay), by this point in each term.`,
         `<div class="grid gap-6 sm:grid-cols-2 mt-4 max-w-3xl">${splitRows}</div>
-        ${months.length ? `<div class="mt-6" data-chart="months"></div>` : ""}`)}
+        <p class="text-xs text-gray-500 mt-3">Month by month: see &ldquo;Party agreement&rdquo; under More charts below.</p>`)}
 
       <section class="text-sm text-gray-600 max-w-3xl">
         <h2 class="font-serif text-xl font-bold text-gray-900">How these numbers are counted</h2>

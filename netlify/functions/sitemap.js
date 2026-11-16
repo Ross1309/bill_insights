@@ -22,7 +22,7 @@ export default async req => {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
       // ~2,600 reads per build: the cache key ignores query strings, so ?x=… can't force one.
-      'Netlify-Vary': 'query=_',
+      'Netlify-Vary': 'query=cw-no-param',
       'Cache-Control': 'public, max-age=3600',
       'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400, stale-while-revalidate=604800',
     },

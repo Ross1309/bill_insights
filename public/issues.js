@@ -19,10 +19,13 @@ const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 const billLink = b => `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="text-xs font-semibold text-accent hover:underline">${esc(officialLabel(b.label))}</button>`;
 
 // Plain-English meaning of each kind of floor question.
-export function explainQuestion(question = "") {
+export function explainQuestion(question = "", opts = {}) {
   const q = question.toLowerCase();
   if (q.includes("concur in")) return "A vote to accept the other chamber's version of the bill. Agreeing usually sends it to the President.";
-  if (q.includes("cloture")) return "A vote on whether to end debate and move forward. It needs 60 of 100 senators.";
+  // Cloture on a nomination needs a simple majority (since 2013/2017); on legislation, 60.
+  if (q.includes("cloture")) return opts.nomination
+    ? "A vote on whether to end debate on a nomination and move to the final vote. It needs a simple majority."
+    : "A vote on whether to end debate and move forward. On legislation it needs 60 of 100 senators.";
   if (q.includes("motion to proceed")) return "A Senate vote on whether to start debating the measure. It doesn't decide whether it passes.";
   if (q.includes("nomination")) return "A Senate vote on whether to confirm the President's nominee.";
   if (q.includes("suspend the rules")) return "A fast-track vote for less controversial bills. It needs two-thirds of the House to pass.";
@@ -160,10 +163,12 @@ function timeline(focused) {
 
 function watchPanel(w) {
   const c = w.counts;
+  const whyText = b => (b.why ? `<p class="text-[11px] text-gray-500 mt-0.5">Listed because ${b.why.subjects ? `CRS tagged it ${esc(b.why.subjects.join(", "))}` : "its title names the topic"}.</p>` : "");
   const billRow = b => `
     <li class="py-3">
       <div class="flex flex-wrap items-center gap-2">${billLink(b)} ${stageChip(b)} <span class="text-[11px] text-gray-500">${sponsorText(b.sponsor)}</span></div>
       <p class="text-sm text-gray-900 mt-1">${esc(b.title)}</p>
+      ${whyText(b)}
       ${b.votes?.length ? `<p class="text-xs text-gray-500 mt-1">${b.votes.map(v => `${v.chamber} ${day(v.date)}: <span class="${v.passed ? "text-green-700" : "text-red-700"}">${esc(v.result)}</span> ${v.yea}–${v.nay}`).join(" · ")}</p>` : ""}
     </li>`;
   return `
@@ -178,7 +183,7 @@ function watchPanel(w) {
       <div class="bg-surface border border-gray-200 rounded-xl p-5">
         <p class="text-sm font-semibold text-gray-900">Broad bills that include ${esc(w.label)} provisions (${w.broad.length})</p>
         <p class="text-xs text-gray-500 mt-1">Large packages, like appropriations and defense authorization bills, that cover many subjects. ${esc(w.label)} is one of them.</p>
-        <ul class="divide-y divide-gray-100 mt-1">${w.broad.map(b => `<li class="py-2 flex flex-wrap items-center gap-2">${billLink(b)}${stageChip(b)}<span class="text-sm text-gray-800 w-full">${esc(b.title)}</span><span class="text-[11px] text-gray-500 w-full">${b.subject_count ?? "?"} CRS subjects</span></li>`).join("")}</ul>
+        <ul class="divide-y divide-gray-100 mt-1">${w.broad.map(b => `<li class="py-2 flex flex-wrap items-center gap-2">${billLink(b)}${stageChip(b)}<span class="text-sm text-gray-800 w-full">${esc(b.title)}</span><span class="text-[11px] text-gray-500 w-full">${b.subject_count ?? "?"} CRS subjects${b.why?.subjects ? `, including ${esc(b.why.subjects.join(", "))}` : ""}</span></li>`).join("")}</ul>
       </div>
     </div>`;
 }
@@ -222,7 +227,7 @@ function laws(s) {
           <div class="mt-2">${summary(b)}</div>
           <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-0.5">
             <p>${chamberLine(b, "House")} · ${chamberLine(b, "Senate")}</p>
-            ${b.sponsor ? `<p>Sponsor: ${esc(b.sponsor.name)} (${esc(b.sponsor.party)}-${esc(b.sponsor.state)})${b.cosponsors_count != null ? ` · ${b.cosponsors_count} cosponsors` : ""}</p>` : ""}
+            ${b.sponsor ? `<p>Sponsor: ${esc(b.sponsor.name)} (${esc(b.sponsor.party)}-${esc(b.sponsor.state)})${b.cosponsors_count != null ? ` · ${b.cosponsors_count} cosponsor${b.cosponsors_count === 1 ? "" : "s"}` : ""}</p>` : ""}
           </div>
         </article>`).join("")}</div>
         ${s.laws.length > 6 ? `<div class="text-center mt-4"><button type="button" data-show-laws class="px-4 py-2 text-sm font-semibold rounded-lg bg-surface border border-gray-300 text-gray-700 hover:bg-gray-100">Show all ${s.laws.length} laws</button></div>` : ""}`
@@ -291,7 +296,7 @@ function agreement(s) {
           const n = t.same + t.opposed, on = o.same + o.opposed;
           return `<div><p class="text-sm font-semibold text-gray-900 mb-2">${ch}</p><div class="space-y-2">
             ${n ? bar(t.same, n, `${s.label} votes (${n})`) : `<p class="text-xs text-gray-500">No ${s.label.toLowerCase()} votes in the ${ch} yet.</p>`}
-            ${bar(o.same, on, `All ${ch} votes this Congress (${on})`)}
+            ${bar(o.same, on, `All ${ch} votes this Congress (${on}${o.unclear ? `; ${o.unclear} where a party tied or took no side left out` : ""})`)}
           </div></div>`;
         }).join("")}
         <p class="text-[11px] text-gray-400">"Agreed" means the majority of Democrats and the majority of Republicans voted the same way (Yea/Nay only; ties left out).</p>

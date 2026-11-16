@@ -65,13 +65,18 @@ export function voteHeadline(v) {
     case "recommit": return `${ch} ${ok ? "sent" : "voted not to send"} ${subject} back to committee`;
     case "discharge": return `${ch} ${ok ? "voted to take" : "voted not to take"} ${subject} out of committee`;
     case "table": {
-      // Name what was set aside when the question says.
-      const q = String(v.question || "").toLowerCase();
+      // Name what was set aside when the record says: the question in the House; in the
+      // Senate the question is always the bare "On the Motion to Table" and what was
+      // tabled is in the vote's title ("Motion to Table the Point of Order …").
+      const q = `${v.question || ""} ${ch === "Senate" ? v.title || "" : ""}`.toLowerCase();
       const what = /discharge/.test(q) ? `a motion to take ${subject} out of committee`
         : /recommit|\bcommit\b/.test(q) ? `a motion to send ${subject} back to committee`
         : /reconsider/.test(q) ? `a motion to reconsider the vote on ${subject}`
         : /appeal|ruling of the chair/.test(q) ? `an appeal of the chair's ruling on ${subject}`
-        : /^on (the )?motion to table$/.test(q.trim()) && isResolution ? subject   // tabling the resolution itself
+        : /point of order/.test(q) ? `a point of order on ${subject}`
+        : /amendment/.test(q) ? `an amendment to ${subject}`
+        // A bare House "On Motion to Table" on a resolution tables the resolution itself.
+        : ch === "House" && /^on (the )?motion to table$/.test(String(v.question || "").toLowerCase().trim()) && isResolution ? subject
         : `a motion on ${subject}`;
       return `${ch} ${ok ? "set aside" : "voted not to set aside"} ${what}`;
     }
@@ -106,6 +111,7 @@ export function resultWord(v) {
   if (kind === "nomination" && !v.bill) return ok ? "Confirmed" : "Rejected";
   if (kind === "override") return ok ? "Veto overridden" : "Veto sustained";
   if (kind === "speaker") return "Speaker elected";
+  if (/call of the house|call by states|quorum/i.test(v.question || "")) return "Quorum call";
   if (kind === "passage" && !(v.bill && isRule(v))) {
     if (!ok && /suspend the rules/i.test(v.question || "") && v.yea != null && v.yea > v.nay) return "Short of two-thirds";
     return ok ? "Passed" : "Failed";

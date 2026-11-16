@@ -20,7 +20,7 @@ export function asVote(v) {
   const bill = v.bill !== undefined ? v.bill
     : v.bill_id ? { id: v.bill_id, label: v.legislation || v.bill_id, title: v.bill_title || null } : null;
   return {
-    id: v.id || v.vote_id, chamber: v.chamber, date: v.date, question: v.question || "", result: v.result || "",
+    id: v.id || v.vote_id, chamber: v.chamber, date: v.date, question: v.question || "", result: v.result || "", title: v.title || null,
     outcome: v.outcome || outcomeOf(v.result), yea: v.yea ?? v.tallies?.yea ?? null, nay: v.nay ?? v.tallies?.nay ?? null,
     parties: v.parties || v.party_breakdown || {}, bill, document_title: v.document_title || null, legislation: v.legislation || null,
     roll: v.roll_call_number ?? v.roll ?? null, source_url: v.source_url || null, kind: v.kind || null,
@@ -50,7 +50,9 @@ export function voteCardHtml(raw, { yours = "", margin = null } = {}) {
   const v = asVote(raw);
   const ok = v.outcome === "succeeded";
   const label = v.bill ? officialLabel(v.bill.label || v.bill.id) : v.legislation ? officialLabel(v.legislation) : "";
-  const meaning = v.bill || !/nomination/i.test(v.question) ? explainQuestion(v.question) : "";
+  // A vote on a nominee (PN …, no bill): cloture then needs a simple majority, not 60.
+  const onNominee = !v.bill && /^PN/i.test(v.legislation || "");
+  const meaning = v.bill || !/nomination/i.test(v.question) ? explainQuestion(v.question, { nomination: onNominee }) : "";
   const independents = v.parties?.I ? `<p class="text-xs text-gray-500">Independents: ${v.parties.I.yea} Yea · ${v.parties.I.nay} Nay</p>` : "";
   return `
     <article class="bg-surface border border-gray-200 rounded-2xl p-5">
