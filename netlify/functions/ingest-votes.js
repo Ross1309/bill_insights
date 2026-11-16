@@ -1,3 +1,4 @@
+import { memberContact } from '../lib/member-contact.js';
 import { createHash } from 'node:crypto';
 import { getDb, admin } from '../lib/firebase.js';
 import { getJson } from '../lib/http.js';
@@ -335,6 +336,11 @@ async function syncCurrentMembers(legislators) {
   const fecIds = legislators
     ? new Map(legislators.filter(l => l.id?.bioguide).map(l => [l.id.bioguide, l.id.fec || []]))
     : null;
+  // Office phone, website and contact form from the member's current term. Without the
+  // dataset, the directory keeps the contacts it had (one extra read, only then).
+  const contacts = legislators
+    ? new Map(legislators.filter(l => l.id?.bioguide).map(l => [l.id.bioguide, memberContact(l.terms?.at(-1))]))
+    : new Map(((await db.collection("directory").doc("members").get()).data()?.members || []).filter(d => d.contact).map(d => [d.id, d.contact]));
 
   const ops = [];
   const pending = []; // [bioguideId, fields] for every current member
@@ -360,6 +366,7 @@ async function syncCurrentMembers(legislators) {
       chamber,
       district: m.district ?? null,
       imageUrl: m.depiction?.imageUrl || null,
+      contact: contacts.get(m.bioguideId) || null,
     });
     pending.push([m.bioguideId, {
       bioguideId: m.bioguideId,
@@ -372,6 +379,7 @@ async function syncCurrentMembers(legislators) {
       imageUrl: m.depiction?.imageUrl || null,
       // Only written when the mapping loaded, so a failed fetch never wipes it.
       ...(fecIds ? { fec_ids: fecIds.get(m.bioguideId) || [] } : {}),
+      ...(legislators ? { contact: contacts.get(m.bioguideId) || null } : {}),
       current: true,
     }]);
   }

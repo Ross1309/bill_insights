@@ -2,7 +2,7 @@
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { collection, doc, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { db, loadParticipation, memberById } from "./data.js";
-import { PARTY_BADGES, STATE_NAMES, escapeHtml, isDelegate, loadErrorHtml, ordinal, store } from "./util.js";
+import { PARTY_BADGES, STATE_NAMES, contactLinks, escapeHtml, isDelegate, loadErrorHtml, ordinal, store } from "./util.js";
 import { activeTab } from "./tabs.js";
 import { currentCongress } from "./congress.js";
 import { missedShort } from "./participation.js";
@@ -139,6 +139,12 @@ function memberCard(m) {
     </button>`;
 }
 
+// A member card plus how to reach them (the "Your representatives" panel).
+function repCard(m) {
+  const contact = contactLinks(m.contact);
+  return `<div class="flex flex-col gap-1">${memberCard(m)}${contact ? `<p class="px-1 text-xs">${contact}</p>` : ""}</div>`;
+}
+
 function renderMemberList(members) {
   const summary = document.getElementById("members-summary");
   const more = document.getElementById("members-more");
@@ -199,8 +205,8 @@ function renderYourReps(members) {
       </div>
       <p class="text-sm text-gray-500 mt-1">${escapeHtml(place)}, in the current Congress's district map.</p>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-        ${senators.map(memberCard).join("")}
-        ${rep ? memberCard(rep) : `<div class="border border-dashed border-gray-300 rounded-xl p-5 text-sm text-gray-500">This House seat is currently vacant.</div>`}
+        ${senators.map(repCard).join("")}
+        ${rep ? repCard(rep) : `<div class="border border-dashed border-gray-300 rounded-xl p-5 text-sm text-gray-500">This House seat is currently vacant.</div>`}
       </div>
       ${delegateOnly ? `<p class="text-xs text-gray-500 mt-2">${escapeHtml(STATE_NAMES[state])} has no senators. Its delegate can vote in committee but not on final passage of bills.</p>` : ""}
       <p class="text-xs text-gray-500 mt-3">All members from ${escapeHtml(STATE_NAMES[state])} are listed below.</p>
@@ -244,7 +250,17 @@ export function myReps() {
 export function rememberMyReps(state, district, members) {
   store.set("cw-state", state);   // Issues tab: "Members from <state>"
   store.set("cw-reps", JSON.stringify({ code: districtCode(state, district), state, district, congress: currentCongress().congress,
-    members: members.map(m => ({ id: m.id, name: m.name, chamber: m.chamber, district: m.district ?? null, party: m.party, state: m.state, imageUrl: m.imageUrl || null })) }));
+    members: members.map(m => ({ id: m.id, name: m.name, chamber: m.chamber, district: m.district ?? null, party: m.party, state: m.state, imageUrl: m.imageUrl || null, contact: m.contact || null })) }));
+}
+// Saves from before contacts were stored get them once from the directory (then re-saved).
+export async function withContacts(reps) {
+  if (!reps?.members?.length || reps.stale || reps.members.every(m => "contact" in m)) return reps;
+  try {
+    const members = await repsFor(reps.state, reps.district);
+    if (!members.length || members.every(m => !("contact" in m))) return reps;   // directory not updated yet
+    rememberMyReps(reps.state, reps.district, members);
+    return myReps();
+  } catch { return reps; }
 }
 export function forgetMyReps() { store.set("cw-reps", "null"); }
 

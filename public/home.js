@@ -4,7 +4,7 @@
 // come from their member_votes docs (3 reads, only once an address was given).
 // Pure rendering: app.js loads the data and wires the address form.
 
-import { escapeHtml as esc, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
+import { contactLinks, escapeHtml as esc, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
 import { voteHeadline, partyWords } from "./plain.js";
 import { voteCardHtml } from "./vote-card.js";
 import { weekRange } from "./week.js";
@@ -25,9 +25,11 @@ const billChip = b => b?.id ? `<button type="button" data-open="bill" data-id="$
 
 // --- Card 1: your members --------------------------------------------------------
 function memberRow(m, participation) {
+  const contact = contactLinks(m.contact);
   const role = m.chamber === "Senate" ? "Senator" : (STATE_NAMES[m.state] && ["DC", "PR", "GU", "VI", "AS", "MP"].includes(m.state)) ? "Delegate" : `Representative${m.district ? `, District ${m.district}` : ", at large"}`;
   const p = PARTY_LETTER[m.party] || "";
   return `
+    <div>
     <button type="button" data-open="member" data-id="${esc(m.id)}" class="w-full flex items-center gap-3 text-left rounded-lg hover:bg-gray-100/60 p-1 -m-1">
       ${m.imageUrl ? `<img src="${esc(m.imageUrl)}" alt="" class="w-10 h-12 rounded object-cover bg-gray-200 shrink-0" loading="lazy" />` : `<span class="w-10 h-12 rounded bg-gray-200 shrink-0"></span>`}
       <span class="min-w-0">
@@ -35,7 +37,9 @@ function memberRow(m, participation) {
         <span class="block text-xs text-gray-500">${esc(role)}${p ? ` · <span class="${PARTY_TEXT[p]} font-semibold">${p}</span>` : ""}</span>
         ${missedShort(m, participation)}
       </span>
-    </button>`;
+    </button>
+    ${contact ? `<p class="pl-[52px] text-xs">${contact}</p>` : ""}
+    </div>`;
 }
 
 // Context for the missed-vote lines: the typical member of each chamber, and that the
@@ -66,6 +70,7 @@ function repsCard(reps, participation) {
         <p class="text-sm text-gray-600 mt-1">Your members for ${esc(reps.code)}${reps.state && STATE_NAMES[reps.state] ? ` (${esc(STATE_NAMES[reps.state])}${reps.district ? `'s ${esc(ordinal(reps.district))} district` : ""})` : ""}:</p>
         <div class="mt-3 space-y-3">${reps.members.map(m => memberRow(m, participation)).join("")}</div>
         ${typicalLine(participation)}
+        <p class="text-[11px] text-gray-500 mt-2">Calls and messages reach their Washington offices. Saying which bill or vote you mean, and that you live in their state or district, helps staff log it.</p>
         <div class="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <a href="#legislators/${esc(reps.code)}" class="font-semibold text-accent hover:underline">All about them →</a>
           <button type="button" data-home-change class="text-gray-500 hover:text-gray-800 underline">Change address</button>

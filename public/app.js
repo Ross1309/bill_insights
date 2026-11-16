@@ -10,7 +10,7 @@ import { renderCongressPage } from "./congress-page.js";
 import { glossaryHtml, setupGlossary } from "./glossary.js";
 import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
-import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
+import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, withContacts, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
 import { renderWeekPage } from "./week.js";
 import { renderHome } from "./home.js";
@@ -177,7 +177,7 @@ async function loadHome() {
 let positionsRequest = 0;
 async function showHome(stats) {
   showFollows(stats);
-  const reps = myReps();
+  const reps = await withContacts(myReps());
   // Missed votes of "your members" (one small doc), only once an address was given.
   const participation = reps?.members?.length && !reps.stale ? await loadParticipation().catch(() => null) : null;
   renderHome(stats, { reps, participation });

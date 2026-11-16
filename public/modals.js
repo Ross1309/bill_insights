@@ -3,7 +3,7 @@
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
 import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesForBill, loadParticipation } from "./data.js";
-import { errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
+import { contactLinks, errorBlock, escapeHtml, externalLink, factList, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
@@ -47,6 +47,7 @@ const memberModal = {
         ${shown.party ? `<span class="text-xs font-semibold px-2 py-0.5 rounded ${PARTY_BADGES[shown.party] || "bg-gray-100 text-gray-800"}">${escapeHtml(shown.party)}</span>` : ""}
         <h2 id="modal-title" class="font-serif text-xl sm:text-2xl font-bold text-gray-900 mt-1">${escapeHtml(name)}</h2>
         ${m ? `<p class="text-sm text-gray-500">${escapeHtml(memberRole(m))} · ${escapeHtml(STATE_NAMES[m.state] || m.state || "")}</p>` : ""}
+        ${m?.current !== false ? `<p class="text-sm">${contactLinks(m?.contact || (p ? { phone: p.office?.phone?.replace(/^\((\d{3})\)\s*/, "$1-"), url: p.website } : null))}</p>` : ""}
       </div>`;
   },
   tabs: [

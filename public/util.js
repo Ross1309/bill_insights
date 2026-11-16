@@ -72,6 +72,20 @@ export function loadErrorHtml(what, err, cls = "") {
   return `<div class="text-center py-12 ${cls}" role="alert"><p class="text-red-500">Couldn't load ${escapeHtml(what)}.</p><p class="text-sm text-gray-500 mt-1 max-w-xl mx-auto">${escapeHtml(why)}</p></div>`;
 }
 
+// How to reach a member: office phone (tap to call), contact form, website. From the
+// congress-legislators dataset (members.contact / directory entries). "" when unknown.
+export function contactLinks(c, { label = "" } = {}) {
+  if (!c) return "";
+  const digits = String(c.phone || "").replace(/\D/g, "");
+  const link = (href, text, ext) => `<a href="${href}"${ext ? ' target="_blank" rel="noopener"' : ""} class="inline-block py-1 font-semibold text-accent hover:underline">${escapeHtml(text)}</a>`;
+  const parts = [
+    digits.length === 10 && link(`tel:+1${digits}`, `Call ${c.phone}`),
+    safeHref(c.form) && link(safeHref(c.form), "Contact form", true),
+    safeHref(c.url) && link(safeHref(c.url), "Website", true),
+  ].filter(Boolean);
+  return parts.length ? `${label}${parts.join(`<span class="text-gray-400" aria-hidden="true"> · </span>`)}` : "";
+}
+
 export function factList(facts) {
   return `<dl>${facts.filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v, raw]) =>
     `<div class="flex gap-3 py-1.5 border-b border-gray-100 text-sm"><dt class="w-36 shrink-0 text-gray-500">${escapeHtml(k)}</dt><dd class="text-gray-900 min-w-0">${raw ? v : escapeHtml(String(v))}</dd></div>`).join("")}</dl>`;

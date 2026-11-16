@@ -352,7 +352,8 @@ bioguideId, name ("Last, First"), state ("WA"), state_name ("Washington"),
 party ("Democratic" | "Republican" | "Independent"), chamber ("House" | "Senate"),
 district (number, null/0 for senators and at-large), imageUrl (Congress.gov depiction or null),
 fec_ids (FEC candidate ids, from the public-domain unitedstates/congress-legislators
-dataset; 537/539 have one), current (bool), updatedAt
+dataset; 537/539 have one), contact { phone, url, form, office } (same dataset, current
+term; `form` for 88/539; memberContact in netlify/lib/member-contact.js), current (bool), updatedAt
 ```
 Synced from `/member?currentMember=true` (3 pages, ~539 incl. 6 delegates). Members no
 longer in that list are set `current: false`, never deleted; the UI queries
@@ -360,7 +361,7 @@ longer in that list are set `current: false`, never deleted; the UI queries
 
 **`directory/members`** — single doc, rewritten by every `ingest-votes.js` run (~100 KB)
 ```
-members [{ id, name, state, party, chamber, district, imageUrl }] (all current members,
+members [{ id, name, state, party, chamber, district, imageUrl, contact }] (all current members,
 sorted by name), count, updatedAt
 ```
 The Legislators tab and headline counts read this one doc (1 read instead of ~540) and
@@ -588,7 +589,9 @@ Redesigned 2026-11-12 from the approved mockup (`mockups/home.html`, real data s
 - Header: logo + **search** (search.js). Tabs: Home, Issues, Bills, Votes, Members. The old
   header count cards are gone (their numbers are in "by the numbers").
 - Home (home.js), one read of `stats/overview`: three cards: **Who represents me?** (address
-  -> `lookupDistrict` + `repsFor` -> remembered in localStorage `cw-reps`), **This week**
+  -> `lookupDistrict` + `repsFor` -> remembered in localStorage `cw-reps`, with each member's
+  `contact`: Call / Contact form / Website links, `contactLinks` in util.js; older saves get
+  contacts once from the directory, `withContacts`), **This week**
   (`this_week`), **Issues** (`topics_summary`); **Key votes** (`this_week.key_votes`: latest 4
   final votes on bills/resolutions + nominations, House rules left out) with plain headlines
   (plain.js), what the vote type means (`explainQuestion`), D/R Yea/Nay bars and, once an
