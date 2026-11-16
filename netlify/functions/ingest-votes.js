@@ -315,6 +315,7 @@ async function fetchLegislators() {
 // read), so only members whose data changed are written; without it (first run) every
 // member is written and retirements come from reading the members collection.
 // Returns how many member docs (incl. the directory) were written.
+const withoutOffice = c => { if (!c) return null; const { office: _office, ...rest } = c; return rest; };
 const fingerprint = value => createHash("sha1").update(JSON.stringify(value)).digest("base64").slice(0, 12);
 
 const MIN_CURRENT_MEMBERS = 500;
@@ -367,7 +368,8 @@ async function syncCurrentMembers(legislators, committees = null) {
       chamber,
       district: m.district ?? null,
       imageUrl: m.depiction?.imageUrl || null,
-      contact: contacts.get(m.bioguideId) || null,
+      // The directory (Members tab, Home) shows no office address: keep it on member docs only.
+      contact: withoutOffice(contacts.get(m.bioguideId)),
     });
     pending.push([m.bioguideId, {
       bioguideId: m.bioguideId,
