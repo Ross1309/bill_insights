@@ -291,7 +291,7 @@ export function setChipGroup(groupId, attr, value) {
   document.querySelectorAll(`#${groupId} [data-${attr}]`).forEach(b => {
     const active = b.dataset[attr] === value;
     b.setAttribute(b.getAttribute("role") === "tab" ? "aria-selected" : "aria-pressed", String(active));
-    b.className = `filter-chip px-3 py-1.5 text-xs font-semibold rounded-full transition ${active ? "bg-cta text-ink" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
+    b.className = `filter-chip px-3 py-1.5 min-h-10 sm:min-h-0 text-xs font-semibold rounded-full transition ${active ? "bg-cta text-ink" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`;
   });
 }
 

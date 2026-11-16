@@ -6,7 +6,8 @@ import { STATE_NAMES, errorBlock, escapeHtml, externalLink, spinner } from "./ut
 
 const usdCompact = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 });
 const usdExact = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const money = v => (typeof v === "number" ? usdCompact.format(v) : "—");
+// "$1.2M" for big amounts, whole dollars under $1,000 ("$408", not "$407.9").
+const money = v => (typeof v !== "number" ? "—" : Math.abs(v) < 1000 ? usdExact.format(v) : usdCompact.format(v));
 const moneyExact = v => (typeof v === "number" ? usdExact.format(v) : "not reported");
 const SIZE_LABELS = { 0: "$200 and under", 200: "$200.01 – $499.99", 500: "$500 – $999.99", 1000: "$1,000 – $1,999.99", 2000: "$2,000 and over" };
 
@@ -98,7 +99,7 @@ export function renderFinanceTab(e, loadInto) {
     ${sizes.length ? `
       <section class="mt-5">
         <h3 class="text-sm font-bold text-gray-900">Individual contributions by size</h3>
-        <p class="text-xs text-gray-500">Grouped by each donor's total to the campaign, as the FEC aggregates them.</p>
+        <p class="text-xs text-gray-500">Grouped by each donor's <em>total</em> to the campaign, as the FEC aggregates them, and shown as shares of individual contributions only. That's why "$200 and under" here differs from "unitemized" above, which counts single gifts of $200 or less (a donor who gave $50 five times is unitemized, but their total is over $200).</p>
         <div class="mt-2">${shareBars(sizes.map(r => ({ label: SIZE_LABELS[r.size] || `${r.size}+`, value: r.total })), sizeTotal)}</div>
       </section>` : ""}
 

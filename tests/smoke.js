@@ -159,6 +159,10 @@ try {
   check(dates.length > 0 && dates.every((d, i) => !i || dates[i - 1] >= d), `Bills are newest first (${dates.length} checked)`);
   await page.fill('#search-input', 'HR 1');
   await waitText('#bills-container', /H\.?R\.? ?1\b/, 'Bill-number search finds H.R. 1');
+  // Word search reaches every stored bill (stats/bill-titles), not just the loaded pages.
+  await page.fill('#search-input', 'border');
+  await waitText('#bills-index', /In all [\d,]+ stored bills: [1-9]\d* with “border”[\s\S]*Immigration on Issues/, 'Bill word search covers all stored bills');
+  await page.fill('#search-input', '');
   await page.fill('#search-input', '');
 
   await page.click('#nav-votes');

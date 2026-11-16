@@ -1,6 +1,6 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { billCache, db } from "./data.js";
+import { billCache, db, getOverviewDoc, loadBillIndex } from "./data.js";
 import { escapeHtml, officialLabel, ordinal, safeHref } from "./util.js";
 import { isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
 import { setChipGroup } from "./members.js";
@@ -319,5 +319,42 @@ function applyBillFilters() {
     (exact(b) ? 1 : 0) - (exact(a) ? 1 : 0) || (b.latest_action_date || "").localeCompare(a.latest_action_date || ""));
 
   renderBills(filtered, term);
+  searchAllBills(term);
   renderLoadMore();
 }
+
+// --- Word search across every stored bill (stats/bill-titles) ----------------------------
+// The paged list holds only the bills loaded so far, so a word like "border" would look like
+// "no bills". This searches all stored bills' numbers and titles (one cached read), and points
+// to an Issues topic when the word matches one.
+const STAGE_WORDS = { law: "Became law", to_president: "Sent to the President", passed_both: "Passed both chambers", passed_one: "Passed one chamber", committee: "In committee", introduced: "Introduced" };
+const foldText = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+let indexRequest = 0;
+async function searchAllBills(term) {
+  const out = document.getElementById("bills-index");
+  if (!out) return;
+  const words = foldText(term).split(/\s+/).filter(w => w.length >= 3);
+  if (!words.length || parseBillNumberTerm(term)) { out.innerHTML = ""; return; }
+  const request = ++indexRequest;
+  try {
+    const [index, overview] = await Promise.all([loadBillIndex(), getOverviewDoc().then(s => s.data()).catch(() => null)]);
+    if (request !== indexRequest) return;
+    const hits = (index?.entries || []).filter(([, label, title]) => { const t = foldText(`${label} ${title}`); return words.every(w => t.includes(w)); })
+      .sort((a, b) => (b[4] || "").localeCompare(a[4] || ""));
+    const topics = (overview?.topics_summary || []).filter(t => words.some(w => foldText(t.label).includes(w) || (t.watchlists || []).some(x => foldText(x).includes(w))));
+    out.innerHTML = `
+      <h3 class="font-serif text-xl font-bold text-gray-900">In all ${(index?.count || 0).toLocaleString("en-US")} stored bills: ${hits.length.toLocaleString("en-US")} with &ldquo;${escapeHtml(term.trim())}&rdquo; in the number or title</h3>
+      ${topics.length ? `<p class="text-sm text-gray-700 mt-1">Following an issue? ${topics.map(t => `<a href="#issues/${escapeHtml(t.slug)}" class="text-accent hover:underline font-semibold">${escapeHtml(t.label)} on Issues</a>`).join(" · ")} brings together the laws, votes and watchlists.</p>` : ""}
+      <ul class="mt-3 divide-y divide-gray-200">${hits.slice(0, 30).map(([id, label, title, stage, date]) => `
+        <li class="py-2.5"><button type="button" data-open="bill" data-id="${escapeHtml(id)}" class="text-left hover:underline">
+          <span class="text-sm font-semibold text-accent">${escapeHtml(officialLabel(label || id))}</span>
+          <span class="text-sm text-gray-900"> ${escapeHtml(title)}</span></button>
+          <span class="block text-xs text-gray-500 mt-0.5">${escapeHtml(STAGE_WORDS[stage] || "Status not tracked")}${date ? ` · latest action ${escapeHtml(date)}` : ""}</span></li>`).join("")}</ul>
+      ${hits.length > 30 ? `<p class="text-xs text-gray-500 mt-2">Showing the 30 most recently active; add a word to narrow it down.</p>` : ""}
+      <p class="text-[11px] text-gray-500 mt-2">Searches bills stored on this site (those that moved, got a vote, became law, or were recently updated), not every bill introduced.</p>`;
+  } catch (err) {
+    console.warn("Bill search index unavailable:", err.message);
+    out.innerHTML = "";
+  }
+}
+

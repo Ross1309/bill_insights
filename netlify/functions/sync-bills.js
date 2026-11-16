@@ -23,6 +23,7 @@ import {
 } from '../lib/bills.js';
 import { currentCongress, outgoingCongress } from '../lib/congress.js';
 import { writeOverviewStats } from '../lib/overview.js';
+import { writeBillIndex } from '../lib/bill-index.js';
 import { recordRun } from '../lib/health.js';
 import { loadTracked, markTracked } from '../lib/tracked-bills.js';
 import { pool } from '../lib/pool.js';
@@ -299,6 +300,10 @@ export default async request => {
         console.error('Stats rebuild failed:', err);
         failedSteps.push('stats');
       }
+    }
+    // The Bills tab's word search (stats/bill-titles, ~3,100 reads), once a night.
+    if (timeLeft() > 6000) {
+      try { await writeBillIndex(db, admin); } catch (err) { console.error('Bill index failed:', err.message); failedSteps.push('bill index'); }
     }
     await recordRun(db, 'sync_bills', { failedSteps, counts: { bills: updated, refreshed, summarized }, scheduled });
 

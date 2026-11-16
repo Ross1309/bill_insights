@@ -85,6 +85,7 @@ public/home.js                     Home tab: your members, this week, issues, ke
 public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
 public/search.js                   Header search: members, bill numbers, topics, Bills-tab fallback
 public/glossary.js                 Plain definitions of official terms + tap-to-explain (termize)
+netlify/lib/bill-index.js          stats/bill-titles: all stored bills' numbers + titles (Bills word search)
 public/participation.js            Missed-vote wording (cards, member window, Home); loadParticipation in data.js
 netlify/lib/participation.js       stats/participation: missed votes per member + chamber medians
 netlify/lib/digest.js              computeWeeks(): stats/week-<Monday> docs, stats/weeks, this_week
@@ -470,6 +471,10 @@ cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting
   resolutions and say why each bill is listed; AI summary prompt covers big bills' main
   subjects (H.R. 1 read as a SNAP bill; `summarize-bills.js --redo-long`).
 - Netlify's "Powered by Netlify" badge is injected by Netlify (owner setting), not our code.
+- **Bills word search** (`stats/bill-titles`, netlify/lib/bill-index.js): every stored bill's
+  [id, number, title (140 chars), stage, date] in one ~330 KB doc, rebuilt nightly by
+  sync-bills and by build-stats; the Bills tab searches it on any word (one cached read),
+  lists matches newest first and links matching Issues topics. Firestore has no text search.
 
 ### Review round 1 (2026-11-15): four parallel reviewers (backend, frontend, data, product)
 Data reconciled exactly everywhere (all 556 member records, 85 weeks, 5 topics, congress-

@@ -112,3 +112,11 @@ export function loadParticipation() {
   participationDoc ??= getFirestoreDoc("stats", "participation").catch(err => { participationDoc = null; throw err; });
   return participationDoc;
 }
+
+// Every stored bill's number, title, stage and date (stats/bill-titles, ~330 KB): the
+// Bills tab's word search. Loaded on the first word search, then cached.
+let billIndexDoc = null;
+export function loadBillIndex() {
+  billIndexDoc ??= getFirestoreDoc("stats", "bill-titles").catch(err => { billIndexDoc = null; throw err; });
+  return billIndexDoc;
+}

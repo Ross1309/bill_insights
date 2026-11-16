@@ -137,10 +137,10 @@ const memberModal = {
             <li class="py-3">
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 ${item.kind === "bill" && item.bill_id
-                  ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-accent hover:underline">${escapeHtml(item.label)}</button>`
-                  : safeHref(item.url) ? `<a href="${safeHref(item.url)}" target="_blank" rel="noopener" class="font-semibold text-accent hover:underline">${escapeHtml(item.label)}</a>`
-                  : `<span class="font-semibold">${escapeHtml(item.label)}</span>`}
-                ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(item.introducedDate)}</span>` : ""}
+                  ? `<button type="button" data-open="bill" data-id="${escapeHtml(item.bill_id)}" class="font-semibold text-accent hover:underline">${escapeHtml(officialLabel(item.label))}</button>`
+                  : safeHref(item.url) ? `<a href="${safeHref(item.url)}" target="_blank" rel="noopener" class="font-semibold text-accent hover:underline">${escapeHtml(officialLabel(item.label))}</a>`
+                  : `<span class="font-semibold">${escapeHtml(officialLabel(item.label))}</span>`}
+                ${item.introducedDate ? `<span class="text-gray-400">Introduced ${escapeHtml(new Date(`${item.introducedDate}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }))}</span>` : ""}
                 ${item.policyArea ? `<span class="text-gray-500">· ${escapeHtml(item.policyArea)}</span>` : ""}
               </div>
               ${item.title ? `<p class="text-sm text-gray-900 mt-1">${escapeHtml(item.title)}</p>` : ""}
