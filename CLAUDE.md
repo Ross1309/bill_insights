@@ -361,7 +361,9 @@ dataset; 537/539 have one), contact { phone, url, form, office } (same dataset, 
 term; `form` for 88/539; memberContact in netlify/lib/member-contact.js),
 committees [{ id ("HSJU"), name, title (Chair/Ranking Member/… or null), subcommittees [{ name,
 title }] }] (congress-legislators committee files, netlify/lib/committees.js; titled seats first;
-member window Overview), current (bool), updatedAt
+member window Overview), term { start, end, class } (current term, same dataset;
+public/terms.js `termFacts` -> term end + election date, "held" between Election Day and the
+term end; never who won), current (bool), updatedAt
 ```
 Synced from `/member?currentMember=true` (3 pages, ~539 incl. 6 delegates). Members no
 longer in that list are set `current: false`, never deleted; the UI queries

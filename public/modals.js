@@ -12,6 +12,7 @@ import { termize } from "./glossary.js";
 import { voteHeadline, outcomeOf, questionKind } from "./plain.js";
 import { explainQuestion } from "./issues.js";
 import { missedLong } from "./participation.js";
+import { termFacts } from "./terms.js";
 import { memberTrendsHtml } from "./member-trends.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole, myReps } from "./members.js";
@@ -61,6 +62,10 @@ const memberModal = {
       const facts = [];
       if (p?.leadership?.length) facts.push(["Leadership", p.leadership.join(", ")]);
       if (m) facts.push(["Role", memberRole(m)], ["State", STATE_NAMES[m.state] || m.state], ["Party", m.party]);
+      // Term end and the election for the seat (members.term, congress-legislators).
+      const t = m && m.current !== false ? termFacts(m.term) : null;
+      if (t) facts.push(["Current term ends", `${t.termEnds}${t.class ? ` (Senate class ${t.class})` : ""}`],
+        ["Election for this seat", t.held ? `${t.election} (held; whoever won takes office when this term ends)` : t.election]);
       if (p) facts.push(["First took office", p.firstTermStart], ["Born", p.birthYear], ["Office", p.office?.address], ["Phone", p.office?.phone]);
       if (m && m.current === false) facts.push(["Status", "No longer serving"]);
       const r = e.data.record;
