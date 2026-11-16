@@ -145,13 +145,26 @@ export function billMetadata(detail = {}, fallback = {}) {
   };
 }
 
+// What the model reads from a CRS summary, at most ~6,000 characters. A long, structured
+// one (reconciliation, appropriations, defense: "TITLE I--…", "TITLE II--…") becomes its
+// overview plus the opening of every title, so the whole bill is represented; the first
+// 6,000 characters alone covered only Title I of the 119th's H.R. 1 (SNAP).
+export function summaryContext(text, max = 6000) {
+  if (text.length <= max) return text;
+  const heads = [...text.matchAll(/TITLE [IVXLC]+--/g)].map(m => m.index);
+  if (heads.length < 3) return text.slice(0, max);
+  const overview = text.slice(0, Math.min(heads[0], 1800));
+  const per = Math.floor((max - overview.length) / heads.length);
+  const parts = heads.map((at, i) => text.slice(at, Math.min(at + per, heads[i + 1] ?? text.length)).trim());
+  return [overview.trim(), ...parts].join('\n\n').slice(0, max);
+}
+
 // Plain-language summary of the official CRS summary. Policy: no CRS summary ->
 // no AI summary (title-only summaries speculated), so `crsSummary` is required.
 export async function generateSummary({ title, crsSummary }, openaiKey) {
   if (!crsSummary) return null;
   const source = 'crs_summary';
-  const long = crsSummary.length > 6000;
-  const context = `Official Congressional Research Service summary${long ? ' (the first part of a longer summary)' : ''}:\n${crsSummary.slice(0, 6000)}`;
+  const context = `Official Congressional Research Service summary${crsSummary.length > 6000 ? ' (shortened from a longer summary)' : ''}:\n${summaryContext(crsSummary)}`;
 
   const prompt = [
     'You write neutral, non-partisan, plain-language explanations of U.S. legislation.',

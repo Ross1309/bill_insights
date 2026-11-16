@@ -342,3 +342,15 @@ test('Senate tabling: what was tabled comes from the vote title; quorum calls', 
   assert.equal(t(null), 'Senate set aside a motion on S.Res. 377');   // unknown: never "the resolution"
   assert.equal(resultWord({ question: 'Call of the House', outcome: 'succeeded', bill: null }), 'Quorum call');
 });
+
+test('summaryContext: long structured CRS summaries keep the overview and every title', async () => {
+  const { summaryContext } = await import('../netlify/lib/bills.js');
+  const titles = Array.from({ length: 10 }, (_, i) => `TITLE ${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][i]}--PART ${i} ${'x'.repeat(20000)}`).join(' ');
+  const text = `This act reduces taxes and increases the debt limit. ${titles}`;
+  const c = summaryContext(text);
+  assert.ok(c.length <= 6000);
+  assert.match(c, /^This act reduces taxes/);
+  assert.equal((c.match(/TITLE [IVX]+--/g) || []).length, 10);
+  assert.equal(summaryContext('short text'), 'short text');
+  assert.equal(summaryContext('y'.repeat(9000)).length, 6000);   // unstructured: the first 6,000
+});
