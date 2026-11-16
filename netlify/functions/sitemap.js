@@ -5,10 +5,7 @@
 import { getDb } from '../lib/firebase.js';
 
 export default async req => {
-  const u = new URL(req.url);
-  // ~2,600 reads per build: a query string (a CDN miss every time) goes to the clean URL.
-  if (u.search) return new Response(null, { status: 301, headers: { Location: '/sitemap.xml', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400' } });
-  const origin = u.origin;
+  const origin = new URL(req.url).origin;
   const db = getDb();
   const [bills, dir] = await Promise.all([
     db.collection('bills').select('update_date').get(),
@@ -24,6 +21,8 @@ export default async req => {
   return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
+      // ~2,600 reads per build: the cache key ignores query strings, so ?x=… can't force one.
+      'Netlify-Vary': 'query=_',
       'Cache-Control': 'public, max-age=3600',
       'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400, stale-while-revalidate=604800',
     },

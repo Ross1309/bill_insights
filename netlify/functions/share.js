@@ -94,9 +94,6 @@ export function withMeta(html, { title, description, url, image }) {
 
 export default async req => {
   const url = new URL(req.url);
-  // A query string would make every request a CDN miss (and Firestore reads): send it to
-  // the clean URL instead, before reading anything.
-  if (url.search) return new Response(null, { status: 301, headers: { Location: url.pathname, 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=86400' } });
   const [, kind, raw] = url.pathname.split('/');
   const id = decodeURIComponent(raw || '');
   if (!KINDS[kind] || !VALID[kind].test(id)) return new Response('Not found', { status: 404 });
@@ -110,6 +107,10 @@ export default async req => {
     status: found ? 200 : 404,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
+      // The cache key ignores query strings (fbclid=…, cache-busters): every variant is one
+      // cached page, so they can't force Firestore reads. (A redirect to the clean URL loops:
+      // Netlify carries the query string over.)
+      'Netlify-Vary': 'query=_',
       'Cache-Control': 'public, max-age=300',
       'Netlify-CDN-Cache-Control': found ? 'public, durable, s-maxage=86400, stale-while-revalidate=604800' : 'public, durable, s-maxage=3600',
     },
