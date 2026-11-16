@@ -24,7 +24,7 @@ let voteChamber = "";
 // in the browser, so no extra index); "all": every roll call.
 let voteScope = "key";
 const SCOPE_NOTE = {
-  key: "Key votes: final votes on bills, resolutions and nominations. Procedural motions, cloture, amendments and House rules are under All roll calls.",
+  key: "Final votes on bills, resolutions and nominations. Procedural steps, amendments and House rules are under All roll calls.",
   all: "Every roll call, including procedural motions, cloture votes, amendments and House rules.",
 };
 let voteIndexMissing = false;

@@ -51,7 +51,7 @@ export function upcomingHtml(floor, reps, now = new Date()) {
   }
   const item = it => `
     <li class="py-1.5">
-      ${it.bill_id ? `<button type="button" data-open="bill" data-id="${esc(it.bill_id)}" class="font-semibold text-accent hover:underline">${esc(officialLabel(it.label))}</button>` : `<span class="font-semibold text-gray-700">${esc(it.label || "")}</span>`}
+      ${it.bill_id ? `<button type="button" data-open="bill" data-id="${esc(it.bill_id)}" class="py-0.5 font-semibold text-accent hover:underline">${esc(officialLabel(it.label))}</button>` : `<span class="font-semibold text-gray-700">${esc(it.label || "")}</span>`}
       <span class="text-gray-700">${esc(it.text.length > 160 ? `${it.text.slice(0, 160).replace(/\s+\S*$/, "")}…` : it.text)}</span>${it.amended ? ` <span class="text-xs text-gray-500">(as amended)</span>` : ""}
     </li>`;
   const groups = floor.categories.map(c => {
@@ -70,7 +70,7 @@ export function upcomingHtml(floor, reps, now = new Date()) {
   return `
     ${sectionHead("Coming up in the House", null, null, `What the House has scheduled for floor consideration, ${esc(when)}. Not every item gets a vote, and items are added during the week.`)}
     ${contact ? `<p class="text-sm mt-3">To share your view before a vote, your representative, ${esc(String(rep.name || "").split(", ").reverse().join(" "))}: ${contact}</p>` : ""}
-    <div class="grid gap-4 lg:grid-cols-2 mt-4">${groups}</div>
+    <div class="grid gap-4 lg:grid-cols-2 items-start mt-4">${groups}</div>
     <p class="text-[11px] text-gray-500 mt-2">From the House floor schedule (<a href="https://docs.house.gov/floor/" target="_blank" rel="noopener" class="text-accent hover:underline">docs.house.gov</a>)${floor.updated ? `, updated ${esc(formatDay(floor.updated))}` : ""}; refreshed nightly. The Senate doesn't publish a comparable list: its votes appear here once they happen.</p>`;
 }
 
@@ -154,9 +154,11 @@ function weekCard(tw) {
 }
 
 // --- Card 3: issues ----------------------------------------------------------------
+// Desktop: the third hero card. Phones: a compact list further down (#home-issues), so
+// the first screens show your members, the week and the key votes.
 function issuesCard(topics) {
   return `
-    <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col" aria-labelledby="home-issues-title">
+    <article class="bg-surface border border-gray-200 rounded-2xl p-5 hidden lg:flex flex-col" aria-labelledby="home-issues-title">
       <h2 id="home-issues-title" class="text-xs font-semibold uppercase tracking-wide text-pink">Issues</h2>
       <p class="text-sm text-gray-600 mt-1">What this Congress has done, topic by topic.</p>
       <div class="mt-3 space-y-2.5">${(topics || []).map(t => `
@@ -165,6 +167,17 @@ function issuesCard(topics) {
           ${t.watchlists?.length ? `<span class="block text-xs text-gray-500 mt-1">${t.watchlists.map(esc).join(" · ")}</span>` : ""}
         </a>`).join("")}</div>
     </article>`;
+}
+
+function issuesList(topics) {
+  if (!topics?.length) return "";
+  return `
+    ${sectionHead("Issues", "#issues", "All topics", "What this Congress has done, topic by topic.")}
+    <ul class="mt-3 bg-surface border border-gray-200 rounded-2xl divide-y divide-gray-200">${topics.map(t => `
+      <li><a href="#issues/${esc(t.slug)}" class="flex items-baseline justify-between gap-3 px-4 py-3 hover:bg-gray-100/40 focus:outline-none focus:ring-2 focus:ring-accent rounded-2xl">
+        <span class="font-serif text-base font-bold text-gray-900">${esc(t.label)}</span>
+        <span class="text-xs text-gray-500 text-right">${num(t.law)} laws · ${num(t.measures)} voted on</span>
+      </a></li>`).join("")}</ul>`;
 }
 
 // --- Key votes: the shared vote card + "your members" -------------------------------
@@ -187,6 +200,7 @@ function keyVoteCard(v, reps, positions) {
 export function renderHome(stats, { reps = null, positions = null, participation = null } = {}) {
   const tw = stats.this_week;
   document.getElementById("home-hero").innerHTML = repsCard(reps, participation) + weekCard(tw) + issuesCard(stats.topics_summary);
+  document.getElementById("home-issues").innerHTML = issuesList(stats.topics_summary);
 
   const key = tw?.key_votes || [];
   const others = tw ? tw.votes.House + tw.votes.Senate - key.length : 0;

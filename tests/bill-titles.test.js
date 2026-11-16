@@ -55,3 +55,10 @@ test('formatDay writes dates by hand', async () => {
   assert.equal(formatDay(''), '');
   assert.equal(formatDay('not a date'), 'not a date');
 });
+
+test('sponsorName reads Congress.gov\'s full name', async () => {
+  const { sponsorName } = await import('../public/util.js');
+  assert.equal(sponsorName({ label: 'Rep. Arrington, Jodey C. [R-TX-19]' }), 'Jodey C. Arrington (R-TX-19)');
+  assert.equal(sponsorName({ label: 'Sen. Britt, Katie Boyd [R-AL]' }), 'Katie Boyd Britt (R-AL)');
+  assert.equal(sponsorName({ name: 'Doe, Jane' }), 'Jane Doe');
+});

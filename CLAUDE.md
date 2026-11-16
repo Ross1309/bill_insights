@@ -608,6 +608,9 @@ Plain-language topic pages, built from the approved mockup (`mockups/foreign-aff
 Redesigned 2026-11-12 from the approved mockup (`mockups/home.html`, real data snapshot):
 - Header: logo + **search** (search.js). Tabs: Home, Issues, Bills, Votes, Members. The old
   header count cards are gone (their numbers are in "by the numbers").
+- Home order (UI review 2026-11-16): hero cards -> Follow tip / Since you last looked -> Key
+  votes -> Coming up in the House -> Issues (phones only, compact list; desktop keeps the third
+  hero card) -> Recently became law -> by the numbers. All six tabs fit a 360 px phone.
 - Home (home.js), one read of `stats/overview`: three cards: **Who represents me?** (address
   -> `lookupDistrict` + `repsFor` -> remembered in localStorage `cw-reps`, with each member's
   `contact`: Call / Contact form / Website links, `contactLinks` in util.js; older saves get

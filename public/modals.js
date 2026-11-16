@@ -3,13 +3,13 @@
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
 import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesForBill, loadParticipation } from "./data.js";
-import { billName, contactLinks, errorBlock, escapeHtml, externalLink, factList, formatDay, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
+import { billName, contactLinks, sponsorName, errorBlock, escapeHtml, externalLink, factList, formatDay, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
-import { voteHeadline, outcomeOf, questionKind } from "./plain.js";
+import { voteHeadline, outcomeOf, questionKind, resultWord } from "./plain.js";
 import { explainQuestion } from "./issues.js";
 import { missedLong } from "./participation.js";
 import { termFacts } from "./terms.js";
@@ -40,7 +40,7 @@ const memberModal = {
   },
   header(e) {
     const m = e.data.member, p = e.data.profile;
-    const name = p?.name || m?.name || (e.errors.member || m === null ? "Member" : "Loading…");
+    const name = p?.name || (m?.name ? String(m.name).split(", ").reverse().join(" ") : "") || (e.errors.member || m === null ? "Member" : "Loading…");
     const shown = m || (p ? { name, party: p.party, imageUrl: p.imageUrl } : { name });
     return `
       ${memberPhoto(shown)}
@@ -61,12 +61,12 @@ const memberModal = {
       }
       const facts = [];
       if (p?.leadership?.length) facts.push(["Leadership", p.leadership.join(", ")]);
-      if (m) facts.push(["Role", memberRole(m)], ["State", STATE_NAMES[m.state] || m.state], ["Party", m.party]);
+      // Role, state, party, phone and website are in the window's header: not repeated here.
       // Term end and the election for the seat (members.term, congress-legislators).
       const t = m && m.current !== false ? termFacts(m.term) : null;
       if (t) facts.push(["Current term ends", `${t.termEnds}${t.class ? ` (Senate class ${t.class})` : ""}`],
-        ["Election for this seat", t.held ? `${t.election} (held; whoever won takes office when this term ends)` : t.election]);
-      if (p) facts.push(["First took office", p.firstTermStart], ["Born", p.birthYear], ["Office", p.office?.address], ["Phone", p.office?.phone]);
+        ["Election for this seat", t.held ? `Held ${t.election}. The winner takes office ${t.termEnds}.` : t.election]);
+      if (p) facts.push(["First took office", p.firstTermStart], ["Born", p.birthYear], ["Office", p.office?.address]);
       if (m && m.current === false) facts.push(["Status", "No longer serving"]);
       const r = e.data.record;
       const votes = m && m.current !== false && r?.totals?.votes ? `
@@ -84,7 +84,7 @@ const memberModal = {
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center"><p class="text-xs text-gray-500 uppercase font-semibold">Bills cosponsored</p><p class="text-xl font-bold text-gray-900">${p.cosponsoredCount ?? "—"}</p></div>
           </div>
           <p class="text-[11px] text-gray-400 mt-1">Career totals, including amendments, per Congress.gov.</p>
-          <div class="flex flex-wrap gap-4 mt-4 text-sm">${externalLink(p.website, "Official website")} ${externalLink(p.bioguideUrl, "Congressional biography")}</div>`
+          <div class="flex flex-wrap gap-4 mt-4 text-sm">${externalLink(p.bioguideUrl, "Congressional biography")}</div>`
         : e.errors.profile ? errorBlock(e.errors.profile) : spinner("Loading details from Congress.gov…")}`;
     }],
     ["votes", "Voting Record", e => {
@@ -198,7 +198,7 @@ const billModal = {
       const sponsor = d?.sponsor;
       const latest = bill.latestAction;
       const facts = [
-        ["Sponsor", sponsor ? memberLink(sponsor.bioguideId, sponsor.label || sponsor.name) : null, true],
+        ["Sponsor", sponsor ? memberLink(sponsor.bioguideId, sponsorName(sponsor)) : null, true],
         ["Cosponsors", d?.cosponsorsCount],
         ["Introduced", bill.introduced_date ? formatDay(bill.introduced_date) : null],
         ["Origin chamber", bill.chamber],
@@ -323,7 +323,12 @@ const voteModal = {
           bill: v.bill_id ? { id: v.bill_id, label: voteBillInfo(v)?.label || v.legislation || v.bill_id, title: voteBillInfo(v)?.title || null } : null }))}</h2>
         ${v.question ? `<p class="text-sm text-gray-600 mt-0.5">${termize(escapeHtml(v.question))}</p>` : ""}
         <p class="text-sm text-gray-500 mt-0.5">
-          <span class="inline-block px-2 py-0.5 text-xs font-bold rounded ${resultBadgeClass(v.result)}">${escapeHtml(v.result || "Result pending")}</span>
+          ${(() => {
+            // The same plain result words as the vote cards; the official wording on hover.
+            const outcome = outcomeOf(v.result);
+            const word = v.result ? resultWord({ question: v.question, outcome, result: v.result, yea: v.tallies?.yea, nay: v.tallies?.nay, bill: v.bill_id ? { id: v.bill_id, title: voteBillInfo(v)?.title || null } : null }) : "Result pending";
+            return `<span class="inline-block px-2 py-0.5 text-xs font-bold rounded ${outcome === "succeeded" ? "bg-green-100 text-green-800" : outcome === "failed" ? "bg-red-100 text-red-800" : resultBadgeClass(v.result)}"${v.result ? ` title="Official result: ${escapeHtml(v.result)}"` : ""}>${escapeHtml(word)}</span>`;
+          })()}
           ${escapeHtml(formatVoteDate(v.date))}
         </p>
       </div>`;

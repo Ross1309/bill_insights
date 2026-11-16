@@ -14,7 +14,7 @@ export const weekRange = w => {
 };
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const billLink = b => b?.id
-  ? `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="font-semibold text-accent hover:underline">${esc(officialLabel(b.label || b.id))}</button>`
+  ? `<button type="button" data-open="bill" data-id="${esc(b.id)}" class="py-0.5 font-semibold text-accent hover:underline">${esc(officialLabel(b.label || b.id))}</button>`
   : "";
 
 // --- #week page -----------------------------------------------------------------
@@ -28,7 +28,7 @@ const ruleRow = v => `
     ${billLink(v.bill)}
     <span class="text-gray-800">terms of debate for ${esc(ruleTarget(v) || "another bill")}</span>
     <span class="text-xs font-bold px-2 py-0.5 rounded ${v.outcome === "succeeded" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}">${esc(resultWord(v))} ${v.yea ?? "—"}–${v.nay ?? "—"}</span>
-    <button type="button" data-open="vote" data-id="${esc(v.id)}" class="text-xs text-accent hover:underline">${esc(v.chamber)} · ${esc(new Date(v.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }))} · how members voted →</button>
+    <button type="button" data-open="vote" data-id="${esc(v.id)}" class="inline-block py-1 text-xs text-accent hover:underline">${esc(v.chamber)} · ${esc(new Date(v.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }))} · how members voted →</button>
   </li>`;
 
 const section = (title, note, body) => `
@@ -53,7 +53,7 @@ export function renderWeekPage(el, w, list) {
 
   const lawCards = w.laws.map(l => `
     <article class="bg-surface border border-gray-200 rounded-xl p-4">
-      <p class="text-xs text-gray-500">${esc(l.law_type || "Public Law")} ${esc(l.law_number || "")} · signed ${esc(day(l.signed, { month: "short", day: "numeric", year: "numeric" }))}${l.sponsor?.name ? ` · sponsor ${l.sponsor.bioguideId ? `<button type="button" data-open="member" data-id="${esc(l.sponsor.bioguideId)}" class="text-accent hover:underline">${esc(l.sponsor.name)}</button>` : esc(l.sponsor.name)}${l.sponsor.party ? ` (${esc(l.sponsor.party)}-${esc(l.sponsor.state || "")})` : ""}` : ""}</p>
+      <p class="text-xs text-gray-500">${esc(l.law_type || "Public Law")} ${esc(l.law_number || "")} · signed ${esc(day(l.signed, { month: "short", day: "numeric", year: "numeric" }))}${l.sponsor?.name ? ` · sponsor ${l.sponsor.bioguideId ? `<button type="button" data-open="member" data-id="${esc(l.sponsor.bioguideId)}" class="inline-block py-1 text-accent hover:underline">${esc(l.sponsor.name)}</button>` : esc(l.sponsor.name)}${l.sponsor.party ? ` (${esc(l.sponsor.party)}-${esc(l.sponsor.state || "")})` : ""}` : ""}</p>
       <p class="mt-1 text-sm">${billLink(l)} <span class="text-gray-900 font-semibold">${esc(l.title || "")}</span></p>
       ${l.summary?.length
         ? `<ul class="list-disc pl-5 mt-2 text-sm text-gray-700 space-y-1">${l.summary.map(b => `<li>${esc(b)}</li>`).join("")}</ul><p class="text-[11px] text-gray-400 mt-1">AI summary of the official CRS summary</p>`

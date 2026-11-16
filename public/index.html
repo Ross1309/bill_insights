@@ -49,9 +49,10 @@
   </header>
 
   <nav class="sticky top-0 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-200" aria-label="Sections">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar">
+    <!-- All six tabs fit a 360 px phone: "Congress" and tighter gaps below sm. -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between sm:justify-start gap-3 sm:gap-8 overflow-x-auto no-scrollbar">
       <button type="button" id="nav-overview" class="nav-tab">Home</button>
-      <button type="button" id="nav-congress" class="nav-tab">This Congress</button>
+      <button type="button" id="nav-congress" class="nav-tab"><span class="sm:hidden">Congress</span><span class="hidden sm:inline">This Congress</span></button>
       <button type="button" id="nav-issues" class="nav-tab">Issues</button>
       <button type="button" id="nav-bills" class="nav-tab">Bills</button>
       <button type="button" id="nav-votes" class="nav-tab">Votes</button>
@@ -67,13 +68,16 @@
       <div>
         <h1 class="font-serif text-3xl sm:text-4xl font-bold text-gray-900">What is Congress doing?</h1>
         <p class="text-gray-600 mt-2 max-w-2xl">This week's key votes, new laws and your own members, in plain language from the official record. Non-partisan; every AI summary is labeled.</p>
-        <div id="home-hero" class="grid gap-4 lg:grid-cols-3 mt-6">
-          <div class="lg:col-span-3 text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
+        <div id="home-hero" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-6">
+          <div class="md:col-span-2 lg:col-span-3 text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
         </div>
       </div>
-      <section id="home-upcoming" class="empty:hidden"></section>
       <section id="home-follows" class="empty:hidden" aria-live="polite"></section>
       <section id="home-keyvotes" class="empty:hidden"></section>
+      <!-- Below Key votes: it loads separately, so arriving late moves nothing on screen. -->
+      <section id="home-upcoming" class="empty:hidden"></section>
+      <!-- Phones only: the Issues hero card moves here, compact (desktop keeps the card). -->
+      <section id="home-issues" class="empty:hidden lg:hidden"></section>
       <section id="home-laws" class="empty:hidden"></section>
       <section id="home-numbers" class="empty:hidden"></section>
     </section>
@@ -128,16 +132,16 @@
 
     <!-- VIEW 1: BILLS & SUMMARIES -->
     <section id="view-bills" class="tab-view hidden">
-      <div class="mb-6">
+      <div class="mb-4 sm:mb-6">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Bills</h2>
-        <p class="text-sm text-gray-500">Where each bill stands, from introduced to law, with a plain-language summary of the official one. Most bills never get a vote, so this starts with the ones that have moved. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a></p>
+        <p class="text-sm text-gray-500">Where each bill stands, from introduced to law, with plain-language summaries of the official ones. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a></p>
       </div>
       <div id="bill-scope-filters" class="flex flex-wrap gap-2 mb-2" role="group" aria-label="Which bills">
         <button type="button" data-scope="moving" class="filter-chip">Moving or passed</button>
         <button type="button" data-scope="all" class="filter-chip">All bills</button>
       </div>
-      <p id="bill-scope-note" class="text-xs text-gray-500 mb-6"></p>
-      <div class="mb-8 flex flex-col md:flex-row gap-4 md:items-center justify-between">
+      <p id="bill-scope-note" class="text-xs text-gray-500 mb-4 sm:mb-6"></p>
+      <div class="mb-5 sm:mb-8 flex flex-col md:flex-row gap-3 sm:gap-4 md:items-center justify-between">
         <div class="w-full md:w-1/2 lg:w-1/3">
           <label for="search-input" class="sr-only">Search bills</label>
           <input
@@ -147,7 +151,8 @@
             class="w-full px-4 py-2 bg-surface border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
           />
         </div>
-        <div id="category-filters" class="flex flex-wrap gap-2" role="group" aria-label="Category">
+        <!-- Phones: one row that scrolls sideways (the cut-off chip shows there's more). -->
+        <div id="category-filters" class="flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 [&>button]:shrink-0" role="group" aria-label="Category">
           <button data-category="all" class="filter-btn px-3 py-1.5 min-h-10 sm:min-h-0 text-xs font-semibold rounded-full bg-cta text-ink transition">All</button>
           <button data-category="Economy" class="filter-btn px-3 py-1.5 min-h-10 sm:min-h-0 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Economy</button>
           <button data-category="Healthcare" class="filter-btn px-3 py-1.5 min-h-10 sm:min-h-0 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">Healthcare</button>
@@ -168,9 +173,9 @@
 
     <!-- VIEW 2: ROLL-CALL VOTES -->
     <section id="view-votes" class="tab-view hidden">
-      <div class="mb-6">
+      <div class="mb-4 sm:mb-6">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Votes</h2>
-        <p class="text-sm text-gray-500">How the House and Senate voted and how each party lined up, from the House Clerk and senate.gov. Tap an underlined term to see what that kind of vote means.</p>
+        <p class="text-sm text-gray-500">How the House and Senate voted and how each party lined up. Tap an underlined term for what it means.</p>
       </div>
       <div class="flex flex-wrap gap-x-6 gap-y-2 mb-2">
         <div id="vote-scope-filters" class="flex flex-wrap gap-2" role="group" aria-label="Which votes">
@@ -183,7 +188,7 @@
           <button type="button" data-chamber="Senate" class="filter-chip">Senate</button>
         </div>
       </div>
-      <p id="vote-scope-note" class="text-xs text-gray-500 mb-6"></p>
+      <p id="vote-scope-note" class="text-xs text-gray-500 mb-4 sm:mb-6"></p>
       <div id="votes-container" class="min-h-[300px]">
         <div class="text-center py-12">
           <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>

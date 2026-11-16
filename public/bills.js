@@ -32,7 +32,7 @@ let billsError = null;   // message shown instead of bills until the next reset
 let billScope = "moving";
 let movingIndexReady = true;
 const SCOPE_NOTE = {
-  moving: "Bills and resolutions that have passed at least one chamber, newest action first (House rules, which only set the terms of debate, left out). Most bills never get a vote: switch to All bills to see those too.",
+  moving: "Passed at least one chamber, newest action first (House rules left out). Most bills never get a vote: All bills shows the rest.",
   all: "Every bill we track, including ones just introduced or in committee, newest action first.",
 };
 
@@ -165,17 +165,17 @@ export function noSummaryText(bill) {
   return "Not summarized yet.";
 }
 
+// Cards show the summary's first point (the bill window has all of them); without one,
+// a single short line (the window explains why).
 function renderSummary(bill) {
   const points = bill.ai_summary?.bullet_points;
   if (!points || points.length === 0) {
-    return `<p class="text-gray-500 text-sm">${escapeHtml(noSummaryText(bill))}</p>`;
+    return `<p class="text-gray-500 text-xs">${bill?.crs_summary_available === false ? "Plain-language summary: waiting for the official CRS summary." : "Not summarized yet."}</p>`;
   }
   const label = SUMMARY_SOURCE_LABELS[bill.ai_summary.source] || 'AI-generated summary';
   return `
-    <ul class="list-disc pl-5 space-y-1 text-gray-600 text-sm">
-      ${points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
-    </ul>
-    <p class="text-[11px] text-gray-400 mt-2">${escapeHtml(label)}</p>
+    <p class="text-gray-600 text-sm">${escapeHtml(points[0])}</p>
+    <p class="text-[11px] text-gray-400 mt-1">${escapeHtml(label)}${points.length > 1 ? ` · ${points.length - 1} more point${points.length > 2 ? 's' : ''} in the details` : ''}</p>
   `;
 }
 
@@ -189,21 +189,21 @@ function renderBills(bills, term = "") {
   }
 
   billsContainer.innerHTML = scopeNote + `
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
       ${bills.map(bill => `
-        <div class="bg-surface border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+        <div class="bg-surface border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span class="bg-accent/10 text-accent font-semibold ring-1 ring-accent/30 px-2 py-0.5 rounded">${escapeHtml(billLabel(bill))}</span>
               <span>${bill.congress ? `${escapeHtml(ordinal(Number(bill.congress)))} Congress` : ''}</span>
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
-            <h3 class="font-serif font-bold text-gray-900 text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(billName(bill) || 'Untitled Bill')}</button></h3>
+            <h3 class="font-serif font-bold text-gray-900 text-lg sm:text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(billName(bill) || 'Untitled Bill')}</button></h3>
             ${bill.title && billName(bill) !== bill.title ? `<p class="text-xs text-gray-500 -mt-2 mb-3">${escapeHtml(bill.title)}</p>` : ""}
             ${stageTrackerHtml(bill, { compact: true })}
             ${renderSummary(bill)}
           </div>
-          <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+          <div class="mt-3 pt-3 sm:mt-4 sm:pt-4 border-t border-gray-100 text-xs text-gray-500 space-y-1">
             ${bill.latestAction?.text ? `<p><strong class="text-gray-700">Latest action${bill.latestAction.actionDate ? `, ${escapeHtml(formatDay(bill.latestAction.actionDate))}` : ''}:</strong> ${escapeHtml(bill.latestAction.text)}</p>` : ''}
             <div class="flex flex-wrap gap-4 pt-1">
               <button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="font-semibold text-accent hover:underline">Details, actions &amp; votes →</button>

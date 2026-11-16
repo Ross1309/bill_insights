@@ -156,14 +156,14 @@ async function loadHome() {
   try {
     const snap = await getOverviewDoc();
     if (!snap.exists()) {
-      hero.innerHTML = `<p class="lg:col-span-3 text-center text-gray-500 py-12">The home page data hasn't been built yet.</p>`;
+      hero.innerHTML = `<p class="md:col-span-2 lg:col-span-3 text-center text-gray-500 py-12">The home page data hasn't been built yet.</p>`;
       return;
     }
     overviewLoaded = true;
     await showHome(snap.data());
   } catch (err) {
     console.error("Error loading home:", err);
-    hero.innerHTML = loadErrorHtml("the home page", err, "lg:col-span-3");
+    hero.innerHTML = loadErrorHtml("the home page", err, "md:col-span-2 lg:col-span-3");
   } finally {
     homeLoading = false;
   }
@@ -217,7 +217,8 @@ async function showFollows(stats) {
   const el = document.getElementById("home-follows");
   if (!el) return;
   if (!followCount()) {
-    el.innerHTML = `<p class="text-xs text-gray-500">Tip: use <strong>Follow</strong> on a bill, a member or an Issues topic, and this page will show what changed since your last visit. Saved in this browser only.</p>`;
+    // A footnote to the cards above (pulled up into the section gap), not a section of its own.
+    el.innerHTML = `<p class="-mt-8 text-xs text-gray-500">Tip: use <strong>Follow</strong> on a bill, a member or an Issues topic, and this page will show what changed since your last visit. Saved in this browser only.</p>`;
     return;
   }
   const request = ++followsRequest;

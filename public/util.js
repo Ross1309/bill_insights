@@ -181,6 +181,13 @@ export function plainDisapproval(title) {
   return other && !/under chapter 8 of title 5/i.test(other[1]) ? `Disapproving ${other[1]}` : null;
 }
 
+// Congress.gov's "Rep. Arrington, Jodey C. [R-TX-19]" -> "Jodey C. Arrington (R-TX-19)".
+export function sponsorName(s) {
+  const m = /^(?:Rep\.|Sen\.|Del\.|Resident Commissioner)?\s*([^,[]+),\s*([^[]+?)\s*\[([^\]]+)\]\s*$/.exec(s?.label || "");
+  if (m) return `${m[2]} ${m[1]} (${m[3]})`;
+  return s?.label || String(s?.name || "").split(", ").reverse().join(" ") || "Not available";
+}
+
 // --- Bill and nomination labels in the official style -----------------------------------
 // Accepts "HR 2102", "hr2102-119", "H.R. 2102", "HRES 1247", "PN 1181-1", "PN1181-7";
 // returns "H.R. 2102", "H.Res. 1247", "Nomination PN 1181". Unknown input comes back as is.
