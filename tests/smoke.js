@@ -206,6 +206,9 @@ try {
   if (LIVE) {
     const html = await (await fetch(new URL('bill/hr2102-119', url))).text();
     check(/<meta property="og:title" content="H\.R\. 2102: [^"]+"/.test(html) && /og:image/.test(html), 'Shared bill link has its own preview');
+    // Social sites add query strings (fbclid=…): the link must still load (no redirect loop).
+    const q = await fetch(new URL('bill/hr2102-119?fbclid=smoke', url), { redirect: 'manual' });
+    check(q.status === 200, `Shared link with a query string loads (got ${q.status})`);
     const sitemap = await (await fetch(new URL('sitemap.xml', url))).text();
     check((sitemap.match(/<url>/g) || []).length > 1000, 'Sitemap lists bills and members');
   }
