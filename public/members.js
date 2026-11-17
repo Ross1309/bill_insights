@@ -53,9 +53,16 @@ export function memberPhoto(m) {
     return `<span class="w-16 h-20 rounded-lg bg-gray-100 border flex items-center justify-center text-xs text-gray-400 shrink-0">No photo</span>`;
   }
   return `<img src="${escapeHtml(m.imageUrl)}" alt="${escapeHtml(m.name || "")}" loading="lazy"
-    class="w-16 h-20 object-cover rounded-lg bg-gray-100 border shrink-0"
-    onerror="this.replaceWith(Object.assign(document.createElement('span'), {className: 'block w-16 h-20 rounded-lg bg-gray-100 border shrink-0'}))" />`;
+    class="w-16 h-20 object-cover rounded-lg bg-gray-100 border shrink-0" data-member-photo />`;
 }
+// A photo that fails to load becomes an empty box. One capture-phase listener (error
+// events don't bubble) instead of inline onerror handlers, which the CSP blocks.
+document.addEventListener("error", e => {
+  const img = e.target;
+  if (img instanceof HTMLImageElement && img.hasAttribute("data-member-photo")) {
+    img.replaceWith(Object.assign(document.createElement("span"), { className: "block w-16 h-20 rounded-lg bg-gray-100 border shrink-0" }));
+  }
+}, true);
 
 // --- Directory: all current members from one `directory/members` doc ----------
 // (written by ingest-votes.js; ~100 KB, so search + filters run client-side with a

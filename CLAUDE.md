@@ -43,6 +43,16 @@ file is the working reference. Dated history lives in docs/HISTORY.md.
   13% invalid = unregistered localhost debug tokens, 0 unknown origin). Verified after
   enforcing: live smoke test (debug token) and a plain browser both load data.
   A fresh localhost browser can't read Firestore until its printed debug token is registered.
+- **Security headers** (`netlify.toml` `[[headers]]`, 2026-11-16): a Content-Security-Policy
+  allowing only the site's own files, the Firebase SDK + reCAPTCHA (www.gstatic.com,
+  www.google.com), Firestore/App Check APIs and congress.gov member photos; frame-ancestors
+  'none' + X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy. **Adding an
+  outside script, image, font or API? Add its origin to the CSP** (the smoke test fails on the
+  console error). No inline event handlers (onerror="…"): use listeners (members.js photos).
+- **Fonts are self-hosted** (public/fonts + @font-face in src/styles.css, OFL licenses
+  alongside): Google Fonts' latin subsets trimmed with fontTools' instancer (Inter wght
+  400-700, Source Serif 4 wght 600-700 / opsz 16-40): 110 KB instead of 170, preloaded, no
+  render-blocking Google CSS. Cached a year (`/fonts/*`): a changed font needs a new file name.
 - The Firebase *web* config in `public/data.js` (`apiKey: "AIza…"`) is public by design.
   Netlify's secret scanner flags it, so `netlify.toml` exempts that one value via
   `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`. Never exempt or disable scanning for

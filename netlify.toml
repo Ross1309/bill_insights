@@ -22,3 +22,24 @@
 # then stats/congress-<n> rebuilt (after the other two, which it reads).
 [functions."sync-congress-stats"]
   schedule = "0 11 * * *"
+
+# Security headers for every page and file. The Content-Security-Policy allows only what
+# the site uses: Firebase SDK + reCAPTCHA (www.gstatic.com, www.google.com), Firestore and
+# App Check APIs, member photos from congress.gov; fonts are self-hosted. Style attributes
+# are used for chart positions/colors, hence 'unsafe-inline' for styles (not scripts).
+# Adding an outside script, image or API? Add its origin here, or browsers block it
+# (the smoke test fails on the console error).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://www.gstatic.com https://www.google.com; style-src 'self' 'unsafe-inline' https://www.gstatic.com; font-src 'self'; img-src 'self' data: https://www.congress.gov; connect-src 'self' https://firestore.googleapis.com https://firebaseappcheck.googleapis.com https://content-firebaseappcheck.googleapis.com https://www.google.com; frame-src https://www.google.com https://recaptcha.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+# Self-hosted fonts never change in place (a new version gets a new file name).
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
