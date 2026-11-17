@@ -5,6 +5,7 @@
 // tags (from Firestore); in the browser the app opens the item as usual (router.js turns
 // the path into its #route). Cached at the CDN for a day.
 
+import { SECURITY_HEADERS } from '../lib/security-headers.js';
 import { getDb } from '../lib/firebase.js';
 import { billName, officialLabel, escapeHtml as esc, ordinal, STATE_NAMES } from '../../public/util.js';
 import { voteHeadline, resultWord, outcomeOf } from '../../public/plain.js';
@@ -107,6 +108,7 @@ export default async req => {
   return new Response(html, {
     status: found ? 200 : 404,
     headers: {
+      ...SECURITY_HEADERS,
       'Content-Type': 'text/html; charset=utf-8',
       // The cache key ignores query strings (fbclid=…, cache-busters): every variant is one
       // cached page, so they can't force Firestore reads. (A redirect to the clean URL loops:

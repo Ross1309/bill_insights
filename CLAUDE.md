@@ -48,7 +48,8 @@ file is the working reference. Dated history lives in docs/HISTORY.md.
   www.google.com), Firestore/App Check APIs and congress.gov member photos; frame-ancestors
   'none' + X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy. **Adding an
   outside script, image, font or API? Add its origin to the CSP** (the smoke test fails on the
-  console error). No inline event handlers (onerror="…"): use listeners (members.js photos).
+  console error). Netlify doesn't add these to function responses in production, so share.js
+  sends them from netlify/lib/security-headers.js (a test keeps it equal to netlify.toml). No inline event handlers (onerror="…"): use listeners (members.js photos).
 - **Fonts are self-hosted** (public/fonts + @font-face in src/styles.css, OFL licenses
   alongside): Google Fonts' latin subsets trimmed with fontTools' instancer (Inter wght
   400-700, Source Serif 4 wght 600-700 / opsz 16-40): 110 KB instead of 170, preloaded, no
