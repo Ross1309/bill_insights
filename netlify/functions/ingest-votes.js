@@ -14,7 +14,7 @@ import { currentCongress, outgoingCongress, today } from '../lib/congress.js';
 import { applyNewMemberVotes } from '../lib/member-votes.js';
 import { writeParticipation } from '../lib/participation.js';
 import { loadVoteIndex } from '../lib/vote-index.js';
-import { recordRun } from '../lib/health.js';
+import { logRunStart, recordRun } from '../lib/health.js';
 import { markTracked } from '../lib/tracked-bills.js';
 import { pool } from '../lib/pool.js';
 
@@ -39,6 +39,9 @@ export async function handler(event, context) {
   const started = Date.now();
   try {
     console.log("Starting Congressional backend data ingestion...");
+    let nextRun = null;
+    try { nextRun = JSON.parse(event?.body || "{}").next_run; } catch { /* not a scheduled run */ }
+    logRunStart("ingest-votes", nextRun, event?.headers?.["x-nf-request-id"]);
 
     // congress-legislators: bioguide -> FEC ids and Senate LIS ids. Optional.
     const [legislators, committees] = await Promise.all([fetchLegislators(), fetchMemberCommittees()]);

@@ -24,7 +24,7 @@ import {
 import { currentCongress, outgoingCongress } from '../lib/congress.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { writeBillIndex } from '../lib/bill-index.js';
-import { recordRun } from '../lib/health.js';
+import { logRunStart, recordRun } from '../lib/health.js';
 import { loadTracked, markTracked } from '../lib/tracked-bills.js';
 import { pool } from '../lib/pool.js';
 
@@ -146,7 +146,9 @@ export default async request => {
   const timeLeft = () => RUN_BUDGET_MS - (Date.now() - started);
   // Netlify's scheduler posts { next_run }. `netlify dev` imitates that locally, hence
   // the NETLIFY_DEV check: only real scheduled runs count as scheduled.
-  const scheduled = !process.env.NETLIFY_DEV && Boolean((await request?.json?.().catch(() => null))?.next_run);
+  const nextRun = (await request?.json?.().catch(() => null))?.next_run;
+  const scheduled = !process.env.NETLIFY_DEV && Boolean(nextRun);
+  logRunStart('sync-bills', nextRun, request?.headers?.get?.('x-nf-request-id'));
   const CONGRESS_API_KEY = process.env.CONGRESS_API_KEY;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 

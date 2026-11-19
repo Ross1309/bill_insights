@@ -9,6 +9,12 @@
 // under netlify dev) can't hide a failed nightly run. Only step names are stored (no
 // error messages: the doc is public).
 
+// One line per invocation, to tell Netlify's repeat invocations of a schedule apart: retries
+// carry the same next_run. Log timestamps are delivery times, so the real time is in the text.
+export function logRunStart(name, nextRun, requestId) {
+  console.log(`${name} run start ${new Date().toISOString()}; next_run ${nextRun || 'none'}; request ${requestId || 'unknown'}`);
+}
+
 export async function recordRun(db, name, { failedSteps = [], counts = {}, scheduled = false } = {}) {
   const now = new Date().toISOString();
   const ok = failedSteps.length === 0;

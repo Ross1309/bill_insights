@@ -413,6 +413,12 @@ per-state `members` query and says nationwide search is unavailable.
   production (nobody can trigger OpenAI/Firestore spend). Run manually with **Run now** on
   the function's page in Netlify; locally `node run-ingest.js` / `netlify dev` + curl.
   Logs: `netlify logs --function ingest-votes --since 24h`.
+- **Repeat invocations (seen 2026-11-18, cause unproven):** `sync-bills` and
+  `sync-congress-stats` ran 3 times in a row on a schedule, `ingest-votes` once. Netlify retries
+  a scheduled function up to 3 times when it treats a run as failed. Each run starts with a `run
+  start` log line (same `next_run` = same schedule). The repeats currently finish work the first
+  run couldn't (sync-bills refreshed 7 of 52, then all 52): don't block them without raising
+  the per-run work.
 - **Public functions:** `member-profile`, `bill-detail` (rate limit 60/min per visitor; the
   plan allows 2 rules, both used; rate-limited functions need explicit paths, hence
   `/api/...`) and `member-finance` set durable `Netlify-CDN-Cache-Control` (404s 1 h).

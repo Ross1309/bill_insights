@@ -15,7 +15,7 @@ import { getDb, admin } from '../lib/firebase.js';
 const { FieldValue } = admin.firestore;
 import { getJson, json } from '../lib/http.js';
 import { currentCongress, outgoingCongress, today as now } from '../lib/congress.js';
-import { recordRun } from '../lib/health.js';
+import { logRunStart, recordRun } from '../lib/health.js';
 import { pool } from '../lib/pool.js';
 import { LAW_TYPES, congressStart, currentCongressDoc, dayIndex, maybePassed, passageDates, probeNewBills } from '../lib/congress-stats.js';
 
@@ -37,7 +37,9 @@ export default async request => {
     if (ms < 1500) return Promise.reject(Object.assign(new Error('out of time'), { status: 0 }));
     return getJson(url, { ...opts, timeoutMs: ms, retries: 0 });
   };
-  const scheduled = !process.env.NETLIFY_DEV && Boolean((await request?.json?.().catch(() => null))?.next_run);
+  const nextRun = (await request?.json?.().catch(() => null))?.next_run;
+  const scheduled = !process.env.NETLIFY_DEV && Boolean(nextRun);
+  logRunStart('sync-congress-stats', nextRun, request?.headers?.get?.('x-nf-request-id'));
   const key = process.env.CONGRESS_API_KEY;
   const db = getDb();
   const failedSteps = [];
