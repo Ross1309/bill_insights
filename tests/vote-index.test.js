@@ -54,5 +54,6 @@ test('voteKind / voteSummary: final votes, nominations, rules, procedural', asyn
   assert.equal(voteKind('On the Cloture Motion', null), 'cloture');
   const s = voteSummary({ id: 'v', question: 'On Passage', individual_votes: [{}] }, 'Some Act');
   assert.equal(s.bill_title, 'Some Act');
+  assert.equal(voteSummary({ id: 'v', question: 'On Passage' }, 'Some Act', 'The bill does X.').bill_summary, 'The bill does X.');
   assert.equal(s.kind, 'passage');
 });

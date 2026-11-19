@@ -9,7 +9,7 @@
 
 import { escapeHtml as esc, formatVoteDate, officialLabel, PARTY_BADGES, safeHref } from "./util.js";
 import { explainQuestion } from "./issues.js";
-import { voteHeadline, resultWord, partyWords, outcomeOf } from "./plain.js";
+import { voteHeadline, resultWord, partyWords, outcomeOf, isRule } from "./plain.js";
 import { termize } from "./glossary.js";
 
 const SOURCE = { House: "House Clerk record", Senate: "Senate.gov record" };
@@ -18,7 +18,7 @@ export const isKeyVote = v => v.kind === "passage" || v.kind === "nomination";
 
 export function asVote(v) {
   const bill = v.bill !== undefined ? v.bill
-    : v.bill_id ? { id: v.bill_id, label: v.legislation || v.bill_id, title: v.bill_title || null } : null;
+    : v.bill_id ? { id: v.bill_id, label: v.legislation || v.bill_id, title: v.bill_title || null, summary: v.bill_summary || null } : null;
   return {
     id: v.id || v.vote_id, chamber: v.chamber, date: v.date, question: v.question || "", result: v.result || "", title: v.title || null,
     outcome: v.outcome || outcomeOf(v.result), yea: v.yea ?? v.tallies?.yea ?? null, nay: v.nay ?? v.tallies?.nay ?? null,
@@ -45,8 +45,19 @@ export function partyBar(label, c, cls) {
     </div>`;
 }
 
-// yours: optional HTML for the "your members" footer (home page).
-export function voteCardHtml(raw, { yours = "", margin = null } = {}) {
+// What the measure voted on does: the first point of its AI summary, labeled with its source.
+// Not for House rules (they only set the terms of debate; the card says so).
+function billDoesHtml(v) {
+  if (!v.bill || isRule(v)) return "";
+  const what = /^[hs](con|j)?res/i.test(String(v.bill.id || "")) ? "resolution" : "bill";
+  return v.bill.summary
+    ? `<div class="mt-2 border-l-2 border-accent/40 pl-3"><p class="text-sm text-gray-800"><span class="font-semibold text-gray-900">What the ${what} does:</span> ${esc(v.bill.summary)}</p><p class="text-[11px] text-gray-500 mt-0.5">AI summary of the official CRS summary</p></div>`
+    : `<p class="text-xs text-gray-500 mt-2">No plain-language summary here yet.</p>`;
+}
+
+// yours: optional HTML for the "your members" footer (home page). billSummary: false where
+// the bill is already on screen (a bill's own Votes tab).
+export function voteCardHtml(raw, { yours = "", margin = null, billSummary = true } = {}) {
   const v = asVote(raw);
   const ok = v.outcome === "succeeded";
   const label = v.bill ? officialLabel(v.bill.label || v.bill.id) : v.legislation ? officialLabel(v.legislation) : "";
@@ -64,6 +75,7 @@ export function voteCardHtml(raw, { yours = "", margin = null } = {}) {
         ${v.bill ? `<button type="button" data-open="bill" data-id="${esc(v.bill.id)}" class="font-semibold text-accent hover:underline">${esc(label)}</button> · ` : label ? `${esc(label)} · ` : ""}${esc(v.chamber || "")}${v.roll != null ? ` roll call #${esc(String(v.roll))}` : ""} · ${esc(formatVoteDate(v.date))}${margin != null ? ` · <strong class="text-gray-800">margin ${margin}</strong>` : ""}
       </p>
       ${!v.bill && v.document_title ? `<p class="text-sm text-gray-700 mt-1">${esc(v.document_title)}</p>` : ""}
+      ${billSummary ? billDoesHtml(v) : ""}
       <p class="text-sm text-gray-600 mt-1"><span class="text-gray-500">${termize(esc(v.question))}.</span>${meaning ? ` ${esc(meaning)}` : ""}</p>
       <div class="mt-3 space-y-1.5">${partyBar("Democrats", v.parties?.D, PARTY_BADGES.Democratic)}${partyBar("Republicans", v.parties?.R, PARTY_BADGES.Republican)}</div>
       ${independents}

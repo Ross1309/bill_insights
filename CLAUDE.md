@@ -811,6 +811,9 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   Votes tab, week pages and a bill's Votes tab (plain headline from plain.js, result badge,
   official label, question + `explainQuestion`, D/R Yea/Nay bars, member list + official
   record links). It accepts a vote_summaries doc or a digest vote item (`asVote`).
+- **What the bill does** on vote cards: first point of the bill's CRS-based AI summary, labeled
+  with its source (`billSummaryLine`; `vote_summaries.bill_summary`, digest `bill.summary`).
+  sync-bills copies a new summary onto stored cards (`refreshVoteSummaryLines`); not on House rules.
 - `vote_summaries.kind` (`voteKind` in vote-index.js: `rule` for House rules, else
   `voteCategory`) and `bill_title` (read from `bills` when summaries are written).
   **Key votes** = kind passage | nomination; the Votes tab defaults to them (filtered in

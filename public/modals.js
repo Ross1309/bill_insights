@@ -264,7 +264,7 @@ const billModal = {
       if (!e.data.votes) return spinner("Loading votes…");
       if (!e.data.votes.length) return noRollCallHtml(e);
       return `
-        <div class="space-y-3">${e.data.votes.map(v => voteCardHtml(v)).join("")}</div>`;
+        <div class="space-y-3">${e.data.votes.map(v => voteCardHtml(v, { billSummary: false })).join("")}</div>`;
     }],
   ],
 };

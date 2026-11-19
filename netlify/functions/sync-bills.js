@@ -24,6 +24,7 @@ import {
 import { currentCongress, outgoingCongress } from '../lib/congress.js';
 import { writeOverviewStats } from '../lib/overview.js';
 import { writeBillIndex } from '../lib/bill-index.js';
+import { refreshVoteSummaryLines } from '../lib/vote-index.js';
 import { logRunStart, recordRun } from '../lib/health.js';
 import { loadTracked, markTracked } from '../lib/tracked-bills.js';
 import { pool } from '../lib/pool.js';
@@ -182,6 +183,7 @@ export default async request => {
     let updated = 0;
     let summaryErrors = 0;
     let summarized = 0;
+    const summarizedIds = [];
 
     // Issue-tracker enrichment (subjects, stage, topics) and existing docs, all in
     // parallel; only the summary step below runs one at a time (OpenAI budget).
@@ -213,7 +215,7 @@ export default async request => {
         const result = await summaryUpdate(meta, existing.ai_summary || null, keys);
         if (result.status === 'error') summaryErrors++;
         Object.assign(update, result.fields);
-        if (result.generated) summarized++;
+        if (result.generated) { summarized++; summarizedIds.push(refs[i].id); }
       }
       writes.push(refs[i].set(update, { merge: true }));
       updated++;
@@ -284,8 +286,14 @@ export default async request => {
         if (result.status === 'error') { await failed(d); continue; }
         await d.ref.set(result.fields, { merge: true });
         summarized++;
+        summarizedIds.push(d.id);
       }
       if (ready.length) console.log(`backlog: ${ready.length} waiting bills now have a CRS summary; summarized ${summarized}`);
+    }
+
+    // Vote cards already stored show a bill's new summary too.
+    if (summarizedIds.length) {
+      try { await refreshVoteSummaryLines(db, summarizedIds); } catch (err) { console.error('Vote card summaries failed:', err.message); failedSteps.push('vote summaries'); }
     }
 
     // Rebuild Overview + Issues stats so today's stage changes show up today.

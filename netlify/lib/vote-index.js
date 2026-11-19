@@ -12,7 +12,7 @@
 
 import { bulkWriter } from './firebase.js';
 import { voteCategory } from './vote-stats.js';
-import { billName } from '../../public/util.js';
+import { billName, billSummaryLine } from '../../public/util.js';
 
 export const indexDocId = (congress, session, chamber) => `${congress}-${session}-${String(chamber).toLowerCase()}`;
 
@@ -73,23 +73,36 @@ export function voteKind(question, billTitle) {
   return cat;
 }
 
-export function voteSummary(vote, billTitle = null) {
+export function voteSummary(vote, billTitle = null, billSummary = null) {
   const { individual_votes: members, members_applied, updatedAt, id, ...rest } = vote;
-  return { ...rest, bill_title: billTitle, kind: voteKind(vote.question, billTitle), member_count: Array.isArray(members) ? members.length : 0 };
+  return { ...rest, bill_title: billTitle, bill_summary: billSummary, kind: voteKind(vote.question, billTitle), member_count: Array.isArray(members) ? members.length : 0 };
 }
 
-// Bill titles come from the bills collection (one small read per distinct bill).
+// Bill titles and summary lines come from the bills collection (one read per distinct bill).
 export async function writeVoteSummaries(db, votes) {
   const ids = [...new Set(votes.map(v => v.bill_id).filter(Boolean))];
-  const titles = new Map();
+  const titles = new Map(), summaries = new Map();
   for (let i = 0; i < ids.length; i += 300) {
-    const snaps = await db.getAll(...ids.slice(i, i + 300).map(id => db.collection('bills').doc(id)), { fieldMask: ['title', 'short_title'] });
-    snaps.forEach(s => { if (s.exists) titles.set(s.id, billName(s.data())); });
+    const snaps = await db.getAll(...ids.slice(i, i + 300).map(id => db.collection('bills').doc(id)), { fieldMask: ['title', 'short_title', 'ai_summary'] });
+    snaps.forEach(s => { if (s.exists) { titles.set(s.id, billName(s.data())); summaries.set(s.id, billSummaryLine(s.data())); } });
   }
   const writer = bulkWriter(db);
-  for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v, titles.get(v.bill_id) ?? null));
+  for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v, titles.get(v.bill_id) ?? null, summaries.get(v.bill_id) ?? null));
   await writer.close();
   return votes.length;
+}
+
+// A bill just got its AI summary: put its first point on the vote cards already stored.
+export async function refreshVoteSummaryLines(db, billIds) {
+  const writer = bulkWriter(db);
+  for (const id of new Set(billIds)) {
+    const bill = (await db.collection('bills').doc(id).get()).data();
+    const line = billSummaryLine(bill);
+    if (!line) continue;
+    const votes = await db.collection('vote_summaries').where('bill_id', '==', id).select().get();
+    votes.docs.forEach(d => writer.update(d.ref, { bill_summary: line }));
+  }
+  await writer.close();
 }
 
 // Add full vote docs to their index docs. `replace` = start each doc from scratch.

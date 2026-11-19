@@ -181,6 +181,10 @@ export function plainDisapproval(title) {
   return other && !/under chapter 8 of title 5/i.test(other[1]) ? `Disapproving ${other[1]}` : null;
 }
 
+// The first point of a bill's AI summary (written only from the official CRS summary), for
+// vote cards; null without one.
+export const billSummaryLine = b => (b?.ai_summary?.source === "crs_summary" && b.ai_summary.bullet_points?.[0]) || null;
+
 // Congress.gov's "Rep. Arrington, Jodey C. [R-TX-19]" -> "Jodey C. Arrington (R-TX-19)".
 export function sponsorName(s) {
   const m = /^(?:Rep\.|Sen\.|Del\.|Resident Commissioner)?\s*([^,[]+),\s*([^[]+?)\s*\[([^\]]+)\]\s*$/.exec(s?.label || "");
