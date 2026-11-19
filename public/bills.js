@@ -1,6 +1,6 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { billCache, db, getOverviewDoc, loadBillIndex } from "./data.js";
+import { billCache, firestore, getOverviewDoc, loadBillIndex } from "./data.js";
 import { billName, escapeHtml, formatDay, hideCeremonialOn, officialLabel, onHideCeremonial, ordinal, safeHref, setHideCeremonial } from "./util.js";
 import { ceremonialTag, isCeremonial, isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
 import { setChipGroup } from "./members.js";
@@ -88,7 +88,7 @@ async function loadBills({ reset = false } = {}) {
       if (billsCursor) constraints.push(startAfter(billsCursor));
       constraints.push(limit(size));
 
-      const snapshot = await getDocs(query(collection(db, "bills"), ...constraints));
+      const snapshot = await getDocs(query(collection(firestore(), "bills"), ...constraints));
       if (generation !== billsGeneration) return;
 
       const page = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -293,7 +293,7 @@ async function lookupBillNumber() {
   try {
     const constraints = [where("number", "==", parsed.number)];
     if (parsed.type) constraints.push(where("type", "==", parsed.type));
-    const snapshot = await getDocs(query(collection(db, "bills"), ...constraints, limit(20)));
+    const snapshot = await getDocs(query(collection(firestore(), "bills"), ...constraints, limit(20)));
     if (numberLookupTerm !== term) return; // input changed meanwhile
     numberMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     rememberBills(numberMatches);

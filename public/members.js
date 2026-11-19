@@ -1,7 +1,7 @@
 // Legislators tab (directory doc + filters) and the header count cards.
 import { DELEGATE_JURISDICTIONS, STATES } from "./states.js";
 import { collection, doc, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { db, loadParticipation, memberById } from "./data.js";
+import { firestore, loadParticipation, memberById } from "./data.js";
 import { PARTY_BADGES, STATE_NAMES, contactLinks, escapeHtml, isDelegate, loadErrorHtml, ordinal, store } from "./util.js";
 import { activeTab } from "./tabs.js";
 import { currentCongress } from "./congress.js";
@@ -76,7 +76,7 @@ let directoryPromise = null;
 let directoryFallbackRequest = 0;
 
 export function loadDirectory() {
-  directoryPromise ??= getDoc(doc(db, "directory", "members")).then(snap => {
+  directoryPromise ??= getDoc(doc(firestore(), "directory", "members")).then(snap => {
     if (!snap.exists()) throw new Error("Directory has not been built yet.");
     const data = snap.data();
     for (const m of data.members || []) if (!memberById.has(m.id)) memberById.set(m.id, m);
@@ -297,7 +297,7 @@ async function showStateFallback() {
     return;
   }
   try {
-    const snapshot = await getDocs(query(collection(db, "members"),
+    const snapshot = await getDocs(query(collection(firestore(), "members"),
       where("state", "==", memberFilters.state), where("current", "==", true), limit(100)));
     if (request !== directoryFallbackRequest) return;
     const members = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));

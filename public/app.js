@@ -2,7 +2,7 @@
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { renderIssue } from "./issues.js";
 import { renderOverview } from "./overview.js";
-import { db, getBill, getFirestoreDoc, getMember, getMemberVotes, getOverviewDoc, getVote, loadParticipation } from "./data.js";
+import { firestore, getBill, getHome, getFirestoreDoc, getMember, getMemberVotes, getOverviewDoc, getVote, loadParticipation } from "./data.js";
 import { billBaseline, billChange, followButtonHtml, followCount, isFollowing, LIMITS, loadFollows, memberBaseline, memberChange, setFollow, topicBaseline, topicChange } from "./follow.js";
 import { escapeHtml, loadErrorHtml, store } from "./util.js";
 import { activeTab, navBills, navCongress, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
@@ -37,7 +37,7 @@ async function loadIssue(slug) {
   try {
     if (!issueCache.has(slug)) {
       container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>`;
-      const snap = await getDoc(doc(db, "stats", `topic-${slug}`));
+      const snap = await getDoc(doc(firestore(), "stats", `topic-${slug}`));
       if (!snap.exists()) throw new Error("This issue page hasn't been built yet.");
       issueCache.set(slug, snap.data());
     }
@@ -124,12 +124,12 @@ async function loadWeek(monday) {
   const request = ++weekRequest;
   container.innerHTML = `<div class="text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading the week…</p></div>`;
   try {
-    weeksPromise ??= getDoc(doc(db, "stats", "weeks")).then(s => s.data()?.weeks || []).catch(err => { weeksPromise = null; throw err; });
+    weeksPromise ??= getDoc(doc(firestore(), "stats", "weeks")).then(s => s.data()?.weeks || []).catch(err => { weeksPromise = null; throw err; });
     const list = await weeksPromise;
     if (!list.length) throw new Error("The weekly digest hasn't been built yet.");
     const target = monday || list.at(-1).week;
     if (!weekDocs.has(target)) {
-      const snap = await getDoc(doc(db, "stats", `week-${target}`));
+      const snap = await getDoc(doc(firestore(), "stats", `week-${target}`));
       weekDocs.set(target, snap.exists() ? snap.data() : null);
     }
     if (request !== weekRequest) return;
@@ -180,7 +180,7 @@ async function showHome(stats) {
   showFollows(stats);
   const reps = await withContacts(myReps());
   // House floor schedule (stats/floor, one small read), rendered on its own.
-  getFirestoreDoc("stats", "floor").then(floor => { document.getElementById("home-upcoming").innerHTML = upcomingHtml(floor, reps); })
+  getHome().then(home => home.floor).then(floor => { document.getElementById("home-upcoming").innerHTML = upcomingHtml(floor, reps); })
     .catch(err => console.warn("Floor schedule unavailable:", err.message));
   // Missed votes of "your members" (one small doc), only once an address was given.
   const participation = reps?.members?.length && !reps.stale ? await loadParticipation().catch(() => null) : null;
@@ -365,9 +365,8 @@ const STALE_AFTER_MS = 36 * 3600 * 1000;   // syncs run daily; allow one missed-
 
 async function loadHealth() {
   try {
-    const snap = await getDoc(doc(db, "stats", "health"));
-    if (!snap.exists()) return;
-    const h = snap.data();
+    const h = (await getHome()).health;
+    if (!h) return;
     const fmt = iso => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     const votesAt = h.ingest_votes?.last_success;
     const billsAt = h.sync_bills?.last_success;

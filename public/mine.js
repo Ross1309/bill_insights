@@ -4,7 +4,7 @@
 // they sponsored, committees, term, and how to reach them. Never ranks or compares members.
 
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { db, fetchFunction, getMember, getMemberVotes, loadParticipation } from "./data.js";
+import { firestore, fetchFunction, getMember, getMemberVotes, loadParticipation } from "./data.js";
 import { billName, callScriptHtml, contactLinks, escapeHtml as esc, formatDay, officialLabel, PARTY_BADGES, POSITION_BADGES, STATE_NAMES } from "./util.js";
 import { lookupDistrict, memberPhoto, memberRole, myReps, rememberMyReps, repsFor, withContacts } from "./members.js";
 import { missedLong } from "./participation.js";
@@ -40,7 +40,7 @@ const section = (title, body, note = "") => `
 
 async function movedBills(id) {
   const congress = currentCongress().congress;
-  const snap = await getDocs(query(collection(db, "bills"), where("sponsor.bioguideId", "==", id)));
+  const snap = await getDocs(query(collection(firestore(), "bills"), where("sponsor.bioguideId", "==", id)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .filter(b => Number(b.congress) === congress && MOVING_STAGES.includes(b.stage))
     .sort((a, b) => (b.latest_action_date || "").localeCompare(a.latest_action_date || ""));

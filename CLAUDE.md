@@ -145,6 +145,7 @@ netlify/functions/member-profile.js  GET /api/member-profile?id={bioguideId}: Co
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
                                    donation-size buckets, itemized by state (api.data.gov key)
 netlify/functions/find-district.js POST /api/find-district {address}: Census geocoder -> { state, district }
+netlify/functions/home.js          GET /api/home: stats overview/health/floor/participation via admin (CDN 5 min)
 netlify/functions/health.js        GET /api/health: stats/health via admin (CDN 5 min), for check-health.js
 netlify/functions/share.js         /bill/<id>, /member/<id>, /vote/<id>: the page with that item's title + preview tags
 netlify/functions/sitemap.js       /sitemap.xml: every stored bill + current member (CDN 1 day)
@@ -1006,6 +1007,18 @@ Firebase SDK `modulepreload`, plain load errors (`loadErrorHtml`: a failed App C
 as "a blocker or strict privacy setting stopped reCAPTCHA", not "insufficient permissions").
 Known: headless browsers without a debug token fail App Check (Lighthouse sees the error
 page); dots in crowded timeline stretches overlap (each vote is also listed below them).
+
+## Home without Firebase on first load (2026-11-19)
+
+- Home's four docs (stats/overview, health, floor, participation) come from `/api/home`
+  (netlify/functions/home.js: firebase-admin, Timestamps -> ISO, CDN 5 min + stale 1 h).
+  `getHome()` in data.js falls back to reading them from Firestore (the local smoke test has
+  no functions). `getOverviewDoc()` returns a snapshot-like `{ exists(), data() }`.
+- **App Check starts on the first Firestore read** (`firestore()` in data.js, used instead of a
+  shared `db`), so a Home-only visit never loads reCAPTCHA. Use `firestore()` for every query.
+- Measured (phone profile, 4x CPU): Home 4,010 KB -> 1,392 KB uncompressed, no reCAPTCHA.
+  The Firestore SDK (183 KB over the wire) still loads at startup: moving it behind a dynamic
+  import would be the next step.
 
 ## Votes paging (frontend)
 

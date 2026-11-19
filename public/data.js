@@ -23,17 +23,41 @@ const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LeWOB0uAAAAACv-bHJFResrg5gcpAYUJewzSlGx"
 if (["localhost", "127.0.0.1"].includes(location.hostname) && !self.FIREBASE_APPCHECK_DEBUG_TOKEN) {
   self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
-initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_ENTERPRISE_SITE_KEY), isTokenAutoRefreshEnabled: true });
-
-export const db = getFirestore(app);
+// Started on the first Firestore read, not at page load: Home comes from /api/home, so a
+// visit that only reads Home never loads reCAPTCHA (~415 KB of script and ~1.6 s of work
+// on a phone). Firestore waits for App Check's token on its first request either way.
+const db = getFirestore(app);
+let appCheckStarted = false;
+export function firestore() {
+  if (!appCheckStarted) {
+    appCheckStarted = true;
+    initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_ENTERPRISE_SITE_KEY), isTokenAutoRefreshEnabled: true });
+  }
+  return db;
+}
 // Every bill seen this session, by id (used to label votes with bill titles).
 export const billCache = new Map();
 
-// stats/overview, shared by the Overview tab and the header cards (one read per visit).
-let overviewDocPromise = null;
+// Home's docs (stats/overview, health, floor, participation): from /api/home (CDN-cached,
+// no Firebase needed), else straight from Firestore. One request per visit.
+let homePromise = null;
+export function getHome() {
+  homePromise ??= fetch("/api/home")
+    .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    .catch(async () => {
+      const read = id => getDoc(doc(firestore(), "stats", id)).then(s => (s.exists() ? s.data() : null)).catch(() => null);
+      const [overview, health, floor, participation] = await Promise.all(["overview", "health", "floor", "participation"].map(read));
+      if (!overview) throw new Error("The home page data isn't available right now.");
+      return { overview, health, floor, participation };
+    })
+    .catch(err => { homePromise = null; throw err; });
+  return homePromise;
+}
+
+// stats/overview as a snapshot-like object ({ exists(), data() }), for the callers that
+// read it (Home, search, Bills' topic links, follows).
 export function getOverviewDoc() {
-  overviewDocPromise ??= getDoc(doc(db, "stats", "overview")).catch(err => { overviewDocPromise = null; throw err; });
-  return overviewDocPromise;
+  return getHome().then(h => ({ exists: () => Boolean(h.overview), data: () => h.overview }));
 }
 
 // Full vote docs by id (see getVote).
@@ -60,7 +84,7 @@ export function fetchFunction(name, id) {
 }
 
 export async function getFirestoreDoc(collectionName, id) {
-  const snap = await getDoc(doc(db, collectionName, id));
+  const snap = await getDoc(doc(firestore(), collectionName, id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
@@ -101,7 +125,7 @@ const billVotesCache = new Map(), memberVotesCache = new Map();
 export function getVotesForBill(billId) {
   // Summaries are enough for the bill's Votes tab (tallies + party table).
   return memo(billVotesCache, billId, async () => {
-    const snap = await getDocs(query(collection(db, "vote_summaries"), where("bill_id", "==", billId), limit(50)));
+    const snap = await getDocs(query(collection(firestore(), "vote_summaries"), where("bill_id", "==", billId), limit(50)));
     return snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   });
@@ -112,7 +136,9 @@ export const getMemberVotes = id => memo(memberVotesCache, id, () => getFirestor
 // Missed votes per member + chamber medians (stats/participation), one read, cached.
 let participationDoc = null;
 export function loadParticipation() {
-  participationDoc ??= getFirestoreDoc("stats", "participation").catch(err => { participationDoc = null; throw err; });
+  participationDoc ??= getHome().then(h => h.participation || Promise.reject(new Error("missing")))
+    .catch(() => getFirestoreDoc("stats", "participation"))
+    .catch(err => { participationDoc = null; throw err; });
   return participationDoc;
 }
 

@@ -275,7 +275,8 @@ function delegationsChart(s) {
 // --- tooltip (one shared element; hover on desktop, tap on touch)
 
 export function renderOverview(container, stats, { onState } = {}) {
-  const updated = stats.generated_at?.toDate?.();
+  // A Firestore Timestamp, or an ISO string when Home came from /api/home.
+  const updated = stats.generated_at?.toDate?.() || (typeof stats.generated_at === "string" ? new Date(stats.generated_at) : null);
   container.innerHTML = `
     <div class="space-y-6">
       ${activityChart(stats)}

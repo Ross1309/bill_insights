@@ -1,6 +1,6 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { billCache, db } from "./data.js";
+import { billCache, firestore } from "./data.js";
 import { billName, escapeHtml, hideCeremonialOn, loadErrorHtml, officialLabel, onHideCeremonial, ordinal, PARTY_NAMES, partyChip, setHideCeremonial } from "./util.js";
 import { voteCardHtml, isKeyVote } from "./vote-card.js";
 import { billLabel } from "./bills.js";
@@ -41,7 +41,7 @@ async function queryVotes({ chamber = "", cursor = null, size }) {
   constraints.push(limit(useIndex || !chamber ? size : FALLBACK_PAGE_SIZE));
   try {
     // Summaries: the vote without its ~435 member positions (~1 KB vs ~30 KB each).
-    const snap = await getDocs(query(collection(db, "vote_summaries"), ...constraints));
+    const snap = await getDocs(query(collection(firestore(), "vote_summaries"), ...constraints));
     const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     return {
       votes: chamber && !useIndex ? docs.filter(v => v.chamber === chamber) : docs,
