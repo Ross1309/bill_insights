@@ -359,7 +359,7 @@
               <li><strong>Bills, actions, laws, CRS summaries and subjects, members:</strong> the Congress.gov API (Library of Congress).</li>
               <li><strong>House recorded votes:</strong> the Office of the Clerk of the U.S. House, via Congress.gov. <strong>Senate recorded votes:</strong> senate.gov's official vote records.</li>
               <li><strong>Campaign finance:</strong> the Federal Election Commission (OpenFEC). <strong>Congressional districts for an address:</strong> the U.S. Census Bureau geocoder.</li>
-              <li>Two automatic updates run every night (votes and members at 10:00 UTC, bills at 10:30 UTC). The footer shows when each last finished, and a notice appears if one hasn't succeeded in 36 hours. We only show what these sources publish; when a value isn't available, we say so instead of estimating.</li>
+              <li>Three automatic updates run every night: votes, members and the House floor schedule at 10:00 UTC, bills at 10:30 UTC, and the This Congress figures at 11:00 UTC. The footer shows when the first two last finished, and a notice appears if one hasn't succeeded in 36 hours. We only show what these sources publish; when a value isn't available, we say so instead of estimating.</li>
             </ul>
           </section>
 
@@ -383,7 +383,7 @@
             <h3>Plain-language summaries</h3>
             <ul>
               <li>Written by an AI model (OpenAI gpt-4o-mini) <strong>only from the official CRS summary</strong>, and labeled with that source. The model is told to stay neutral and not add anything that isn't in the CRS text.</li>
-              <li>No CRS summary yet means no AI summary: the bill says CRS hasn't published one. We never summarize from a title alone. Waiting bills are re-checked every night in turn (25 a night, bills with new activity first), so a new CRS summary usually appears within days for a bill that's moving, and within about six weeks otherwise.</li>
+              <li>No CRS summary yet means no AI summary: the bill says CRS hasn't published one. We never summarize from a title alone. Waiting bills are re-checked every night in turn (at least 25 a night, bills with new activity first), so a new CRS summary usually appears within days for a bill that's moving, and within about six weeks otherwise.</li>
             </ul>
           </section>
 
@@ -425,7 +425,7 @@
             <ul>
               <li>Counts cover every recorded vote in the member's own chamber this Congress on which the official record lists them, including as Not Voting.</li>
               <li><strong>Committees</strong> (member pages): current committee and subcommittee seats and titles (Chair, Ranking Member …) from the public-domain congress-legislators dataset, updated nightly.</li>
-              <li><strong>Term and election</strong> (member pages): when the current term ends (and the Senate class) from the same dataset. The election date is worked out from it: terms end January 3, and federal elections are held the Tuesday after the first Monday in November of the year before. Once that election has been held we don't say who won; the winner takes office when the term ends. After a term ends, these lines stay hidden until the dataset lists the new term.</li>
+              <li><strong>Term and election</strong> (member pages): when the current term ends (and the Senate class) from the same dataset. The election date is worked out from it: terms end January 3, and federal elections are held the Tuesday after the first Monday in November of the year before. An appointed senator serves until a special election; for them we show that election's date instead. Once that election has been held we don't say who won; the winner takes office when the term ends. After a term ends, these lines stay hidden until the dataset lists the new term.</li>
               <li><strong>Voted on</strong> = Yea, Nay or Present. <strong>Voted with their party's majority</strong> compares their Yea or Nay with their party's majority position on that vote (as above); Independents aren't compared.</li>
               <li><strong>Missed votes</strong> = recorded votes where the official record lists the member as Not Voting, out of the recorded votes held while they served (Present is not a missed vote). Shown on member cards, in the member window and on Home.</li>
               <li><strong>Month by month</strong> (Voting Record): the same counts by the month of each vote (Eastern time): the share of recorded votes missed, and how often their Yea or Nay matched their party's majority (months with fewer than 5 such votes are left out). A member is compared only with themselves.</li>

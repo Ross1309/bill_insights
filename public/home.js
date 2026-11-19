@@ -125,6 +125,7 @@ function repsCard(reps, participation) {
         <div class="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <a href="#my-members" class="font-semibold text-accent hover:underline">What they've done →</a>
           <button type="button" data-home-change class="text-gray-500 hover:text-gray-800 underline">Change address</button>
+          <button type="button" data-forget-reps aria-label="Forget your members saved in this browser" class="text-gray-500 hover:text-gray-800 underline">Forget</button>
         </div>
         <div data-home-change-form class="hidden">${form}</div>`
       : `<p class="text-sm text-gray-600 mt-1">Enter your home address to see your two senators and your representative, and how they voted.</p>${form}`}

@@ -10,7 +10,7 @@ import { renderCongressPage } from "./congress-page.js";
 import { glossaryHtml, setupGlossary } from "./glossary.js";
 import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
-import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, withContacts, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
+import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, forgetMyReps, lookupDistrict, myReps, rememberMyReps, repsFor, withContacts, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
 import { renderWeekPage } from "./week.js";
 import { loadMine, setupMine } from "./mine.js";
@@ -297,6 +297,18 @@ function setupFollow() {
   });
 }
 
+// "Forget" (Home's members card, My members): removes the saved district and members from
+// this browser (cw-reps), then redraws the page it was on.
+function setupForgetReps() {
+  document.addEventListener("click", async ev => {
+    if (!ev.target.closest("[data-forget-reps]")) return;
+    forgetMyReps();
+    if (activeTab() === "mine") return loadMine();
+    const snap = await getOverviewDoc().catch(() => null);
+    if (snap?.exists()) showHome(snap.data());
+  });
+}
+
 function setupHome() {
   const hero = document.getElementById("home-hero");
   hero.addEventListener("submit", async ev => {
@@ -428,6 +440,7 @@ async function init() {
   setupIssues();
   setupHome();
   setupMine();
+  setupForgetReps();
   setupFollow();
   setupSearch();
   setupGlossary();

@@ -130,7 +130,10 @@ export async function loadMine() {
         <h2 class="font-serif text-3xl font-bold text-gray-900">My members · ${esc(reps.code)}</h2>
         <p class="text-gray-600 mt-1 max-w-2xl">${esc(place)}. Each member on their own record, from official votes and Congress.gov. Members aren't compared or ranked.</p>
       </div>
+      <div class="flex gap-2">
+      <button type="button" data-forget-reps aria-label="Forget your members saved in this browser" class="px-3 py-1.5 rounded-lg text-sm font-semibold text-gray-600 border border-gray-300 hover:bg-gray-100">Forget</button>
       <button type="button" data-mine-change class="px-3 py-1.5 rounded-lg text-sm font-semibold text-accent border border-accent/40 hover:bg-accent/10">Change address</button>
+      </div>
     </div>
     <div data-mine-change-form class="hidden">${form("Update")}</div>
     <div class="mt-4 max-w-2xl">${callScriptHtml({ code: reps.code })}</div>

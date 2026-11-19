@@ -87,3 +87,20 @@ test('thisWeek key_votes: final votes and nominations, rules left out; recentLaw
   assert.deepEqual(recent.map(l => l.id), ['b', 'a']);
   assert.equal(recent[1].summary, 'First.');
 });
+
+test('vote items carry the bill summary line and the Ceremonial flag; thisWeek has the closest vote', () => {
+  const bills = new Map([
+    ['hr1-119', { bill_number: 'HR 1', title: 'One Act', ai_summary: { source: 'crs_summary', bullet_points: ['Does one thing.', 'And another.'] } }],
+    ['hr2-119', { bill_number: 'HR 2', type: 'HR', title: 'To designate the facility of the United States Postal Service located at 1 Main Street as the "X Post Office".' }],
+  ]);
+  const w = computeWeeks(votes, laws, bills).get('2026-11-09');
+  const h1 = w.passage.find(x => x.id === 'h1'), h2 = w.passage.find(x => x.id === 'h2');
+  assert.equal(h1.bill.summary, 'Does one thing.');
+  assert.equal(h1.bill.ceremonial, false);
+  assert.equal(h2.bill.ceremonial, true);
+  assert.equal(h2.bill.summary, null);
+  const card = thisWeek(w);
+  assert.equal(card.closest.id, 's1');                     // 51-49: the smallest margin among passage, cloture, nomination, amendment
+  assert.deepEqual([card.closest.yea, card.closest.nay], [51, 49]);
+  assert.equal(card.closest.document_title, 'Jane Doe, of Ohio, to be a Judge');
+});

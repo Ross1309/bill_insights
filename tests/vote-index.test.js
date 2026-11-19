@@ -57,3 +57,11 @@ test('voteKind / voteSummary: final votes, nominations, rules, procedural', asyn
   assert.equal(voteSummary({ id: 'v', question: 'On Passage' }, 'Some Act', 'The bill does X.').bill_summary, 'The bill does X.');
   assert.equal(s.kind, 'passage');
 });
+
+test('voteSummary carries the bill summary line and the Ceremonial flag', async () => {
+  const { voteSummary } = await import('../netlify/lib/vote-index.js');
+  const s = voteSummary({ id: 'v', question: 'On Passage' }, 'X Post Office Act', null, true);
+  assert.equal(s.bill_ceremonial, true);
+  assert.equal(s.bill_summary, null);
+  assert.equal(voteSummary({ id: 'v', question: 'On Passage' }).bill_ceremonial, false);
+});

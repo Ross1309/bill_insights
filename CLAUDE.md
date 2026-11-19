@@ -500,6 +500,14 @@ per-state `members` query and says nationwide search is unavailable.
 stats/health); Bills loads on its tab, the 100 KB directory on Legislators. Nightly runs
 cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting day).
 
+### Review round 4 (2026-11-19): whole app, new angles
+Unused exports (only `forgetMyReps`: nothing let a visitor remove their saved members, so Home and
+My members now have **Forget**), How we count vs the code (every number matched; fixed "two
+nightly updates" -> three, "25 a night" -> at least, appointed senators), dates and the January
+switch in the new features (fine), a live click-through of 23 pages/windows + every member tab
+at 360 px and 1366 px (no errors, nothing too wide), and tests for the digest's closest vote and
+the vote cards' summary line + Ceremonial flag.
+
 ### Review round 3 (2026-11-19): everything since round 2 (31 commits, ~2,450 lines)
 Data reconciled: all 1,616 vote summaries match their bills (title, summary line, ceremonial),
 all votes applied, member_votes monthly = totals, 539/539 members with contact/term/committees.
