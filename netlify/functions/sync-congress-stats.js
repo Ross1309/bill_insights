@@ -10,6 +10,7 @@
 //   3. The stats doc rebuilt from that state + vote_index + laws in `bills`.
 // Everything stops early near the time budget; the next run carries on.
 
+import { acquireRunLock } from '../lib/run-lock.js';
 import { getDb, admin } from '../lib/firebase.js';
 
 const { FieldValue } = admin.firestore;
@@ -28,8 +29,7 @@ const RUN_BUDGET_MS = 25_000;   // Netlify stops functions at 30 s; the final wr
 const LIST_PAGE = 250;   // this Congress's bills only (/bill/{congress}), as many pages as time allows
 const MAX_ACTION_FETCHES = 60;
 
-export default async request => {
-  const started = Date.now();
+async function syncCongressStats(request, started) {
   const timeLeft = () => RUN_BUDGET_MS - (Date.now() - started);
   // A request may use the time left minus a margin for the final writes, at most 8 s, no retries.
   const quick = (url, { maxMs = 8000, ...opts } = {}) => {
@@ -175,5 +175,22 @@ export default async request => {
     console.error('Fatal:', err);
     await recordRun(db, 'congress_stats', { failedSteps: ['run'], scheduled });
     return json({ error: err.message }, 500);
+  }
+};
+
+// Netlify starts another copy of a scheduled function after ~15 s without an answer: copies
+// take turns (run-lock.js), each with the time it has left out of its own 30 s.
+export default async request => {
+  const started = Date.now();
+  const lock = await acquireRunLock(getDb(), 'sync-congress-stats', started + 30_000);
+  if (!lock) {
+    console.log('sync-congress-stats: an earlier copy is still working and this one has too little time left; stopping');
+    return json({ skipped: 'an earlier copy is still working' });
+  }
+  if (lock.waitedMs) console.log(`sync-congress-stats: waited ${Math.round(lock.waitedMs / 1000)} s for the copy before`);
+  try {
+    return await syncCongressStats(request, started);
+  } finally {
+    await lock.release();
   }
 };

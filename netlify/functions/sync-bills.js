@@ -5,6 +5,7 @@
 // official CRS summary. Bills without one are marked crs_summary_available: false;
 // a few of those are re-checked each run so summaries appear once CRS publishes.
 
+import { acquireRunLock } from '../lib/run-lock.js';
 import { getDb, admin } from '../lib/firebase.js';
 import { json } from '../lib/http.js';
 import {
@@ -142,8 +143,7 @@ async function waitingBills(db, n) {
   }
 }
 
-export default async request => {
-  const started = Date.now();
+async function syncBills(request, started) {
   const timeLeft = () => RUN_BUDGET_MS - (Date.now() - started);
   // Netlify's scheduler posts { next_run }. `netlify dev` imitates that locally, hence
   // the NETLIFY_DEV check: only real scheduled runs count as scheduled.
@@ -326,5 +326,22 @@ export default async request => {
     console.error('Fatal sync error:', err);
     try { await recordRun(getDb(), 'sync_bills', { failedSteps: ['run'], scheduled }); } catch { /* no Firestore */ }
     return json({ error: err.message }, 500);
+  }
+};
+
+// Netlify starts another copy of a scheduled function after ~15 s without an answer: copies
+// take turns (run-lock.js), each with the time it has left out of its own 30 s.
+export default async request => {
+  const started = Date.now();
+  const lock = await acquireRunLock(getDb(), 'sync-bills', started + 30_000);
+  if (!lock) {
+    console.log('sync-bills: an earlier copy is still working and this one has too little time left; stopping');
+    return json({ skipped: 'an earlier copy is still working' });
+  }
+  if (lock.waitedMs) console.log(`sync-bills: waited ${Math.round(lock.waitedMs / 1000)} s for the copy before`);
+  try {
+    return await syncBills(request, started);
+  } finally {
+    await lock.release();
   }
 };

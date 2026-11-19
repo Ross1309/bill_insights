@@ -13,7 +13,7 @@
 // expiry, retry timers etc. keep the real clock.
 
 import 'dotenv/config';
-import { DocumentReference, WriteBatch, BulkWriter } from 'firebase-admin/firestore';
+import { DocumentReference, WriteBatch, BulkWriter, Transaction } from 'firebase-admin/firestore';
 
 const arg = name => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : null; };
 const date = arg('date');
@@ -36,6 +36,7 @@ for (const op of ['set', 'update', 'create', 'delete']) {
   DocumentReference.prototype[op] = function (data) { return record(op, this, data); };
   WriteBatch.prototype[op] = function (ref, data) { record(op, ref, data); return this; };
   BulkWriter.prototype[op] = function (ref, data) { return record(op, ref, data); };
+  Transaction.prototype[op] = function (ref, data) { record(op, ref, data); return this; };   // run locks
 }
 WriteBatch.prototype.commit = () => Promise.resolve([]);
 BulkWriter.prototype.close = () => Promise.resolve();

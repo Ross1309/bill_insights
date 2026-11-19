@@ -1,4 +1,5 @@
 import { memberContact } from '../lib/member-contact.js';
+import { acquireRunLock } from '../lib/run-lock.js';
 import { memberTerm } from '../lib/member-term.js';
 import { fetchFloorSchedule } from '../lib/house-floor.js';
 import { fetchMemberCommittees } from '../lib/committees.js';
@@ -35,8 +36,24 @@ const isScheduled = event => {
   try { return Boolean(JSON.parse(event?.body || "{}").next_run); } catch { return false; }
 };
 
-export async function handler(event, context) {
+// Netlify starts another copy of a scheduled function after ~15 s without an answer: copies
+// take turns (run-lock.js), each with the time it has left out of its own 30 s.
+export async function handler(event) {
   const started = Date.now();
+  const lock = await acquireRunLock(db, "ingest-votes", started + 30_000);
+  if (!lock) {
+    console.log("ingest-votes: an earlier copy is still working and this one has too little time left; stopping");
+    return { statusCode: 200, body: JSON.stringify({ skipped: "an earlier copy is still working" }) };
+  }
+  if (lock.waitedMs) console.log(`ingest-votes: waited ${Math.round(lock.waitedMs / 1000)} s for the copy before`);
+  try {
+    return await ingest(event, started);
+  } finally {
+    await lock.release();
+  }
+}
+
+async function ingest(event, started) {
   try {
     console.log("Starting Congressional backend data ingestion...");
     let nextRun = null;

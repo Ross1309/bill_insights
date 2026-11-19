@@ -125,6 +125,7 @@ netlify/lib/overview.js            writeOverviewStats(): rebuild stats/overview 
 netlify/lib/member-votes.js        member_votes docs: per-member totals + latest 50 (applyNewMemberVotes)
 netlify/lib/vote-index.js          vote_index docs: compact fields of every vote (stats + ingest read these)
 netlify/lib/health.js              recordRun(): stats/health, latest run of each scheduled sync
+netlify/lib/run-lock.js            acquireRunLock(): one working copy of a nightly job at a time
 netlify/lib/tracked-bills.js       sync_state/tracked: enriched bill ids + stored laws (markTracked)
 scripts/build-tracked-bills.js     Rebuild sync_state/tracked from `bills` [--write]
 scripts/rehearse.js                Dry run of a nightly job as of any date (writes recorded, not sent)
@@ -414,12 +415,15 @@ per-state `members` query and says nationwide search is unavailable.
   production (nobody can trigger OpenAI/Firestore spend). Run manually with **Run now** on
   the function's page in Netlify; locally `node run-ingest.js` / `netlify dev` + curl.
   Logs: `netlify logs --function ingest-votes --since 24h`.
-- **Repeat invocations (seen 2026-11-18, cause unproven):** `sync-bills` and
-  `sync-congress-stats` ran 3 times in a row on a schedule, `ingest-votes` once. Netlify retries
-  a scheduled function up to 3 times when it treats a run as failed. Each run starts with a `run
-  start` log line (real start time, `next_run`, request id) to settle it. The repeats currently finish work the first
-  run couldn't (sync-bills refreshed 7 of 52, then all 52): don't block them without raising
-  the per-run work.
+- **Repeat invocations (proven 2026-11-19 from the `run start` lines):** Netlify starts another
+  copy of a scheduled function when one hasn't answered within ~15 s, up to 3 copies, and they
+  ran AT THE SAME TIME (sync-congress-stats: copies at +0, +15, +30 s, 24 s each), overwriting each
+  other's progress windows; two sync-bills copies could summarize the same bill. ingest-votes
+  (~8 s) ran once. Fix: `acquireRunLock` (netlify/lib/run-lock.js, `sync_state/locks.<job>`): copies
+  take turns, each working with the time left of its own 30 s, so the repeats still add capacity
+  (sync-bills refreshed 7 of 52, then the rest) without overlapping. The lock expires at its
+  holder's 30 s, so a crash can't block the next copy or night. Verified with two real
+  run-ingest.js copies 3 s apart: the second waited 16 s, then ran. Rehearsals capture lock writes.
 - **Public functions:** `member-profile`, `bill-detail` (rate limit 60/min per visitor; the
   plan allows 2 rules, both used; rate-limited functions need explicit paths, hence
   `/api/...`) and `member-finance` set durable `Netlify-CDN-Cache-Control` (404s 1 h).
