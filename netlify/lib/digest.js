@@ -172,6 +172,9 @@ export function thisWeek(w) {
       document_title: v.document_title, legislation: v.legislation,
     })),
     final_votes: finals.length,
+    // For the plain-English brief on Home.
+    closest: w.closest[0] ? { id: w.closest[0].id, chamber: w.closest[0].chamber, question: w.closest[0].question, result: w.closest[0].result, outcome: w.closest[0].outcome,
+      yea: w.closest[0].yea, nay: w.closest[0].nay, bill: w.closest[0].bill, legislation: w.closest[0].legislation, document_title: w.closest[0].document_title } : null,
   };
 }
 

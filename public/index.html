@@ -69,6 +69,7 @@
       <div>
         <h1 class="font-serif text-3xl sm:text-4xl font-bold text-gray-900">What is Congress doing?</h1>
         <p class="text-gray-600 mt-2 max-w-2xl">This week's key votes, new laws and your own members, in plain language from the official record. Non-partisan; every AI summary is labeled.</p>
+        <div id="home-brief" class="empty:hidden mt-5 max-w-3xl border-l-2 border-accent/50 pl-4"></div>
         <div id="home-hero" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-6">
           <div class="md:col-span-2 lg:col-span-3 text-center py-12"><div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div><p class="text-gray-500">Loading...</p></div>
         </div>
@@ -468,6 +469,13 @@
             <ul>
               <li>Follow a bill, a member or an Issues topic (up to 20 bills, 10 members, 10 topics). What you follow is saved only in this browser; nothing is sent to us, and clearing your browser data removes it.</li>
               <li>Following saves what the item looked like then. Home compares that with today's data: a bill's new stage or latest action, a member's new roll-call votes and how many they missed (with their latest positions), a topic's new laws and measures. "Mark all as seen" saves today's state instead.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>The week in plain English</h3>
+            <ul>
+              <li>Home opens with a few sentences filled in from the week's counts by a fixed template, with no AI. "Passed by recorded vote" leaves out bills passed by voice vote or unanimous consent, and House rules. The closest vote is the smallest Yea-Nay margin among votes on passage, ending debate, nominations and amendments.</li>
             </ul>
           </section>
 

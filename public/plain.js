@@ -136,6 +136,33 @@ export function partyWords(p) {
   return "";
 }
 
+// The week in plain English: sentences filled in from the week's counts (no AI, nothing
+// beyond the numbers). w: { votes: { House, Senate }, passed, failed, laws, confirmed, same,
+// opposed, closest (a vote item or null) }.
+export function weekBrief(w) {
+  const n = (x, one, many = `${one}s`) => `${x} ${x === 1 ? one : many}`;
+  const h = w.votes?.House || 0, s = w.votes?.Senate || 0, total = h + s;
+  const out = [];
+  if (h && s) out.push(`Congress held ${n(total, "recorded vote")}: ${h} in the House and ${s} in the Senate.`);
+  else if (total) out.push(`The ${h ? "House" : "Senate"} held ${n(total, "recorded vote")}; the ${h ? "Senate" : "House"} held none.`);
+  else out.push("Neither chamber held a recorded vote.");
+  const did = [
+    w.passed && `${n(w.passed, "bill or resolution", "bills or resolutions")} passed by recorded vote`,
+    w.failed && `${w.failed} failed`,
+    w.laws && `${n(w.laws, "measure")} became law`,
+    w.confirmed && `the Senate confirmed ${n(w.confirmed, "nominee")}`,
+  ].filter(Boolean);
+  if (did.length) {
+    const list = did.length > 1 ? `${did.slice(0, -1).join(", ")} and ${did.at(-1)}` : did[0];
+    out.push(`${list[0].toUpperCase()}${list.slice(1)}.`);
+  }
+  const sided = (w.same || 0) + (w.opposed || 0);
+  if (sided) out.push(`Most Democrats and most Republicans took opposite sides on ${w.opposed || 0} of the ${n(sided, "vote")} where each party had a majority position.`);
+  const c = w.closest;
+  if (c?.yea != null && c?.nay != null) out.push(`The closest vote: ${voteHeadline(c)}, ${c.yea}–${c.nay}.`);
+  return out;
+}
+
 // How divided a vote was: glossary keys for its tags, by published rules (How we count).
 // Close: the margin is 5% or less of all Yea and Nay votes. Party lines: most of each party
 // on opposite sides, with at least 90% of each party on its side. Broad agreement: most of

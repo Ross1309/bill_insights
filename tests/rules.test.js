@@ -391,3 +391,17 @@ test('voteDivision: close, party lines, broad agreement, mixed', async () => {
   assert.deepEqual(d({ yea: 0, nay: 0 }), []);                                                     // quorum calls
   assert.deepEqual(d({ yea: 60, nay: 5, parties: P(5, 0, 55, 5) }), []);                           // too few Democrats voted to tag
 });
+
+test('weekBrief: sentences only from the counts', async () => {
+  const { weekBrief } = await import('../public/plain.js');
+  const full = weekBrief({ votes: { House: 9, Senate: 6 }, passed: 4, failed: 1, laws: 2, confirmed: 3, same: 5, opposed: 8,
+    closest: { chamber: 'House', question: 'On Passage', outcome: 'succeeded', result: 'Passed', yea: 215, nay: 214, bill: { id: 'hr1-119', label: 'HR 1', title: 'Example Act' } } });
+  assert.deepEqual(full, [
+    'Congress held 15 recorded votes: 9 in the House and 6 in the Senate.',
+    '4 bills or resolutions passed by recorded vote, 1 failed, 2 measures became law and the Senate confirmed 3 nominees.',
+    'Most Democrats and most Republicans took opposite sides on 8 of the 13 votes where each party had a majority position.',
+    'The closest vote: House passed the Example Act, 215–214.',
+  ]);
+  assert.deepEqual(weekBrief({ votes: { House: 1, Senate: 0 }, laws: 1 }), ['The House held 1 recorded vote; the Senate held none.', '1 measure became law.']);
+  assert.deepEqual(weekBrief({ votes: { House: 0, Senate: 0 }, confirmed: 1 }), ['Neither chamber held a recorded vote.', 'The Senate confirmed 1 nominee.']);
+});

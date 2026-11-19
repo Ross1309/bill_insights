@@ -5,7 +5,7 @@
 // Pure rendering: app.js loads the data and wires the address form.
 
 import { contactLinks, escapeHtml as esc, formatDay, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
-import { voteHeadline, partyWords } from "./plain.js";
+import { voteHeadline, partyWords, weekBrief } from "./plain.js";
 import { voteCardHtml } from "./vote-card.js";
 import { weekRange } from "./week.js";
 import { missedShort, WHY_NOTE } from "./participation.js";
@@ -131,6 +131,16 @@ function repsCard(reps, participation) {
     </article>`;
 }
 
+// --- The week in plain English (template sentences from the week's counts) ------------
+export function briefHtml(tw, now = Date.now()) {
+  if (!tw) return "";
+  const open = now < new Date(`${tw.week_end}T23:59:59-05:00`).getTime();
+  const brief = weekBrief({ votes: tw.votes, passed: tw.passed, failed: tw.failed, laws: tw.law_count, confirmed: tw.confirmed, same: tw.same, opposed: tw.opposed, closest: tw.closest });
+  return `
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-pink">${open ? "This week so far" : "The latest week"} in plain English · ${esc(weekRange(tw))}</h2>
+    <p class="text-gray-800 mt-1">${brief.map(esc).join(" ")}</p>`;
+}
+
 // --- Card 2: this week -------------------------------------------------------------
 // The card shows the latest week with votes or laws; in a recess (or around January 3)
 // that's an earlier week, so it isn't called "this week". `monday` is "YYYY-MM-DD".
@@ -199,6 +209,7 @@ function keyVoteCard(v, reps, positions) {
 // --- Page ------------------------------------------------------------------------------
 export function renderHome(stats, { reps = null, positions = null, participation = null } = {}) {
   const tw = stats.this_week;
+  document.getElementById("home-brief").innerHTML = briefHtml(tw);
   document.getElementById("home-hero").innerHTML = repsCard(reps, participation) + weekCard(tw) + issuesCard(stats.topics_summary);
   document.getElementById("home-issues").innerHTML = issuesList(stats.topics_summary);
 

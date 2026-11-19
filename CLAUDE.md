@@ -625,6 +625,8 @@ Plain-language topic pages, built from the approved mockup (`mockups/foreign-aff
 Redesigned 2026-11-12 from the approved mockup (`mockups/home.html`, real data snapshot):
 - Header: logo + **search** (search.js). Tabs: Home, Issues, Bills, Votes, Members. The old
   header count cards are gone (their numbers are in "by the numbers").
+- **The week in plain English** (`weekBrief` in plain.js; Home `#home-brief`): template
+  sentences from the counts, no AI. `this_week.closest` = the week's closest vote.
 - Home order (UI review 2026-11-16): hero cards -> Follow tip / Since you last looked -> Key
   votes -> Coming up in the House -> Issues (phones only, compact list; desktop keeps the third
   hero card) -> Recently became law -> by the numbers. All six tabs fit a 360 px phone.
