@@ -355,3 +355,25 @@ test('summaryContext: long structured CRS summaries keep the overview and every 
   assert.equal(summaryContext('short text'), 'short text');
   assert.equal(summaryContext('y'.repeat(9000)).length, 6000);   // unstructured: the first 6,000
 });
+
+test('nextStep: the rules of the process for the current stage, never a prediction', async () => {
+  const { nextStep } = await import('../public/stage.js');
+  const { currentCongress } = await import('../public/congress.js');
+  const n = currentCongress().congress;
+  const bill = (x = {}) => ({ type: 'HR', chamber: 'House', congress: n, stage: 'committee', ...x });
+  assert.match(nextStep(bill()).text, /committee decides/);
+  assert.match(nextStep(bill()).expires, new RegExp(`January 3, ${1789 + 2 * n}`));
+  assert.match(nextStep(bill({ stage: 'passed_one', passed_house: true })).text, /^The Senate doesn't have to take it up/);
+  assert.match(nextStep(bill({ stage: 'passed_both', passed_house: true, passed_senate: true })).text, /identical text/);
+  assert.match(nextStep(bill({ stage: 'to_president', passed_house: true, passed_senate: true })).text, /10 days/);
+  assert.match(nextStep(bill({ stage: 'law' })).text, /now law/);
+  assert.equal(nextStep(bill({ stage: 'law' })).expires, null);
+  assert.match(nextStep(bill({ stage: 'committee', failed_house: false, vetoed: true, passed_house: true, passed_senate: true })).text, /override/);
+  assert.match(nextStep(bill({ stage: 'passed_one', failed_senate: true, passed_house: true })).text, /Senate could vote on it again/);
+  assert.match(nextStep(bill({ type: 'HRES', stage: 'passed_one', passed_house: true })).text, /applies to its own chamber/);
+  assert.match(nextStep(bill({ type: 'HCONRES', stage: 'passed_both', passed_house: true, passed_senate: true })).text, /doesn't become law/);
+  assert.match(nextStep(bill({ type: 'HJRES', title: 'Proposing an amendment to the Constitution', stage: 'passed_both', passed_house: true, passed_senate: true })).text, /three-fourths/);
+  assert.match(nextStep(bill({ congress: n - 2 })).text, /expired/);
+  assert.match(nextStep(bill({ congress: n - 2, vetoed: true })).text, /veto stands/);
+  assert.equal(nextStep({ type: 'HR' }), null);
+});

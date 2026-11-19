@@ -835,6 +835,9 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   pages in the browser (console warning with Firestore's create link). The service
   account can't create indexes (403), so they're created in the Firebase console.
 - Exact bill-number search ignores the scope.
+- **What happens next** (`nextStep` in stage.js): the process's general rules for the current
+  stage, never a prediction; bills of an ended Congress read as expired (except one awaiting
+  the President during the outgoing Congress's tail).
 
 ## This Congress (#congress) (2026-11-15)
 
