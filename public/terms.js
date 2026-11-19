@@ -18,7 +18,8 @@ export function termFacts(term, today = new Date()) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(term?.end || "");
   if (!m) return null;
   const end = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-  if (today >= end) return null;
+  // Terms end at noon Eastern on January 3 (20th Amendment): 17:00 UTC in winter.
+  if (today >= new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 17))) return null;
   const vote = electionDay(+m[1] - 1);
   return { termEnds: day(end), election: day(vote), held: today >= vote, class: term.class ?? null };
 }

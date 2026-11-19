@@ -416,7 +416,7 @@ per-state `members` query and says nationwide search is unavailable.
 - **Repeat invocations (seen 2026-11-18, cause unproven):** `sync-bills` and
   `sync-congress-stats` ran 3 times in a row on a schedule, `ingest-votes` once. Netlify retries
   a scheduled function up to 3 times when it treats a run as failed. Each run starts with a `run
-  start` log line (same `next_run` = same schedule). The repeats currently finish work the first
+  start` log line (real start time, `next_run`, request id) to settle it. The repeats currently finish work the first
   run couldn't (sync-bills refreshed 7 of 52, then all 52): don't block them without raising
   the per-run work.
 - **Public functions:** `member-profile`, `bill-detail` (rate limit 60/min per visitor; the

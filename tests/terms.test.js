@@ -18,6 +18,9 @@ test('termFacts: upcoming vs already held, never who won', () => {
   assert.equal(termFacts(null, now), null);
   // After January 3 the dataset may still list the old term: show nothing rather than a past date.
   assert.equal(termFacts({ end: '2027-01-03' }, new Date('2027-01-04T15:00:00Z')), null);
+  // The term runs until noon Eastern on January 3.
+  assert.ok(termFacts({ end: '2027-01-03' }, new Date('2027-01-03T16:59:00Z')));
+  assert.equal(termFacts({ end: '2027-01-03' }, new Date('2027-01-03T17:00:00Z')), null);
   assert.equal(termFacts({ end: '2027-01-03' }, new Date('2027-01-02T15:00:00Z')).held, true);
   assert.deepEqual(memberTerm({ type: 'sen', start: '2023-01-03', end: '2029-01-03', class: 3 }), { start: '2023-01-03', end: '2029-01-03', class: 3 });
   assert.equal(memberTerm({}), null);
