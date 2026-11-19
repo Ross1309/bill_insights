@@ -97,7 +97,7 @@ export function voteCardHtml(raw, { yours = "", margin = null, billSummary = tru
       ${compact ? `
       ${tieLine(v)}
       ${divisionTags(v)}
-      <details class="mt-2">
+      <details class="mt-2" data-vote="${esc(v.id)}">
         <summary class="cursor-pointer py-1 text-xs font-semibold text-accent">Details: how each party voted</summary>
         ${question}${bars}${words}${links}
       </details>` : `

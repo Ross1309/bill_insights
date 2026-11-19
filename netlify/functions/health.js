@@ -6,7 +6,8 @@
 import { getDb } from '../lib/firebase.js';
 import { json } from '../lib/http.js';
 
-const CACHE = { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=300', 'Cache-Control': 'public, max-age=60' };
+// Query strings are left out of the cache key, so ?x=1 variants can't force fresh reads.
+const CACHE = { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=300', 'Cache-Control': 'public, max-age=60', 'Netlify-Vary': 'query=cw-no-param' };
 
 export default async () => {
   try {

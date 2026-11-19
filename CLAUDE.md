@@ -507,6 +507,11 @@ Fixed: run lock fails open on a Firestore error and needs per-job working time; 
 5 s limit covers only the server's first answer (not a slow download); My members caches its
 bill query; appointed senators (Husted, Moody: terms ending at the Nov 3 special election) no
 longer get an election date a year early; a misplaced comment in bills.js.
+Second pass (whole app): every template value from outside data is escaped (scanned all 314
+interpolations); functions validate ids/addresses; rules cover exactly what the page reads;
+nightly steps re-run safely. Fixed: Home's second draw (members' positions arriving) redrew the
+whole page, closing opened key-vote Details and wiping a half-typed address (now `keyVotesOnly`,
+opened Details kept); /api/health ignores query strings like /api/home.
 
 ### Review round 2 (2026-11-16): a fresh reviewer on the round-1 diff + the product review
 - sync-congress-stats window redesigned again: lists `/bill/{congress}` (this Congress only),

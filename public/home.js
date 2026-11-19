@@ -207,18 +207,26 @@ function keyVoteCard(v, reps, positions) {
 }
 
 // --- Page ------------------------------------------------------------------------------
-export function renderHome(stats, { reps = null, positions = null, participation = null } = {}) {
+// keyVotesOnly: only the key votes change (your members' positions arrived), so the rest of
+// the page isn't redrawn: an address being typed or a section someone opened stays as it is.
+export function renderHome(stats, { reps = null, positions = null, participation = null, keyVotesOnly = false } = {}) {
   const tw = stats.this_week;
-  document.getElementById("home-brief").innerHTML = briefHtml(tw);
-  document.getElementById("home-hero").innerHTML = repsCard(reps, participation) + weekCard(tw) + issuesCard(stats.topics_summary);
-  document.getElementById("home-issues").innerHTML = issuesList(stats.topics_summary);
+  if (!keyVotesOnly) {
+    document.getElementById("home-brief").innerHTML = briefHtml(tw);
+    document.getElementById("home-hero").innerHTML = repsCard(reps, participation) + weekCard(tw) + issuesCard(stats.topics_summary);
+    document.getElementById("home-issues").innerHTML = issuesList(stats.topics_summary);
+  }
 
+  // Key vote "Details" someone already opened stay open across the redraw.
+  const opened = new Set([...document.querySelectorAll("#home-keyvotes details[open][data-vote]")].map(d => d.dataset.vote));
   const key = tw?.key_votes || [];
   const others = tw ? tw.votes.House + tw.votes.Senate - key.length : 0;
   document.getElementById("home-keyvotes").innerHTML = key.length ? `
     ${sectionHead(`Key votes${tw ? ` · ${esc(weekRange(tw))}` : ""}`, `#week/${esc(tw.week)}`, "All votes that week",
       `The latest final votes on bills and nominations.${others > 0 ? ` ${others} other recorded votes that week (procedural steps, amendments, rules) are on the week page.` : ""}`)}
     <div class="grid gap-4 md:grid-cols-2 mt-4">${key.map(v => keyVoteCard(v, reps, positions)).join("")}</div>` : "";
+  document.querySelectorAll("#home-keyvotes details[data-vote]").forEach(d => { if (opened.has(d.dataset.vote)) d.open = true; });
+  if (keyVotesOnly) return;
 
   const laws = stats.recent_laws || [];
   document.getElementById("home-laws").innerHTML = laws.length ? `

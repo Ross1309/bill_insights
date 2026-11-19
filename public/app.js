@@ -195,7 +195,7 @@ async function showHome(stats) {
     positions.set(kv.id, vote.individual_votes.filter(iv => mine.has(iv.bioguideId))
       .map(iv => ({ id: iv.bioguideId, name: mine.get(iv.bioguideId).name, position: iv.position || "Not recorded" })));
   }));
-  if (request === positionsRequest) renderHome(stats, { reps, positions, participation });
+  if (request === positionsRequest) renderHome(stats, { reps, positions, participation, keyVotesOnly: true });
 }
 
 // The home page's address form (find your members) and "Change address".
