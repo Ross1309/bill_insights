@@ -149,7 +149,7 @@ export function weekBrief(w) {
   const did = [
     w.passed && `${n(w.passed, "bill or resolution", "bills or resolutions")} passed by recorded vote`,
     w.failed && `${w.failed} failed`,
-    w.laws && `${n(w.laws, "measure")} became law`,
+    w.laws && `${n(w.laws, "bill or resolution", "bills or resolutions")} became law`,
     w.confirmed && `the Senate confirmed ${n(w.confirmed, "nominee")}`,
   ].filter(Boolean);
   if (did.length) {

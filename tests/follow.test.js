@@ -29,18 +29,18 @@ test('member: counts new votes and misses since the baseline', () => {
     { id: '119-1-house-vote-3', date: '2025-06-01T15:00:00Z', chamber: 'House', question: 'On Passage', result: 'Passed', position: 'Yea' },
   ]);
   const c = memberChange(base, later);
-  assert.equal(c.what, '2 new roll-call votes, 1 missed');
+  assert.equal(c.what, '2 new recorded votes, 1 missed');
   assert.deepEqual(c.votes.map(v => v.id), ['119-1-house-vote-5', '119-1-house-vote-4']);
   assert.ok(c.votes.every(v => typeof v.headline === 'string' && v.headline));
 });
 
 test('member: a new Congress counts every vote as new', () => {
   const base = memberBaseline(null, rec(700, 10));
-  assert.equal(memberChange(base, rec(5, 0, [], 120)).what, '5 new roll-call votes');
+  assert.equal(memberChange(base, rec(5, 0, [], 120)).what, '5 new recorded votes');
 });
 
 test('topic: new laws and measures only when they grew', () => {
   const base = topicBaseline({ label: 'Economy', law: 10, measures: 40 });
   assert.equal(topicChange(base, { law: 10, measures: 40 }), null);
-  assert.equal(topicChange(base, { law: 11, measures: 42 }).what, '1 new law, 2 more measures voted on or enacted');
+  assert.equal(topicChange(base, { law: 11, measures: 42 }).what, '1 new law, 2 more bills or resolutions voted on or enacted');
 });

@@ -97,9 +97,11 @@ try {
 
   // Home: three ways in, key votes in plain language, recent laws, numbers.
   await waitText('#home-hero', /Who represents me\?[\s\S]*(This|Latest) week in Congress[\s\S]*Issues/i, 'Home: the three starting cards');
-  await waitText('#home-keyvotes', /Key votes[\s\S]*(Yea|Nay)/, 'Home: key votes with party Yea/Nay');
+  await waitText('#home-keyvotes', /Key votes[\s\S]*Details: how each party voted/, 'Home: short key vote cards');
+  await page.click('#home-keyvotes details summary');
+  await waitText('#home-keyvotes', /Democrats[\s\S]*\d+ Yea · \d+ Nay/, 'Home: a key vote opens to the party split');
   await waitText('#home-laws', /Recently became law[\s\S]*Signed/, 'Home: recent laws');
-  await waitText('#home-numbers', /by the numbers[\s\S]*roll-call votes/, 'Home: by the numbers');
+  await waitText('#home-numbers', /by the numbers[\s\S]*recorded votes/, 'Home: by the numbers');
   await waitText('footer', /Data last updated/, 'Footer shows data freshness');
   await page.click('#home-numbers a[href="#congress"]');
   await waitText('#congress-container', /Congress (so far|in full)[\s\S]*From bill to law/, 'This Congress page renders');
@@ -119,7 +121,7 @@ try {
 
   // Weekly digest: from the home card to the full week page, and stepping back a week.
   await page.click('#home-hero a[href^="#week/"]');
-  await waitText('#week-container', /What Congress did[\s\S]*roll-call votes/, 'Week page opens from the card');
+  await waitText('#week-container', /What Congress did[\s\S]*recorded votes/, 'Week page opens from the card');
   const firstWeek = await page.evaluate(() => location.hash);
   const earlier = await page.$('#week-container a[href^="#week/"]');
   if (earlier) {
@@ -171,7 +173,7 @@ try {
   await waitText('#votes-container', /(passed|adopted|confirmed|rejected|failed)[\s\S]*roll call/i, 'Votes tab: key votes with plain headlines');
   check(await page.$eval('#view-votes [data-scope="key"]', el => el.getAttribute('aria-pressed') === 'true' || el.classList.contains('active') || /bg-cta/.test(el.className)), 'Key votes is the default');
   await page.click('#view-votes [data-scope="all"]');
-  await waitText('#vote-scope-note', /Every roll call/, 'All roll calls filter');
+  await waitText('#vote-scope-note', /Every recorded vote/, 'All recorded votes filter');
   // Tap-to-explain: an official term opens its plain explanation; Escape closes it.
   const term = page.locator('#votes-container [data-term]').first();
   await term.waitFor({ timeout: 20000 }).catch(() => {});
@@ -227,7 +229,7 @@ try {
   }
   await openDetail('member', MEMBER);
   await waitText('#modal-root', /Jayapal/, 'Member detail opens');
-  await waitText('#modal-root', /Votes this Congress[\s\S]*Missed \d+ of \d+ roll-call votes[\s\S]*Typical House member/, 'Member window shows missed votes with context');
+  await waitText('#modal-root', /Votes this Congress[\s\S]*Missed \d+ of \d+ recorded votes[\s\S]*Typical House member/, 'Member window shows missed votes with context');
   await modalTab('Voting Record');
   await waitText('#modal-root', /In the \d+(st|nd|rd|th) Congress, voted on \d+ of \d+/, 'Member Voting Record renders');
   await waitText('#modal-root', /Month by month[\s\S]*Votes missed[\s\S]*Voted with their party/, 'Member Voting Record: month by month');
@@ -265,17 +267,23 @@ try {
     await waitText('#modal-root', /Yea|Nay|Aye|No/, 'Vote detail opens');
     await closeModal();
   }
+  await page.click('#nav-bills');
+  await page.check('#bills-hide-ceremonial');
+  await waitText('#bills-container', /Latest action/, 'Bills tab still lists bills with ceremonial ones hidden');
+  check(!(await page.$('#bills-container [data-term="ceremonial"]')), 'Hide ceremonial removes them from the list');
+  await page.uncheck('#bills-hide-ceremonial');
+  await waitText('#bills-container', /Latest action/, 'Bills tab lists bills again');
   await page.click('footer a[href="#methodology"]');
   await waitText('#view-methodology', /How we count[\s\S]*Party agreement[\s\S]*Campaign finance/, 'Footer link opens How we count');
   await page.click('footer a[href="#how-laws-are-made"]');
-  await waitText('#view-process', /How a bill becomes law[\s\S]*Committee[\s\S]*The President[\s\S]*Not every measure is a bill/, 'Footer link opens How a bill becomes law');
+  await waitText('#view-process', /How a bill becomes law[\s\S]*Committee[\s\S]*The President[\s\S]*Not everything Congress votes on is a bill/, 'Footer link opens How a bill becomes law');
 
   if (LIVE) {
     // A law passed without roll calls: the Votes tab says how it passed (not "not synced").
     await page.goto(`${url}?v=1#bill/hr2481-119`, { waitUntil: 'domcontentloaded' });
     await waitText('#modal-root', /H\.?R\.? ?2481/, 'Bill passed by voice vote opens');
     await modalTab('Votes');
-    await waitText('#modal-root', /No recorded \(roll-call\) vote[\s\S]*voice vote[\s\S]*Unanimous Consent/, 'Votes tab explains a voice-vote / unanimous-consent law');
+    await waitText('#modal-root', /No recorded vote[\s\S]*voice vote[\s\S]*Unanimous Consent/, 'Votes tab explains a voice-vote / unanimous-consent law');
     await closeModal();
   }
 

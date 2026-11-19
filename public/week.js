@@ -74,8 +74,8 @@ export function renderWeekPage(el, w, list) {
       </div>
 
       <p class="text-base sm:text-lg text-gray-800 max-w-3xl">
-        The House held <strong>${c.votes.House}</strong> and the Senate <strong>${c.votes.Senate}</strong> roll-call votes.
-        ${c.passed || c.failed ? `<strong>${c.passed}</strong> ${c.passed === 1 ? "bill or resolution" : "bills and resolutions"} passed a chamber by roll call${c.failed ? ` and <strong>${c.failed}</strong> failed` : ""}.` : ""}
+        The House held <strong>${c.votes.House}</strong> and the Senate <strong>${c.votes.Senate}</strong> recorded votes.
+        ${c.passed || c.failed ? `<strong>${c.passed}</strong> ${c.passed === 1 ? "bill or resolution" : "bills and resolutions"} passed a chamber by recorded vote${c.failed ? ` and <strong>${c.failed}</strong> failed` : ""}.` : ""}
         ${c.laws ? `<strong>${plural(c.laws, "law")}</strong> ${c.laws === 1 ? "was" : "were"} signed.` : "No new laws were signed."}
         ${c.rules ? `The House also voted on ${plural(c.rules, "rule")} setting the terms of debate.` : ""}
         ${c.nominations ? `The Senate confirmed <strong>${c.confirmed}</strong> of ${plural(c.nominations, "nominee")} it voted on.` : ""}
@@ -83,8 +83,8 @@ export function renderWeekPage(el, w, list) {
       </p>
 
       ${section("Became law", "Bills signed into law this week (Public Law date).", w.laws.length ? `<div class="grid gap-3 md:grid-cols-2">${lawCards}</div>` : empty("No bills became law this week."))}
-      ${section("Passed by roll call", "Passage votes that succeeded, in order. Bills passed by voice vote or unanimous consent have no roll call; they appear here when they become law.",
-        passed.length ? voteGrid(passed) : empty("No bills or resolutions passed a chamber by roll call this week."))}
+      ${section("Passed by recorded vote", "Passage votes that succeeded, in order. Bills passed by voice vote or unanimous consent have no recorded vote; they appear here when they become law.",
+        passed.length ? voteGrid(passed) : empty("No bills or resolutions passed a chamber by recorded vote this week."))}
       ${failed.length ? section("Failed", "Passage votes that failed.", voteGrid(failed)) : ""}
       ${(w.rules || []).length ? section("Debate rules", "House resolutions that only set the terms of debate for another bill (a procedural step, not counted as passed above).",
         `<ul class="divide-y divide-gray-200 text-sm">${w.rules.map(ruleRow).join("")}</ul>`) : ""}
@@ -93,6 +93,6 @@ export function renderWeekPage(el, w, list) {
       ${c.nominations ? section("Nominations", "Senate votes on nominations (nominee as named in the vote record).",
         voteGrid(w.nominations)) : ""}
 
-      <p class="text-xs text-gray-500 border-t border-gray-200 pt-4">Weeks run Monday to Sunday, Eastern time. Built from roll-call votes (House Clerk, senate.gov) and Congress.gov bill records. Party numbers are Yea–Nay. <a href="#methodology" class="text-accent hover:underline">How we count</a></p>
+      <p class="text-xs text-gray-500 border-t border-gray-200 pt-4">Weeks run Monday to Sunday, Eastern time. Built from recorded votes (House Clerk, senate.gov) and Congress.gov bill records. Party numbers are Yea–Nay. <a href="#methodology" class="text-accent hover:underline">How we count</a></p>
     </div>`;
 }

@@ -153,12 +153,12 @@ function weekCard(tw) {
   return `
     <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col" aria-labelledby="home-week-title">
       <h2 id="home-week-title" class="text-xs font-semibold uppercase tracking-wide text-pink">${isThisWeek(tw.week) ? "This week" : "Latest week"} in Congress · ${esc(weekRange(tw))}</h2>
-      <div class="grid grid-cols-3 gap-2 mt-3">${stat(tw.votes.House + tw.votes.Senate, "roll-call votes")}${stat(tw.passed, "passed by roll call")}${stat(tw.law_count, "became law")}</div>
+      <div class="grid grid-cols-3 gap-2 mt-3">${stat(tw.votes.House + tw.votes.Senate, "recorded votes")}${stat(tw.passed, "passed by recorded vote")}${stat(tw.law_count, "became law")}</div>
       ${items.length ? `<ul class="mt-4 space-y-2.5 text-sm">${items.map(v => `
         <li><span class="text-gray-900">${esc(voteHeadline(v))}</span>
           <span class="block text-xs text-gray-500">${billChip(v.bill)} · ${v.yea}–${v.nay}${v.parties ? ` · ${esc(partyWords(v.parties))}` : ""}</span></li>`).join("")}</ul>
       ${tw.passed > items.length ? `<p class="text-xs text-gray-500 mt-2">The latest ${items.length} of ${tw.passed}; all of them are on the week page.</p>` : ""}`
-        : `<p class="text-sm text-gray-500 mt-4">No bills passed by roll call this week.</p>`}
+        : `<p class="text-sm text-gray-500 mt-4">No bills passed by recorded vote this week.</p>`}
       <a href="#week/${esc(tw.week)}" class="mt-auto pt-4 text-sm font-semibold text-accent hover:underline">The full week →</a>
     </article>`;
 }
@@ -173,7 +173,7 @@ function issuesCard(topics) {
       <p class="text-sm text-gray-600 mt-1">What this Congress has done, topic by topic.</p>
       <div class="mt-3 space-y-2.5">${(topics || []).map(t => `
         <a href="#issues/${esc(t.slug)}" class="block rounded-xl border border-gray-200 bg-gray-50/40 px-3.5 py-3 hover:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent">
-          <span class="flex items-baseline justify-between gap-2"><span class="font-serif text-lg font-bold text-gray-900">${esc(t.label)}</span><span class="text-xs text-gray-500">${num(t.law)} laws · ${num(t.measures)} measures voted on</span></span>
+          <span class="flex items-baseline justify-between gap-2"><span class="font-serif text-lg font-bold text-gray-900">${esc(t.label)}</span><span class="text-xs text-gray-500">${num(t.law)} laws · ${num(t.measures)} bills and resolutions</span></span>
           ${t.watchlists?.length ? `<span class="block text-xs text-gray-500 mt-1">${t.watchlists.map(esc).join(" · ")}</span>` : ""}
         </a>`).join("")}</div>
     </article>`;
@@ -186,7 +186,7 @@ function issuesList(topics) {
     <ul class="mt-3 bg-surface border border-gray-200 rounded-2xl divide-y divide-gray-200">${topics.map(t => `
       <li><a href="#issues/${esc(t.slug)}" class="flex items-baseline justify-between gap-3 px-4 py-3 hover:bg-gray-100/40 focus:outline-none focus:ring-2 focus:ring-accent rounded-2xl">
         <span class="font-serif text-base font-bold text-gray-900">${esc(t.label)}</span>
-        <span class="text-xs text-gray-500 text-right">${num(t.law)} laws · ${num(t.measures)} voted on</span>
+        <span class="text-xs text-gray-500 text-right">${num(t.law)} laws · ${num(t.measures)} bills and resolutions</span>
       </a></li>`).join("")}</ul>`;
 }
 
@@ -203,7 +203,7 @@ function keyVoteCard(v, reps, positions) {
         <div class="flex flex-wrap gap-1.5">${mine?.length ? mine.map(m => `<button type="button" data-open="member" data-id="${esc(m.id)}" class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200 hover:border-accent/60"><span class="text-gray-800">${esc(String(m.name || "").split(",")[0])}</span><span class="font-bold px-1 rounded ${posBadge(m.position)}">${esc(m.position)}</span></button>`).join("")
           : `<span class="text-xs text-gray-500">${!positions ? "Loading…" : !known || mine === null ? "How your members voted isn't available right now." : "None of your members were recorded on this vote."}</span>`}</div></div>`
     : `<p class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">Enter your address above to see how your members voted.</p>`;
-  return voteCardHtml(v, { yours });
+  return voteCardHtml(v, { yours, compact: true });
 }
 
 // --- Page ------------------------------------------------------------------------------
@@ -217,7 +217,7 @@ export function renderHome(stats, { reps = null, positions = null, participation
   const others = tw ? tw.votes.House + tw.votes.Senate - key.length : 0;
   document.getElementById("home-keyvotes").innerHTML = key.length ? `
     ${sectionHead(`Key votes${tw ? ` · ${esc(weekRange(tw))}` : ""}`, `#week/${esc(tw.week)}`, "All votes that week",
-      `The latest final votes on bills and nominations.${others > 0 ? ` ${others} other roll calls that week (procedural steps, amendments, rules) are on the week page.` : ""}`)}
+      `The latest final votes on bills and nominations.${others > 0 ? ` ${others} other recorded votes that week (procedural steps, amendments, rules) are on the week page.` : ""}`)}
     <div class="grid gap-4 md:grid-cols-2 mt-4">${key.map(v => keyVoteCard(v, reps, positions)).join("")}</div>` : "";
 
   const laws = stats.recent_laws || [];
@@ -239,9 +239,9 @@ export function renderHome(stats, { reps = null, positions = null, participation
   document.getElementById("home-numbers").innerHTML = `
     ${sectionHead(`The ${stats.congress ? esc(ordinal(stats.congress)) : ""} Congress by the numbers`, "#congress", "Compared with past Congresses")}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-      ${tile(num((totals.House || 0) + (totals.Senate || 0)), "roll-call votes", `House ${num(totals.House)} · Senate ${num(totals.Senate)}`)}
+      ${tile(num((totals.House || 0) + (totals.Senate || 0)), "recorded votes", `House ${num(totals.House)} · Senate ${num(totals.Senate)}`)}
       ${stats.laws_total != null ? tile(num(stats.laws_total), "bills became law", "this Congress") : ""}
       ${h != null ? tile(`${h}%`, "of House votes split by party", "most Democrats and most Republicans voted opposite ways") : ""}
-      ${s != null ? tile(`${s}%`, "of Senate votes split by party", "same measure; many Senate votes are on nominations") : ""}
+      ${s != null ? tile(`${s}%`, "of Senate votes split by party", "counted the same way; many Senate votes are on nominations") : ""}
     </div>`;
 }

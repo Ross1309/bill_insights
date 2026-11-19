@@ -398,10 +398,40 @@ test('weekBrief: sentences only from the counts', async () => {
     closest: { chamber: 'House', question: 'On Passage', outcome: 'succeeded', result: 'Passed', yea: 215, nay: 214, bill: { id: 'hr1-119', label: 'HR 1', title: 'Example Act' } } });
   assert.deepEqual(full, [
     'Congress held 15 recorded votes: 9 in the House and 6 in the Senate.',
-    '4 bills or resolutions passed by recorded vote, 1 failed, 2 measures became law and the Senate confirmed 3 nominees.',
+    '4 bills or resolutions passed by recorded vote, 1 failed, 2 bills or resolutions became law and the Senate confirmed 3 nominees.',
     'Most Democrats and most Republicans took opposite sides on 8 of the 13 votes where each party had a majority position.',
     'The closest vote: House passed the Example Act, 215–214.',
   ]);
-  assert.deepEqual(weekBrief({ votes: { House: 1, Senate: 0 }, laws: 1 }), ['The House held 1 recorded vote; the Senate held none.', '1 measure became law.']);
+  assert.deepEqual(weekBrief({ votes: { House: 1, Senate: 0 }, laws: 1 }), ['The House held 1 recorded vote; the Senate held none.', '1 bill or resolution became law.']);
   assert.deepEqual(weekBrief({ votes: { House: 0, Senate: 0 }, confirmed: 1 }), ['Neither chamber held a recorded vote.', 'The Senate confirmed 1 nominee.']);
+});
+
+test('isCeremonial: naming, medals and coins, marked days; never political statements', async () => {
+  const { isCeremonial: c } = await import('../public/stage.js');
+  const yes = [
+    { type: 'HR', title: 'To designate the facility of the United States Postal Service located at 86 Main Street in Haverstraw, New York, as the "Sgt. X Post Office".' },
+    { type: 'HR', title: "To name the Department of Veterans Affairs community-based outpatient clinic in Toms River, New Jersey, the Leonard G. Harbor Clinic." },
+    { type: 'S', title: 'A bill to designate the facility of the United States Postal Service located at 50 East 100 North in Moab, Utah.' },
+    { type: 'HR', title: 'To designate the community-based outpatient clinic of the Department of Veterans Affairs in Lafayette, Louisiana.' },
+    { type: 'HR', title: 'Miracle on Ice Congressional Gold Medal Act' },
+    { type: 'HR', title: '25th Anniversary of 9/11 Commemorative Coin Act' },
+    { type: 'HR', title: 'To award a medal', short_title: 'Muhammad Ali Congressional Gold Medal Act' },
+    { type: 'HRES', title: 'Expressing support for the designation of October 2026 as "National Dyslexia Awareness Month".' },
+    { type: 'SRES', title: 'A resolution designating October 2025 as "National Country Music Month".' },
+    { type: 'HRES', title: 'Supporting the goals and ideals of "National Veterans Small Business Week".' },
+    { type: 'HR', title: 'A Post Office Act', subjects: ['Postal service', 'Congressional tributes'] },
+  ];
+  const no = [
+    { type: 'HR', title: 'To designate Ukraine under section 244 of the Immigration and Nationality Act to provide certain nationals of Ukraine with status.' },
+    { type: 'HR', title: 'To require the United States Postal Service to designate ZIP Codes for certain communities.' },
+    { type: 'HR', title: 'To designate the area between the intersections of 16th Street Northwest and Fuller Street Northwest.' },
+    { type: 'HRES', title: 'Honoring the life and legacy of a human rights activist.' },
+    { type: 'HRES', title: 'Recognizing the significance of equal pay and the disparity between wages paid to men and women.' },
+    { type: 'HRES', title: 'Expressing support for the designation of a group as a foreign terrorist organization.' },
+    { type: 'HRES', title: 'Condemning the attack on Veterans Day.' },
+    { type: 'HR', title: 'National STEM Week Act' },
+    { type: 'HR', title: 'Postal Service Reform Act', subjects: ['Postal service'] },
+  ];
+  for (const b of yes) assert.equal(c(b), true, b.title);
+  for (const b of no) assert.equal(c(b), false, b.title);
 });

@@ -823,6 +823,14 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - **How divided** tags (`voteDivision` in plain.js, `divisionTags` in vote-card.js, rules in the
   glossary and How we count): close vote (margin <= 5%), party lines (90% of each party on
   opposite sides), broad agreement (two-thirds of each on the same side), mixed support.
+- **Short cards on Home** (`compact`): headline, what it does, tags and your members; party bars,
+  procedure and record links fold behind "Details".
+- **Everyday words (2026-11-19):** visitors read "recorded votes" and "bills and resolutions", not
+  "roll-call votes" and "measures". Official labels ("House roll call #323") and the glossary keep the term.
+- **Ceremonial** (`isCeremonial` in stage.js; `vote_summaries.bill_ceremonial`, digest `bill.ceremonial`):
+  naming post offices, VA facilities, courthouses and federal buildings; Gold Medals and commemorative
+  coins; resolutions marking a day, week or month. Deliberately narrow: "recognizing" and "honoring"
+  resolutions aren't tagged. Bills and Votes tabs can hide them (`cw-hide-ceremonial`, off by default).
 - `vote_summaries.kind` (`voteKind` in vote-index.js: `rule` for House rules, else
   `voteCategory`) and `bill_title` (read from `bills` when summaries are written).
   **Key votes** = kind passage | nomination; the Votes tab defaults to them (filtered in

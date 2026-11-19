@@ -12,7 +12,7 @@
 //   the states, not the President (ratification isn't tracked here)
 // Only what the actions say counts; nothing is inferred.
 
-import { termize } from "./glossary.js";
+import { termize, termButton } from "./glossary.js";
 import { currentCongress, outgoingCongress, ordinal } from "./congress.js";
 
 // Stages in order (introduced -> committee -> passed_one -> passed_both -> to_president -> law).
@@ -53,6 +53,25 @@ const isAmendment = (type, title) => (type === "HJRES" || type === "SJRES") && /
 // House rules ("Providing for consideration of the bill …") only set the terms of debate
 // for another bill; the Bills tab's "Moving or passed" view leaves them out.
 export const isRuleBill = bill => /^providing for consideration of/i.test(String(bill?.title || ""));
+
+// Ceremonial measures: naming a post office, veterans' clinic, courthouse or federal
+// building; a Congressional Gold Medal or commemorative coin; a resolution marking a day,
+// week or month. Deliberately narrow, from the official title and CRS subjects: resolutions
+// that "recognize", "honor" or "express support" for a cause or person aren't included,
+// because those can be real political statements.
+const NAMES_FACILITY = /^(?:a bill )?to (?:re)?(?:designate|name) the (?:facility of the united states postal service|department of veterans affairs\b|community-based outpatient clinic of the department of veterans affairs\b|(?:[\w.' -]+ )?(?:united states courthouse|federal building)\b)/i;
+const HONOR_ACT = /\b(?:congressional gold medal|commemorative coin) act\b/i;
+const MARKS_DATE = /^(?:a resolution )?(?:(?:expressing support for|supporting) the (?:designation|recognition) of|expressing support for designating|designating|supporting the goals and ideals of)\b.*\b(?:day|week|month)\b/i;
+export function isCeremonial(bill) {
+  const title = String(bill?.title || "").trim();
+  const type = String(bill?.type || "").toUpperCase().replace(/[.\s]/g, "");
+  if (NAMES_FACILITY.test(title) || HONOR_ACT.test(title) || HONOR_ACT.test(String(bill?.short_title || ""))) return true;
+  const subjects = bill?.subjects || [];
+  if (subjects.includes("Postal service") && subjects.includes("Congressional tributes")) return true;
+  return (SIMPLE.has(type) || CONCURRENT.has(type)) && MARKS_DATE.test(title);
+}
+// The tag on cards and bill windows; tapping it explains the rule.
+export const ceremonialTag = () => `<span class="inline-flex items-center text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded px-2 [&>button]:min-h-6">${termButton("ceremonial", "Ceremonial")}</span>`;
 
 // { steps: [{ label, state: done|failed|todo }], status, final } or null when the bill has
 // no stage data. `final` = nothing further can happen (law, vetoed, adopted resolution).

@@ -17,6 +17,7 @@
 
 import { easternDate, weekStart, addDays, voteCategory, voteOutcome, partyAlignment } from './vote-stats.js';
 import { billName, billSummaryLine } from '../../public/util.js';
+import { isCeremonial } from '../../public/stage.js';
 
 const CLOSE_CATEGORIES = new Set(['passage', 'cloture', 'nomination', 'amendment']);
 export const CLOSEST_N = 3;
@@ -45,7 +46,7 @@ function voteItem(v, billsById) {
     nay: v.tallies?.nay ?? null,
     parties: parties(v.party_breakdown),
     alignment: partyAlignment(v.party_breakdown),
-    bill: v.bill_id ? { id: v.bill_id, label: billLabel(bill, v.legislation), title: billName(bill), summary: billSummaryLine(bill) } : null,
+    bill: v.bill_id ? { id: v.bill_id, label: billLabel(bill, v.legislation), title: billName(bill), summary: billSummaryLine(bill), ceremonial: isCeremonial(bill) } : null,
     legislation: v.legislation || null,
     document_title: v.document_title || null,
   };

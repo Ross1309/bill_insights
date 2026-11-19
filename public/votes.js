@@ -1,7 +1,7 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { billName, escapeHtml, loadErrorHtml, officialLabel, ordinal, PARTY_NAMES, partyChip } from "./util.js";
+import { billName, escapeHtml, loadErrorHtml, officialLabel, ordinal, PARTY_NAMES, partyChip, store } from "./util.js";
 import { voteCardHtml, isKeyVote } from "./vote-card.js";
 import { billLabel } from "./bills.js";
 import { setChipGroup } from "./members.js";
@@ -23,9 +23,10 @@ let voteChamber = "";
 // "key": final votes on bills, resolutions and nominations (vote_summaries.kind; filtered
 // in the browser, so no extra index); "all": every roll call.
 let voteScope = "key";
+let hideCeremonial = store.get("cw-hide-ceremonial", "0") === "1";
 const SCOPE_NOTE = {
-  key: "Final votes on bills, resolutions and nominations. Procedural steps, amendments and House rules are under All roll calls.",
-  all: "Every roll call, including procedural motions, cloture votes, amendments and House rules.",
+  key: "Final votes on bills, resolutions and nominations. Procedural steps, amendments and House rules are under All recorded votes.",
+  all: "Every recorded vote, including procedural motions, cloture votes, amendments and House rules.",
 };
 let voteIndexMissing = false;
 const votesState = { items: [], cursor: null, exhausted: false, loading: false, generation: 0 };
@@ -82,7 +83,7 @@ async function loadVotes({ reset = false } = {}) {
       // Key votes are ~40% of roll calls: fetch bigger pages to fill one.
       const res = await queryVotes({ chamber: voteChamber, cursor: st.cursor, size: voteScope === "key" ? 25 : VOTES_PAGE_SIZE });
       if (generation !== st.generation) return;
-      page.push(...(voteScope === "key" ? res.votes.filter(isKeyVote) : res.votes));
+      page.push(...(voteScope === "key" ? res.votes.filter(isKeyVote) : res.votes).filter(v => !(hideCeremonial && v.bill_ceremonial)));
       st.cursor = res.cursor;
       st.exhausted = res.done;
     }
@@ -244,6 +245,15 @@ export function setupVoteFilters() {
     if (note) note.textContent = SCOPE_NOTE[voteScope];
     fetchVotes();
   });
+  const hide = document.getElementById("votes-hide-ceremonial");
+  if (hide) {
+    hide.checked = hideCeremonial;
+    hide.addEventListener("change", () => {
+      hideCeremonial = hide.checked;
+      store.set("cw-hide-ceremonial", hideCeremonial ? "1" : "0");
+      fetchVotes();
+    });
+  }
   document.getElementById("vote-chamber-filters")?.addEventListener("click", e => {
     const b = e.target.closest("[data-chamber]");
     if (!b || b.dataset.chamber === voteChamber) return;   // already showing it

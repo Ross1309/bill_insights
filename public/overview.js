@@ -97,7 +97,7 @@ function activityChart(s) {
     return `
       <div class="mt-2">
         <div class="flex justify-between text-xs text-gray-600"><span class="font-semibold text-gray-800">${chamber}</span><span>${total} votes</span></div>
-        <svg viewBox="0 0 ${width} ${H}" preserveAspectRatio="none" class="w-full h-16 mt-1" role="img" aria-label="${chamber} roll-call votes per week">
+        <svg viewBox="0 0 ${width} ${H}" preserveAspectRatio="none" class="w-full h-16 mt-1" role="img" aria-label="${chamber} recorded votes per week">
           <line x1="0" y1="${H - 0.5}" x2="${width}" y2="${H - 0.5}" stroke="${C.grid}" stroke-width="1" vector-effect="non-scaling-stroke"></line>
           ${bars}
         </svg>
@@ -113,7 +113,7 @@ function activityChart(s) {
   const empty = weeks.filter(w => !w.House && !w.Senate).length;
   return card(
     "How busy has Congress been?",
-    `Recorded roll-call votes per week since ${esc(fmtDay(weeks[0]?.week || ""))}. Empty weeks are usually recesses (${empty} weeks with no votes).`,
+    `Recorded votes per week since ${esc(fmtDay(weeks[0]?.week || ""))}. Empty weeks are usually recesses (${empty} weeks with no votes).`,
     row("House") + row("Senate") + axis,
     {
       note: `Both rows use the same scale (tallest bar = ${max} votes). Busiest week: ${esc(fmtDay(busiest?.week || ""))}, ${busiest ? busiest.House + busiest.Senate : 0} votes. Source: House Clerk, senate.gov.`,
@@ -166,7 +166,7 @@ function alignmentChart(s) {
 
   return card(
     "How often do the parties agree?",
-    "Share of roll-call votes each month where the majority of Democrats and the majority of Republicans voted the same way, or opposite ways.",
+    "Share of recorded votes each month where the majority of Democrats and the majority of Republicans voted the same way, or opposite ways.",
     row("House") + row("Senate") + axis,
     {
       legend: swatch(C.opposed, "Majorities opposed") + swatch(C.same, "Majorities agreed"),
@@ -208,7 +208,7 @@ function outcomesChart(s) {
   }
   return card(
     "What gets voted on, and what succeeds?",
-    "Every roll call grouped by the kind of question, split by whether the motion, bill or nomination succeeded.",
+    "Every recorded vote grouped by the kind of question, split by whether the motion, bill or nomination succeeded.",
     `<div class="grid gap-6 md:grid-cols-2">${block("House")}${block("Senate")}</div>`,
     {
       legend: swatch(C.succeeded, "Succeeded") + swatch(C.failed, "Failed"),
@@ -282,7 +282,7 @@ export function renderOverview(container, stats, { onState } = {}) {
       ${alignmentChart(stats)}
       ${outcomesChart(stats)}
       ${delegationsChart(stats)}
-      <p class="text-xs text-gray-400">${stats.congress ? `${ordinalOf(stats.congress)} Congress · ` : ""}${(stats.totals?.House || 0) + (stats.totals?.Senate || 0)} roll-call votes${updated ? ` · updated ${esc(updated.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))}` : ""}</p>
+      <p class="text-xs text-gray-400">${stats.congress ? `${ordinalOf(stats.congress)} Congress · ` : ""}${(stats.totals?.House || 0) + (stats.totals?.Senate || 0)} recorded votes${updated ? ` · updated ${esc(updated.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))}` : ""}</p>
     </div>`;
   wireTooltip(container);
   container.querySelectorAll("[data-state]").forEach(b =>

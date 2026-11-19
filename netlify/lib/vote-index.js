@@ -13,6 +13,7 @@
 import { bulkWriter } from './firebase.js';
 import { voteCategory } from './vote-stats.js';
 import { billName, billSummaryLine } from '../../public/util.js';
+import { isCeremonial } from '../../public/stage.js';
 
 export const indexDocId = (congress, session, chamber) => `${congress}-${session}-${String(chamber).toLowerCase()}`;
 
@@ -73,21 +74,26 @@ export function voteKind(question, billTitle) {
   return cat;
 }
 
-export function voteSummary(vote, billTitle = null, billSummary = null) {
+export function voteSummary(vote, billTitle = null, billSummary = null, ceremonial = false) {
   const { individual_votes: members, members_applied, updatedAt, id, ...rest } = vote;
-  return { ...rest, bill_title: billTitle, bill_summary: billSummary, kind: voteKind(vote.question, billTitle), member_count: Array.isArray(members) ? members.length : 0 };
+  return { ...rest, bill_title: billTitle, bill_summary: billSummary, bill_ceremonial: ceremonial, kind: voteKind(vote.question, billTitle), member_count: Array.isArray(members) ? members.length : 0 };
 }
 
 // Bill titles and summary lines come from the bills collection (one read per distinct bill).
 export async function writeVoteSummaries(db, votes) {
   const ids = [...new Set(votes.map(v => v.bill_id).filter(Boolean))];
-  const titles = new Map(), summaries = new Map();
+  const titles = new Map(), summaries = new Map(), ceremonial = new Set();
   for (let i = 0; i < ids.length; i += 300) {
-    const snaps = await db.getAll(...ids.slice(i, i + 300).map(id => db.collection('bills').doc(id)), { fieldMask: ['title', 'short_title', 'ai_summary'] });
-    snaps.forEach(s => { if (s.exists) { titles.set(s.id, billName(s.data())); summaries.set(s.id, billSummaryLine(s.data())); } });
+    const snaps = await db.getAll(...ids.slice(i, i + 300).map(id => db.collection('bills').doc(id)), { fieldMask: ['title', 'short_title', 'ai_summary', 'type', 'subjects'] });
+    snaps.forEach(s => {
+      if (!s.exists) return;
+      titles.set(s.id, billName(s.data()));
+      summaries.set(s.id, billSummaryLine(s.data()));
+      if (isCeremonial(s.data())) ceremonial.add(s.id);
+    });
   }
   const writer = bulkWriter(db);
-  for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v, titles.get(v.bill_id) ?? null, summaries.get(v.bill_id) ?? null));
+  for (const v of votes) writer.set(db.collection('vote_summaries').doc(v.id || v.vote_id), voteSummary(v, titles.get(v.bill_id) ?? null, summaries.get(v.bill_id) ?? null, ceremonial.has(v.bill_id)));
   await writer.close();
   return votes.length;
 }

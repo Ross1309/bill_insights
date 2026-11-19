@@ -87,7 +87,7 @@ export function memberTrendsHtml(record) {
           label: k => (row(k)?.[3] >= 5 ? `${monthName(k, "long")}: with their party on ${row(k)[2]} of ${row(k)[3]} votes` : `${monthName(k, "long")}: too few votes to compare`) })}
       </div>` : ""}
       <details class="mt-2 text-sm"><summary class="cursor-pointer text-accent">View as table</summary>
-        <div class="overflow-x-auto mt-2"><table class="text-xs tabular-nums"><thead class="text-gray-500"><tr><th class="text-left pr-4 py-1">Month</th><th class="text-right pr-4">Roll calls</th><th class="text-right pr-4">Missed</th><th class="text-right">With party</th></tr></thead>
+        <div class="overflow-x-auto mt-2"><table class="text-xs tabular-nums"><thead class="text-gray-500"><tr><th class="text-left pr-4 py-1">Month</th><th class="text-right pr-4">Recorded votes</th><th class="text-right pr-4">Missed</th><th class="text-right">With party</th></tr></thead>
         <tbody>${keys.filter(row).map(k => `<tr class="border-t border-gray-200"><td class="pr-4 py-1">${monthName(k, "long")}</td><td class="text-right pr-4">${row(k)[0]}</td><td class="text-right pr-4">${row(k)[1]}</td><td class="text-right">${row(k)[3] ? `${row(k)[2]} of ${row(k)[3]}` : "—"}</td></tr>`).join("")}</tbody></table></div>
       </details>
     </section>`;

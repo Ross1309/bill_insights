@@ -93,7 +93,7 @@ async function writeDigest(db, now, votes, congress, allWeeks) {
   const billIds = [...new Set(votes.filter(inScope).map(v => v.bill_id).filter(Boolean))];
   const billsById = new Map();
   for (let i = 0; i < billIds.length; i += 300) {
-    const snaps = await db.getAll(...billIds.slice(i, i + 300).map(id => db.collection('bills').doc(id)), { fieldMask: ['bill_number', 'title', 'short_title', 'ai_summary'] });
+    const snaps = await db.getAll(...billIds.slice(i, i + 300).map(id => db.collection('bills').doc(id)), { fieldMask: ['bill_number', 'title', 'short_title', 'ai_summary', 'type', 'subjects'] });
     snaps.forEach(s => { if (s.exists) billsById.set(s.id, s.data()); });
   }
 

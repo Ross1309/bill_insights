@@ -1,8 +1,8 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db, getOverviewDoc, loadBillIndex } from "./data.js";
-import { billName, escapeHtml, formatDay, officialLabel, ordinal, safeHref } from "./util.js";
-import { isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
+import { billName, escapeHtml, formatDay, officialLabel, ordinal, safeHref, store } from "./util.js";
+import { ceremonialTag, isCeremonial, isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
 import { setChipGroup } from "./members.js";
 
 // DOM Elements
@@ -30,6 +30,7 @@ let billsError = null;   // message shown instead of bills until the next reset
 // and (category, stage, latest_action_date) indexes. Without them pages are filtered in
 // the browser (bigger pages, so each still shows something).
 let billScope = "moving";
+let hideCeremonial = store.get("cw-hide-ceremonial", "0") === "1";
 let movingIndexReady = true;
 const SCOPE_NOTE = {
   moving: "Passed at least one chamber, newest action first (House rules left out). Most bills never get a vote: All bills shows the rest.",
@@ -79,7 +80,7 @@ async function loadBills({ reset = false } = {}) {
     let found = 0;
     // House rules are dropped from "Moving or passed" here, so a page can come up short:
     // fetch again (a few rounds at most).
-    for (let round = 0; round < (clientStage ? 5 : billScope === "moving" ? 3 : 1) && !billsExhausted && found < BILLS_PAGE_SIZE; round++) {
+    for (let round = 0; round < (clientStage ? 5 : billScope === "moving" || hideCeremonial ? 3 : 1) && !billsExhausted && found < BILLS_PAGE_SIZE; round++) {
       const constraints = [];
       if (activeCategory !== "all") constraints.push(where("category", "==", activeCategory));
       if (serverStage) constraints.push(where("stage", "in", MOVING_STAGES));
@@ -92,7 +93,8 @@ async function loadBills({ reset = false } = {}) {
 
       const page = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       rememberBills(page);
-      const kept = billScope === "moving" ? page.filter(b => MOVING_STAGES.includes(b.stage) && !isRuleBill(b)) : page;
+      const kept = (billScope === "moving" ? page.filter(b => MOVING_STAGES.includes(b.stage) && !isRuleBill(b)) : page)
+        .filter(b => !(hideCeremonial && isCeremonial(b)));
       allBills.push(...kept);
       found += kept.length;
       billsCursor = snapshot.docs.at(-1) || billsCursor;
@@ -198,6 +200,7 @@ function renderBills(bills, term = "") {
               <span>${bill.congress ? `${escapeHtml(ordinal(Number(bill.congress)))} Congress` : ''}</span>
             </div>
             ${bill.policy_area ? `<p class="text-xs font-medium text-gray-500 mb-2">${escapeHtml(bill.policy_area)}</p>` : ''}
+            ${isCeremonial(bill) ? `<p class="mb-2">${ceremonialTag()}</p>` : ''}
             <h3 class="font-serif font-bold text-gray-900 text-lg sm:text-xl leading-snug mb-3"><button type="button" data-open="bill" data-id="${escapeHtml(bill.id)}" class="text-left hover:text-accent-light hover:underline">${escapeHtml(billName(bill) || 'Untitled Bill')}</button></h3>
             ${bill.title && billName(bill) !== bill.title ? `<p class="text-xs text-gray-500 -mt-2 mb-3">${escapeHtml(bill.title)}</p>` : ""}
             ${stageTrackerHtml(bill, { compact: true })}
@@ -237,6 +240,16 @@ export function setupBillFilters() {
     if (note) note.textContent = SCOPE_NOTE[billScope];
     loadBills({ reset: true });
   });
+
+  const hide = document.getElementById("bills-hide-ceremonial");
+  if (hide) {
+    hide.checked = hideCeremonial;
+    hide.addEventListener("change", () => {
+      hideCeremonial = hide.checked;
+      store.set("cw-hide-ceremonial", hideCeremonial ? "1" : "0");
+      loadBills({ reset: true });
+    });
+  }
 
   document.querySelectorAll("#category-filters .filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {

@@ -9,7 +9,7 @@ import { escapeHtml as esc, isDelegate } from "./util.js";
 const pct = x => `${x < 0.1 ? (x * 100).toFixed(1) : Math.round(x * 100)}%`;
 const fmt = n => Number(n).toLocaleString("en-US");
 export const WHY_NOTE = "The official record doesn't say why a vote was missed (illness, family, travel, campaigning or other duties look the same).";
-const DELEGATE_NOTE = "Delegates may vote only on some amendments, so most House roll calls don't apply to them.";
+const DELEGATE_NOTE = "Delegates may vote only on some amendments, so most House recorded votes don't apply to them.";
 
 // m: a member ({ id | bioguideId, chamber, state }); counts: [roll calls, missed] or
 // member_votes totals; doc: stats/participation. null when there's nothing to show.
@@ -36,6 +36,6 @@ export function missedLong(m, doc, counts = null, { note = true } = {}) {
   if (!x) return "";
   if (x.delegate) return `<p class="text-sm text-gray-600">${esc(DELEGATE_NOTE)}</p>`;
   return `
-    <p class="text-sm text-gray-800">Missed <strong>${fmt(x.missed)} of ${fmt(x.votes)}</strong> roll-call votes this Congress (${pct(x.share)}).${x.median != null ? ` <span class="text-gray-600">Typical ${esc(x.chamber)} member: ${pct(x.median)}.</span>` : ""}</p>
+    <p class="text-sm text-gray-800">Missed <strong>${fmt(x.missed)} of ${fmt(x.votes)}</strong> recorded votes this Congress (${pct(x.share)}).${x.median != null ? ` <span class="text-gray-600">Typical ${esc(x.chamber)} member: ${pct(x.median)}.</span>` : ""}</p>
     ${note ? `<p class="text-xs text-gray-500 mt-1">${esc(WHY_NOTE)} <a href="#methodology" class="text-accent hover:underline">How we count</a></p>` : ""}`;
 }

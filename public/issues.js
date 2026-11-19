@@ -26,17 +26,17 @@ export function explainQuestion(question = "", opts = {}) {
   if (q.includes("cloture")) return opts.nomination
     ? "A vote on whether to end debate on a nomination and move to the final vote. It needs a simple majority."
     : "A vote on whether to end debate and move forward. On legislation it needs 60 of 100 senators.";
-  if (q.includes("motion to proceed")) return "A Senate vote on whether to start debating the measure. It doesn't decide whether it passes.";
+  if (q.includes("motion to proceed")) return "A Senate vote on whether to start debating the bill or resolution. It doesn't decide whether it passes.";
   if (q.includes("nomination")) return "A Senate vote on whether to confirm the President's nominee.";
   if (q.includes("suspend the rules")) return "A fast-track vote for less controversial bills. It needs two-thirds of the House to pass.";
   if (q.includes("recommit")) return "The minority party's last chance to send the bill back to committee before the final vote.";
-  if (q.includes("table")) return "A vote to set a measure aside, which usually ends it.";
-  if (q.includes("discharge")) return "A vote to pull a measure out of committee so the full chamber can consider it.";
+  if (q.includes("table")) return "A vote to set a bill or resolution aside, which usually ends it.";
+  if (q.includes("discharge")) return "A vote to pull a bill or resolution out of committee so the full chamber can consider it.";
   if (q.includes("previous question")) return "A procedural House vote that ends debate on the rule for considering a bill.";
   if (q.includes("amendment")) return "A vote on changing the bill's text.";
   if (q.includes("passage") || q.includes("pass the bill")) return "The final vote on whether this chamber passes the bill.";
   if (q.includes("resolution")) return "The vote on whether this chamber adopts the resolution.";
-  return "A recorded floor vote on this measure.";
+  return "A recorded floor vote on this bill or resolution.";
 }
 
 const EXPLAINERS = {
@@ -45,7 +45,7 @@ const EXPLAINERS = {
   resolutions: ["Bills, joint and concurrent resolutions",
     "Bills (H.R./S.) and joint resolutions (H.J.Res./S.J.Res.) must pass both chambers and be signed by the President (or survive a veto) to become law. Concurrent resolutions (H.Con.Res./S.Con.Res.) need both chambers but don't go to the President; they usually concern how Congress itself operates. Simple resolutions (H.Res./S.Res.) involve one chamber only."],
   "no-vote": ["Why most bills never get a vote",
-    "Thousands of bills are introduced each Congress. Most are referred to a committee and never move further: committees and chamber leaders decide what reaches the floor. A bill that never gets a vote hasn't been rejected; it just didn't advance. This page focuses on measures that reached a floor vote or became law."],
+    "Thousands of bills are introduced each Congress. Most are referred to a committee and never move further: committees and chamber leaders decide what reaches the floor. A bill that never gets a vote hasn't been rejected; it just didn't advance. This page focuses on bills and resolutions that reached a floor vote or became law."],
 };
 // Glossary chips on topic pages: shared definitions (glossary.js).
 const GLOSSARY_KEYS = ["cloture", "suspension", "recommit", "table", "discharge", "rule", "two_thirds", "appropriations"];
@@ -71,12 +71,12 @@ function glance(s) {
   return `
     <section>
       <h3 class="font-serif text-2xl font-bold text-gray-900">At a glance</h3>
-      <p class="text-base sm:text-lg text-gray-800 mt-2 max-w-3xl">This Congress, <strong>${c.measures}</strong> ${esc(s.label.toLowerCase())} measures reached a floor vote or became law. <strong>${c.law}</strong> became law, <strong>${c.passed_both + c.passed_one}</strong> more passed at least one chamber, and <strong>${c.none}</strong> didn't pass either. Members cast <strong>${c.votes}</strong> recorded votes on them.</p>
-      ${c.beyond_policy_area ? `<p class="text-sm text-gray-600 mt-2 max-w-3xl">Those are bills whose official policy area is ${s.policy_areas?.length === 1 ? `&ldquo;${esc(s.policy_areas[0])}&rdquo;` : `one of ${esc(s.label.toLowerCase())}'s (listed under Definitions below)`}. Another <strong>${c.beyond_policy_area}</strong> measures from other policy areas (spending bills, for example) include ${esc(s.label.toLowerCase())} provisions: see the watchlists below.</p>` : ""}
+      <p class="text-base sm:text-lg text-gray-800 mt-2 max-w-3xl">This Congress, <strong>${c.measures}</strong> ${esc(s.label.toLowerCase())} bills and resolutions reached a floor vote or became law. <strong>${c.law}</strong> became law, <strong>${c.passed_both + c.passed_one}</strong> more passed at least one chamber, and <strong>${c.none}</strong> didn't pass either. Members cast <strong>${c.votes}</strong> recorded votes on them.</p>
+      ${c.beyond_policy_area ? `<p class="text-sm text-gray-600 mt-2 max-w-3xl">Those are bills whose official policy area is ${s.policy_areas?.length === 1 ? `&ldquo;${esc(s.policy_areas[0])}&rdquo;` : `one of ${esc(s.label.toLowerCase())}'s (listed under Definitions below)`}. Another <strong>${c.beyond_policy_area}</strong> bills and resolutions from other policy areas (spending bills, for example) include ${esc(s.label.toLowerCase())} provisions: see the watchlists below.</p>` : ""}
       <div class="mt-5 bg-surface border border-gray-200 rounded-xl p-5">
         <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-3">How far they got</p>
         <div class="space-y-2.5">${steps.map(([lbl, n], i) => `
-          <div data-tip="${esc(`${lbl}: ${n} of ${c.measures} measures`)}">
+          <div data-tip="${esc(`${lbl}: ${n} of ${c.measures} bills and resolutions`)}">
             <div class="flex justify-between text-sm"><span class="text-gray-800">${i ? "→ " : ""}${esc(lbl)}</span><span class="font-semibold text-gray-900 tabular-nums">${n}</span></div>
             <div class="h-2.5 mt-1 rounded-full bg-gray-100"><div class="h-2.5 rounded-full" style="width:${c.measures ? Math.max(1.5, (n / c.measures) * 100) : 0}%;background:${C.accent}"></div></div>
           </div>`).join("")}
@@ -107,7 +107,7 @@ function monthByMonth(s) {
       <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Month by month</p>
       <p class="text-sm text-gray-800 mt-2">The busiest month for ${topic} votes was <strong>${esc(monthLabel(busiest))}</strong>, with ${v(busiest)} recorded vote${v(busiest) === 1 ? "" : "s"}. In the last three months (${esc(monthLabel(recent[0]))} to ${esc(monthLabel(recent[2]))}): ${recentVotes} vote${recentVotes === 1 ? "" : "s"} and ${recentLaws} new law${recentLaws === 1 ? "" : "s"}.</p>
       <p class="text-sm font-semibold text-gray-800 mt-4">Recorded votes</p>
-      ${bars(keys, k => (m[k] ? v(k) : null), { max: scale(Math.max(...keys.map(v))), unit: "", title: `Recorded votes on ${s.label} measures each month`,
+      ${bars(keys, k => (m[k] ? v(k) : null), { max: scale(Math.max(...keys.map(v))), unit: "", title: `Recorded votes on ${s.label} bills and resolutions each month`,
         label: k => `${monthLabel(k)}: ${v(k)} recorded vote${v(k) === 1 ? "" : "s"}` })}
       <p class="text-sm font-semibold text-gray-800 mt-4">Laws signed</p>
       ${bars(keys, k => (l(k) ? l(k) : null), { max: scale(Math.max(...keys.map(l))), unit: "", title: `${s.label} laws signed each month`,
@@ -116,7 +116,7 @@ function monthByMonth(s) {
         <div class="overflow-x-auto mt-2"><table class="text-xs tabular-nums"><thead class="text-gray-500"><tr><th class="text-left pr-4 py-1">Month</th><th class="text-right pr-4">Recorded votes</th><th class="text-right">Laws signed</th></tr></thead>
         <tbody>${keys.filter(k => m[k]).map(k => `<tr class="border-t border-gray-200"><td class="pr-4 py-1">${esc(monthLabel(k))}</td><td class="text-right pr-4">${v(k)}</td><td class="text-right">${l(k)}</td></tr>`).join("")}</tbody></table></div>
       </details>
-      <p class="text-[11px] text-gray-400 mt-2">Votes on the measures counted above (by Eastern date); laws by the date they were signed.</p>
+      <p class="text-[11px] text-gray-400 mt-2">Votes on the bills and resolutions counted above (by Eastern date); laws by the date they were signed.</p>
     </div>`;
 }
 
@@ -149,7 +149,7 @@ function timeline(focused) {
   return `
     <div class="bg-surface border border-gray-200 rounded-xl p-5">
       <div class="flex flex-wrap justify-between gap-2">
-        <p class="text-sm font-semibold text-gray-900">Floor votes on these measures over time</p>
+        <p class="text-sm font-semibold text-gray-900">Floor votes on these bills and resolutions over time</p>
         <div class="flex gap-4 text-xs text-gray-600">
           <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:${C.succeeded}"></span>Passed / agreed to</span>
           <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:${C.failed}"></span>Failed / rejected</span>
@@ -173,7 +173,7 @@ function watchPanel(w) {
     </li>`;
   return `
     <p class="text-sm text-gray-600 max-w-3xl">${esc(w.intro)}</p>
-    <p class="text-base text-gray-900 mt-3"><strong>${c.measures}</strong> measures focused on ${esc(w.label)} reached the floor or became law${c.law ? ` (${c.law} became law)` : ""}, with <strong>${c.votes}</strong> recorded votes. Another <strong>${c.broad}</strong> broad bills include ${esc(w.label)} provisions.</p>
+    <p class="text-base text-gray-900 mt-3"><strong>${c.measures}</strong> bills and resolutions focused on ${esc(w.label)} reached the floor or became law${c.law ? ` (${c.law} became law)` : ""}, with <strong>${c.votes}</strong> recorded votes. Another <strong>${c.broad}</strong> broad bills include ${esc(w.label)} provisions.</p>
     <div class="mt-4">${timeline(w.focused)}</div>
     <div class="grid gap-4 lg:grid-cols-2 mt-4">
       <div class="bg-surface border border-gray-200 rounded-xl p-5">
@@ -214,7 +214,7 @@ function laws(s) {
     const v = b.chamber_votes?.[ch];
     if (v) return `${ch}: <span class="text-gray-900 tabular-nums">${v.yea}–${v.nay}</span>`;
     const did = ch === "House" ? b.passed_house : b.passed_senate;
-    return did ? `${ch}: passed without a recorded roll call` : `${ch}: —`;
+    return did ? `${ch}: passed without a recorded vote` : `${ch}: —`;
   };
   return `
     <section>
@@ -250,7 +250,7 @@ function keyVotes(s) {
   return `
     <section>
       <h3 class="font-serif text-2xl font-bold text-gray-900">Recent key votes</h3>
-      <p class="text-sm text-gray-500">The latest recorded floor votes on ${esc(s.label.toLowerCase())} measures, explained, with how your state's members voted.</p>
+      <p class="text-sm text-gray-500">The latest recorded floor votes on ${esc(s.label.toLowerCase())} bills and resolutions, explained, with how your state's members voted.</p>
       <div class="space-y-4 mt-4">${s.key_votes.map(v => {
         const pb = v.party_breakdown || {};
         return `
@@ -322,8 +322,8 @@ function definition(s) {
   const w = Object.values(s.watchlists || {});
   return `
     <section class="text-xs text-gray-500 border-t border-gray-200 pt-5 space-y-1.5">
-      <p><strong class="text-gray-700">What counts as ${esc(s.label.toLowerCase())} here:</strong> measures whose CRS policy area is <em>${s.policy_areas.map(esc).join("</em>, <em>")}</em>.${w.length ? ` Watchlists use CRS subject tags (${w.map(x => `${esc(x.label)}: <em>${x.subjects.map(esc).join("</em>, <em>")}</em>`).join("; ")}) or the topic named in the title, and can include bills from other policy areas, such as defense and appropriations.` : ""}</p>
-      ${w.length ? `<p><strong class="text-gray-700">Focused vs. broad:</strong> a watchlist measure is focused if its title names the topic or CRS assigned it ${FOCUSED_MAX_SUBJECTS} or fewer subjects; otherwise it's a broad bill that includes the topic.</p>` : ""}
+      <p><strong class="text-gray-700">What counts as ${esc(s.label.toLowerCase())} here:</strong> bills and resolutions whose CRS policy area is <em>${s.policy_areas.map(esc).join("</em>, <em>")}</em>.${w.length ? ` Watchlists use CRS subject tags (${w.map(x => `${esc(x.label)}: <em>${x.subjects.map(esc).join("</em>, <em>")}</em>`).join("; ")}) or the topic named in the title, and can include bills from other policy areas, such as defense and appropriations.` : ""}</p>
+      ${w.length ? `<p><strong class="text-gray-700">Focused vs. broad:</strong> a watchlist bill or resolution is focused if its title names the topic or CRS assigned it ${FOCUSED_MAX_SUBJECTS} or fewer subjects; otherwise it's a broad bill that includes the topic.</p>` : ""}
       <p><strong class="text-gray-700">Coverage:</strong> bills that became law or got a recorded floor vote this Congress. Bills that never reached the floor aren't counted. More in <a href="#methodology" class="text-accent hover:underline">How we count</a>.</p>
       <p><strong class="text-gray-700">Sources:</strong> Congress.gov (bills, CRS subjects and summaries, actions, laws), Office of the Clerk of the U.S. House, U.S. Senate (senate.gov).${s.generated_at?.toDate ? ` Updated ${esc(s.generated_at.toDate().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))}.` : ""}</p>
     </section>`;

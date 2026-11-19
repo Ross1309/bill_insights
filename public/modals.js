@@ -7,7 +7,7 @@ import { billName, contactLinks, sponsorName, errorBlock, escapeHtml, externalLi
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { asVote, divisionTags, tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
-import { stageFromDetail, stageTrackerHtml } from "./stage.js";
+import { ceremonialTag, isCeremonial, stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
 import { voteHeadline, outcomeOf, questionKind, resultWord } from "./plain.js";
 import { explainQuestion } from "./issues.js";
@@ -89,13 +89,13 @@ const memberModal = {
       if (e.data.record === undefined) return spinner("Loading votes…");
       const r = e.data.record;
       if (!r || !r.totals?.votes) {
-        return `<p class="text-sm text-gray-500 py-8 text-center">No recorded roll-call votes for this member in the current Congress yet.</p>`;
+        return `<p class="text-sm text-gray-500 py-8 text-center">No recorded votes for this member in the current Congress yet.</p>`;
       }
       const t = r.totals;
       const cast = t.yea + t.nay + t.present;
       const stat = (label, value, cls) => `<div class="${cls} border rounded-lg p-2 text-center"><p class="text-[11px] font-semibold uppercase">${label}</p><p class="text-lg font-bold tabular-nums">${value}</p></div>`;
       return `
-        <p class="text-sm text-gray-800">In the ${escapeHtml(ordinal(r.congress))} Congress, voted on <strong>${cast} of ${t.votes}</strong> ${escapeHtml(r.chamber || "")} roll calls they were eligible for (${Math.round((cast / t.votes) * 100)}%).${t.votes - cast - (t.not_voting || 0) > 0 ? ` <span class="text-gray-600">${t.votes - cast - (t.not_voting || 0)} more ${t.votes - cast - (t.not_voting || 0) === 1 ? "was a vote" : "were votes"} by name, such as the Speaker election.</span>` : ""}</p>
+        <p class="text-sm text-gray-800">In the ${escapeHtml(ordinal(r.congress))} Congress, voted on <strong>${cast} of ${t.votes}</strong> ${escapeHtml(r.chamber || "")} recorded votes they were eligible for (${Math.round((cast / t.votes) * 100)}%).${t.votes - cast - (t.not_voting || 0) > 0 ? ` <span class="text-gray-600">${t.votes - cast - (t.not_voting || 0)} more ${t.votes - cast - (t.not_voting || 0) === 1 ? "was a vote" : "were votes"} by name, such as the Speaker election.</span>` : ""}</p>
         ${e.data.member && e.data.member.current !== false ? `<div class="mt-1">${missedLong(e.data.member, e.data.participation, t)}</div>` : ""}
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
           ${stat("Yea", t.yea, "bg-green-50 border-green-200 text-green-700")}
@@ -183,6 +183,7 @@ const billModal = {
         </div>
         <h2 id="modal-title" class="font-serif text-xl font-bold text-gray-900 mt-1">${escapeHtml(title || label)}</h2>
         ${official ? `<p class="text-xs text-gray-500 mt-0.5">Official title: ${escapeHtml(official)}</p>` : ""}
+        ${isCeremonial(b || d) ? `<p class="mt-1">${ceremonialTag()}</p>` : ""}
       </div>`;
   },
   tabs: [
@@ -334,7 +335,7 @@ const voteModal = {
       const v = e.data.vote;
       if (e.errors.vote) return `<p class="text-sm text-red-600 py-8 text-center">Failed to load vote: ${escapeHtml(e.errors.vote)}</p>`;
       if (v === undefined) return spinner("Loading vote…");
-      if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This roll call isn't in our records yet. New votes are added nightly, and only the current Congress's votes are stored.</p>`;
+      if (v === null) return `<p class="text-sm text-gray-500 py-8 text-center">This recorded vote isn't in our records yet. New votes are added nightly, and only the current Congress's votes are stored.</p>`;
       return `
         ${v.question ? `<p class="text-sm text-gray-700 mb-3"><span class="font-semibold text-gray-900">What this vote was:</span> ${escapeHtml(/nomination/i.test(v.question) && !v.bill_id ? "A Senate vote on whether to confirm the President's nominee." : explainQuestion(v.question, { nomination: !v.bill_id && /^PN/i.test(v.legislation || "") }))}</p>` : ""}
         ${voteBillLine(v)}
@@ -440,7 +441,7 @@ function yourMembersHtml(e) {
     <section class="mt-5 bg-gray-50 border border-gray-200 rounded-lg p-3">
       <h3 class="text-sm font-bold text-gray-900">Your members (${escapeHtml(reps.code)}) on this bill</h3>
       <ul class="divide-y divide-gray-200">${rows}</ul>
-      <p class="text-[11px] text-gray-500 mt-1">Sponsors and cosponsors from Congress.gov; votes are the final roll calls on the bill itself (not procedural steps). A bill passed by voice vote has no recorded positions.</p>
+      <p class="text-[11px] text-gray-500 mt-1">Sponsors and cosponsors from Congress.gov; votes are the final recorded votes on the bill itself (not procedural steps). A bill passed by voice vote has no recorded positions.</p>
     </section>`;
 }
 
@@ -523,18 +524,18 @@ function noRollCallHtml(e) {
   const box = inner => `<div class="text-sm text-gray-700 py-6 space-y-3">${inner}</div>`;
   const why = `<p class="text-xs text-gray-500">A voice vote or unanimous consent doesn't record how each member voted, so there's no member-by-member result to show.</p>`;
   if (!actions) {
-    return box(`<p>No recorded (roll-call) votes on this bill in our records.</p>${why}<p class="text-xs text-gray-500">The Actions tab shows how it moved through Congress.</p>`);
+    return box(`<p>No recorded votes on this bill in our records.</p>${why}<p class="text-xs text-gray-500">The Actions tab shows how it moved through Congress.</p>`);
   }
   const floor = actions.filter(a => FLOOR_RESULT.test(a.text || "")).reverse();   // oldest first
   if (!floor.length) {
     return box(`<p>This bill hasn't had a floor vote in either chamber. Most bills are never brought to the floor.</p>`);
   }
   if (floor.some(a => a.recordedVotes?.length)) {
-    return box(`<p>This bill had recorded votes, but they aren't in our records (we store every roll call of the current Congress).</p><p class="text-xs text-gray-500">The Actions tab links to the official record of each vote.</p>`);
+    return box(`<p>This bill had recorded votes, but they aren't in our records (we store every recorded vote of the current Congress).</p><p class="text-xs text-gray-500">The Actions tab links to the official record of each vote.</p>`);
   }
   const chamberOf = a => FLOOR_RESULT.exec(a.text)[2];
   return box(`
-    <p>No recorded (roll-call) vote: it passed or failed without one.</p>
+    <p>No recorded vote: it passed or failed without one.</p>
     <ul class="space-y-1.5">${floor.map(a => `
       <li><strong class="text-gray-900">${escapeHtml(chamberOf(a))}</strong>, ${escapeHtml(actionDay(a.actionDate))}: ${termize(escapeHtml(a.text.replace(FLOOR_RESULT, "")))}</li>`).join("")}
     </ul>${why}`);

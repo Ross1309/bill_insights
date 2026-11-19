@@ -100,15 +100,15 @@ export function renderCongressPage(el, { docs, cur, overview }) {
     return hi === others.length ? `more than ${which}` : lo === others.length ? `fewer than ${which}` : others.length === 2 ? "between the two" : `the same as ${which}`;
   };
   const lateShare = c => { const all = totalOf(c); return all ? Math.round((all - at(c, "laws", null, N)) / all * 100) : null; };
-  const lede = `${fmt(at(cur, "laws"))} laws and ${fmt(votesAt(cur))} roll-call votes in ${fmt(N)} days.` +
-    (past.length ? ` Compared with the last ${past.length === 2 ? "two Congresses" : "Congress"} at this point: laws ${rel(at(cur, "laws"), past.map(c => at(c, "laws")))}, roll calls ${rel(votesAt(cur), past.map(c => votesAt(c)))}.` : "") +
+  const lede = `${fmt(at(cur, "laws"))} laws and ${fmt(votesAt(cur))} recorded votes in ${fmt(N)} days.` +
+    (past.length ? ` Compared with the last ${past.length === 2 ? "two Congresses" : "Congress"} at this point: laws ${rel(at(cur, "laws"), past.map(c => at(c, "laws")))}, recorded votes ${rel(votesAt(cur), past.map(c => votesAt(c)))}.` : "") +
     (!D.final && past.length ? ` But the final weeks matter most: the ${ordinal(past[0])} signed <strong>${lateShare(past[0])}%</strong> of its laws after this point${past[1] ? `, the ${ordinal(past[1])} <strong>${lateShare(past[1])}%</strong>` : ""}.` : "");
 
   // --- Comparison tiles ---
   const tiles = [
     { label: "Laws enacted", v: c => at(c, "laws"), note: "Signed into law (public and private)." },
-    { label: "Roll-call votes", v: c => votesAt(c), note: "House and Senate together." },
-    { label: "Bills introduced", v: c => at(c, "introduced"), note: "Bills and joint resolutions (measures that can become law)." },
+    { label: "Recorded votes", v: c => votesAt(c), note: "House and Senate together." },
+    { label: "Bills introduced", v: c => at(c, "introduced"), note: "Bills and joint resolutions (the kinds that can become law)." },
     { label: "Passed a chamber", v: c => at(c, "passed_one"), note: "Bills and joint resolutions the House or Senate passed." },
   ];
   const cmp = (a, others) => {
@@ -167,7 +167,7 @@ export function renderCongressPage(el, { docs, cur, overview }) {
   const splitRows = ["House", "Senate"].map(ch => `
     <div>
       <p class="text-sm font-semibold text-gray-900">${ch}</p>
-      <div class="mt-1.5 space-y-1.5" role="img" aria-label="${esc(`${ch}: parties split on ${all.map(c => `${splitShare(c, ch) ?? "—"}% (${ordinal(c)})`).join(", ")} of roll calls by day ${N}`)}">
+      <div class="mt-1.5 space-y-1.5" role="img" aria-label="${esc(`${ch}: parties split on ${all.map(c => `${splitShare(c, ch) ?? "—"}% (${ordinal(c)})`).join(", ")} of recorded votes by day ${N}`)}">
         ${all.map(c => { const s = splitShare(c, ch); return `
           <div class="flex items-center gap-2 text-xs" aria-hidden="true">
             <span class="w-10 shrink-0 ${c === cur ? "font-bold text-gray-900" : "text-gray-500"}">${ordinal(c)}</span>
@@ -215,12 +215,12 @@ export function renderCongressPage(el, { docs, cur, overview }) {
         `Most bills never get a vote. So far in the ${ordinal(cur)} Congress, about <strong>1 in ${oneIn(intro, one)}</strong> bills introduced has passed the House or the Senate, and about <strong>1 in ${oneIn(intro, laws)}</strong> has become law. Bars are drawn to scale. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a>`,
         funnel)}
 
-      ${card("congress-votes", "Roll-call votes over the term",
-        `By this point the House had held ${fmt(at(cur, "votes", "House"))} roll-call votes${past.length ? ` (${past.map(c => `${ordinal(c)}: ${fmt(at(c, "votes", "House"))}`).join(", ")})` : ""} and the Senate ${fmt(at(cur, "votes", "Senate"))}${past.length ? ` (${past.map(c => `${ordinal(c)}: ${fmt(at(c, "votes", "Senate"))}`).join(", ")})` : ""}. Most Senate roll calls are on nominations.`,
+      ${card("congress-votes", "Recorded votes over the term",
+        `By this point the House had held ${fmt(at(cur, "votes", "House"))} recorded votes${past.length ? ` (${past.map(c => `${ordinal(c)}: ${fmt(at(c, "votes", "House"))}`).join(", ")})` : ""} and the Senate ${fmt(at(cur, "votes", "Senate"))}${past.length ? ` (${past.map(c => `${ordinal(c)}: ${fmt(at(c, "votes", "Senate"))}`).join(", ")})` : ""}. Most Senate recorded votes are on nominations.`,
         `<div class="grid gap-6 lg:grid-cols-2 mt-4"><div><h4 class="text-sm font-bold text-gray-900">House</h4><div data-chart="House"></div></div><div><h4 class="text-sm font-bold text-gray-900">Senate</h4><div data-chart="Senate"></div></div></div>`)}
 
       ${card("congress-split", "How often the parties split",
-        `Roll calls where most Democrats and most Republicans voted opposite ways (Yea vs Nay), by this point in each term.`,
+        `Recorded votes where most Democrats and most Republicans voted opposite ways (Yea vs Nay), by this point in each term.`,
         `<div class="grid gap-6 sm:grid-cols-2 mt-4 max-w-3xl">${splitRows}</div>
         <p class="text-xs text-gray-500 mt-3">Month by month: see &ldquo;Party agreement&rdquo; under More charts below.</p>`)}
 
@@ -228,9 +228,9 @@ export function renderCongressPage(el, { docs, cur, overview }) {
         <h2 class="font-serif text-xl font-bold text-gray-900">How these numbers are counted</h2>
         <ul class="list-disc pl-5 mt-2 space-y-1.5">
           <li><strong>Same point in the term:</strong> each Congress starts on January 3 of an odd year; "day N" is N days after that, so every Congress is compared at the same stage of its two years.</li>
-          <li><strong>Bills:</strong> measures that can become law (H.R., S., H.J.Res., S.J.Res.), counted by their introduction date. Simple and concurrent resolutions, which can't become law, are left out.</li>
+          <li><strong>Bills:</strong> the kinds that can become law (H.R., S., H.J.Res., S.J.Res.), counted by their introduction date. Simple and concurrent resolutions, which can't become law, are left out.</li>
           <li><strong>Passed a chamber / both:</strong> the first "Passed/agreed to in House" or "in Senate" action in the official history. <strong>Laws:</strong> the "Became Public/Private Law" action.</li>
-          <li><strong>Roll-call votes and party splits:</strong> every recorded vote (House Clerk, senate.gov); a split is most Democrats voting the opposite way from most Republicans, ties left out.</li>
+          <li><strong>Recorded votes and party splits:</strong> every recorded vote (House Clerk, senate.gov); a split is most Democrats voting the opposite way from most Republicans, ties left out.</li>
           <li><strong>Sources:</strong> GovInfo's bill status files and Congress.gov (bills), the House Clerk and senate.gov (votes). Updated nightly. <a href="#methodology" class="text-accent hover:underline">How we count</a></li>
         </ul>
       </section>
@@ -256,14 +256,14 @@ function monthlySplit(el, months) {
     return `<text x="${L}" y="${top - 12}" font-size="13" font-weight="700" fill="#f3f3f3">${ch}, by month</text>
       ${[0, 50, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#444"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#b0b0b0">${v}%</text>`).join("")}
       ${months.map((m, i) => { const s = share(m[ch]); if (s == null) return "";
-        return `<rect x="${L + i * bw + 2}" y="${y(s)}" width="${Math.max(1, bw - 4)}" height="${y(0) - y(s)}" rx="2" fill="#8f68cb" data-tip="${esc(`${label(m.month)} · ${ch}: parties split on ${s}% (${m[ch].opposed} of ${m[ch].same + m[ch].opposed} roll calls)`)}"/>`; }).join("")}`;
+        return `<rect x="${L + i * bw + 2}" y="${y(s)}" width="${Math.max(1, bw - 4)}" height="${y(0) - y(s)}" rx="2" fill="#8f68cb" data-tip="${esc(`${label(m.month)} · ${ch}: parties split on ${s}% (${m[ch].opposed} of ${m[ch].same + m[ch].opposed} recorded votes)`)}"/>`; }).join("")}`;
   };
   el.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="Share of roll calls where the parties split, by month, House and Senate">
+    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="Share of recorded votes where the parties split, by month, House and Senate">
       ${row("House", T)}${row("Senate", T + RH + gap)}
       ${months.map((m, i) => i % (W < 600 ? 6 : 3) === 0 ? `<text x="${L + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="12" fill="#b0b0b0">${new Date(`${m.month}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" })}</text>` : "").join("")}
     </svg>
-    <p class="text-xs text-gray-500 mt-1">Months with no bar had no roll calls where both parties took a side (recess).</p>`;
+    <p class="text-xs text-gray-500 mt-1">Months with no bar had no recorded votes where both parties took a side (recess).</p>`;
   el.addEventListener("pointermove", ev => {
     const t = ev.target.closest("[data-tip]");
     if (!t) { tip?.classList.add("hidden"); return; }

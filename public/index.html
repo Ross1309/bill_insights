@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Congress Watcher</title>
-  <meta name="description" content="Non-partisan tracking of what the US Congress is doing: bills in plain language, House and Senate roll-call votes, members and campaign finance, from official sources." />
+  <meta name="description" content="Non-partisan tracking of what the US Congress is doing: bills in plain language, House and Senate recorded votes, members and campaign finance, from official sources." />
   <!-- Link previews (share.js replaces these for /bill, /member and /vote links). -->
   <link rel="canonical" href="https://congress-watcher.netlify.app/" />
   <meta property="og:site_name" content="Congress Watcher" />
@@ -142,7 +142,8 @@
         <button type="button" data-scope="moving" class="filter-chip">Moving or passed</button>
         <button type="button" data-scope="all" class="filter-chip">All bills</button>
       </div>
-      <p id="bill-scope-note" class="text-xs text-gray-500 mb-4 sm:mb-6"></p>
+      <p id="bill-scope-note" class="text-xs text-gray-500 mb-2"></p>
+      <label class="inline-flex items-center gap-2 min-h-10 sm:min-h-0 mb-3 text-xs text-gray-700 cursor-pointer"><input type="checkbox" id="bills-hide-ceremonial" class="w-4 h-4 accent-accent" /> Hide ceremonial bills and resolutions (naming buildings, medals, awareness days)</label>
       <div class="mb-5 sm:mb-8 flex flex-col md:flex-row gap-3 sm:gap-4 md:items-center justify-between">
         <div class="w-full md:w-1/2 lg:w-1/3">
           <label for="search-input" class="sr-only">Search bills</label>
@@ -182,7 +183,7 @@
       <div class="flex flex-wrap gap-x-6 gap-y-2 mb-2">
         <div id="vote-scope-filters" class="flex flex-wrap gap-2" role="group" aria-label="Which votes">
           <button type="button" data-scope="key" class="filter-chip">Key votes</button>
-          <button type="button" data-scope="all" class="filter-chip">All roll calls</button>
+          <button type="button" data-scope="all" class="filter-chip">All recorded votes</button>
         </div>
         <div id="vote-chamber-filters" class="flex flex-wrap gap-2" role="group" aria-label="Chamber">
           <button type="button" data-chamber="" class="filter-chip">Both chambers</button>
@@ -190,7 +191,8 @@
           <button type="button" data-chamber="Senate" class="filter-chip">Senate</button>
         </div>
       </div>
-      <p id="vote-scope-note" class="text-xs text-gray-500 mb-4 sm:mb-6"></p>
+      <p id="vote-scope-note" class="text-xs text-gray-500 mb-2"></p>
+      <label class="inline-flex items-center gap-2 min-h-10 sm:min-h-0 mb-3 text-xs text-gray-700 cursor-pointer"><input type="checkbox" id="votes-hide-ceremonial" class="w-4 h-4 accent-accent" /> Hide ceremonial bills and resolutions (naming buildings, medals, awareness days)</label>
       <div id="votes-container" class="min-h-[300px]">
         <div class="text-center py-12">
           <div class="inline-block animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-4 border-accent border-t-transparent mb-4"></div>
@@ -291,7 +293,7 @@
             <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">3</span>
             <h3 class="font-serif text-xl font-bold text-gray-900">A vote in the first chamber</h3>
             <div class="text-gray-700 mt-1 space-y-2"><p><strong>In the House</strong>, most important bills come to the floor under a <button type="button" data-term="rule" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">rule</button>: a resolution, adopted by majority vote first, that sets how long debate lasts and which amendments are allowed. Less controversial bills use a fast track, <button type="button" data-term="suspension" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">suspension of the rules</button>, which needs two-thirds to pass.</p><p><strong>In the Senate</strong>, any senator can keep debate going. Ending it takes <button type="button" data-term="cloture" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">cloture</button>: 60 votes for most legislation. Many bills instead pass by <button type="button" data-term="unanimous_consent" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">unanimous consent</button>, with no recorded vote at all.</p><p>Along the way there may be votes on <button type="button" data-term="amendment" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">amendments</button>, a <button type="button" data-term="recommit" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">motion to recommit</button> or a <button type="button" data-term="table" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">motion to table</button>. Only the final vote decides whether the bill passes.</p></div>
-            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> the Votes tab&rsquo;s &ldquo;Key votes&rdquo; are those final votes; &ldquo;All roll calls&rdquo; adds the steps on the way. Bills passed by voice vote or unanimous consent have no roll call; their page says so.</p>
+            <p class="text-sm text-gray-500 mt-2"><span class="font-semibold text-gray-600">On this site:</span> the Votes tab&rsquo;s &ldquo;Key votes&rdquo; are those final votes; &ldquo;All recorded votes&rdquo; adds the steps on the way. Bills passed by voice vote or unanimous consent have no recorded vote; their page says so.</p>
           </li>
           <li class="relative pl-12">
             <span class="absolute left-0 top-0 w-8 h-8 rounded-full bg-accent/15 text-accent font-bold flex items-center justify-center" aria-hidden="true">4</span>
@@ -320,7 +322,7 @@
         </ol>
 
         <section class="mt-10">
-          <h3 class="font-serif text-2xl font-bold text-gray-900">Not every measure is a bill</h3>
+          <h3 class="font-serif text-2xl font-bold text-gray-900">Not everything Congress votes on is a bill</h3>
           <ul class="list-disc pl-5 mt-2 space-y-1.5 text-gray-700">
             <li><strong>Joint resolutions</strong> (H.J.Res., S.J.Res.) work like bills and can become law. One exception: a joint resolution <strong>proposing a constitutional amendment</strong> needs two-thirds of both chambers, skips the President and goes to the states; three-fourths of them (38) must ratify it.</li>
             <li><strong>Concurrent resolutions</strong> (H.Con.Res., S.Con.Res.) pass both chambers but don&rsquo;t go to the President and aren&rsquo;t law: the budget resolution, for example.</li>
@@ -331,7 +333,7 @@
         <section class="mt-10">
           <h3 class="font-serif text-2xl font-bold text-gray-900">How votes are taken</h3>
           <ul class="list-disc pl-5 mt-2 space-y-1.5 text-gray-700">
-            <li>A <button type="button" data-term="roll_call" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">roll-call vote</button> records how each member voted (Yea, Nay, Present or Not Voting). Those are the votes this site shows member by member.</li>
+            <li>A <button type="button" data-term="roll_call" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">recorded vote</button> records how each member voted (Yea, Nay, Present or Not Voting). Those are the votes this site shows member by member.</li>
             <li>A <button type="button" data-term="voice_vote" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">voice vote</button> or <button type="button" data-term="unanimous_consent" aria-expanded="false" class="underline decoration-dotted decoration-accent/70 underline-offset-2 hover:text-accent">unanimous consent</button> records only the result, so there&rsquo;s no member-by-member record.</li>
             <li>Most votes need a simple majority of those voting. The exceptions: two-thirds for suspension of the rules, veto overrides and constitutional amendments; 60 senators for most cloture votes.</li>
           </ul>
@@ -350,7 +352,7 @@
             <h3>Sources and updates</h3>
             <ul>
               <li><strong>Bills, actions, laws, CRS summaries and subjects, members:</strong> the Congress.gov API (Library of Congress).</li>
-              <li><strong>House roll-call votes:</strong> the Office of the Clerk of the U.S. House, via Congress.gov. <strong>Senate roll-call votes:</strong> senate.gov's official vote records.</li>
+              <li><strong>House recorded votes:</strong> the Office of the Clerk of the U.S. House, via Congress.gov. <strong>Senate recorded votes:</strong> senate.gov's official vote records.</li>
               <li><strong>Campaign finance:</strong> the Federal Election Commission (OpenFEC). <strong>Congressional districts for an address:</strong> the U.S. Census Bureau geocoder.</li>
               <li>Two automatic updates run every night (votes and members at 10:00 UTC, bills at 10:30 UTC). The footer shows when each last finished, and a notice appears if one hasn't succeeded in 36 hours. We only show what these sources publish; when a value isn't available, we say so instead of estimating.</li>
             </ul>
@@ -365,6 +367,7 @@
               <li>Categories (Economy, Healthcare, Foreign Affairs, Immigration, Defense, the same as the Issues topics) come from the bill's <strong>policy area</strong>, which the Congressional Research Service (CRS) assigns.</li>
               <li><strong>Stage</strong> comes from the official action history: a chamber counts as passing a bill only when an action <em>starts</em> with "Passed/agreed to in House/Senate". "Became law" requires a law number or a "Became Public Law" action.</li>
               <li><strong>The story so far</strong> (bill pages) lists a bill's milestones from its official action history: introduced, sent to committee, floor votes, settling differences between the chambers, the President, and becoming law. The Actions tab has every step.</li>
+              <li><strong>Ceremonial</strong> marks bills and resolutions that name a post office, veterans' clinic, courthouse or federal building, award a Congressional Gold Medal or commemorative coin, or (for resolutions) mark a day, week or month. It comes from the official title and CRS subjects. Resolutions that recognize or honor a person or cause aren't tagged. The tag says what kind of bill or resolution it is, not whether it matters, and nothing is hidden unless you choose to hide these.</li>
               <li><strong>What happens next</strong> (bill cards and bill pages) states the general rules of the process for the bill's current stage. It isn't a prediction of what Congress will do.</li>
               <li><strong>Stage tracker</strong> (bill cards and bill pages): Introduced, Committee, each chamber, the President, Law. Simple resolutions (H.Res., S.Res.) need only their own chamber; concurrent resolutions both chambers; neither goes to the President. Constitutional amendments go to the states after both chambers, not the President (ratification isn't tracked). "Failed" and "Vetoed" are shown only when an official action says so. Bills we haven't stored get their stage from the same rule applied to their action history; with no stage data, no tracker is shown.</li>
               <li><strong>Moving or passed</strong> (the Bills tab's default): bills and resolutions that passed at least one chamber, sent to the President or became law. House rules, which only set the terms of debate for another bill, are left out. "All bills" shows everything we store.</li>
@@ -383,21 +386,22 @@
             <h3>This Congress so far</h3>
             <ul>
               <li><strong>Same point in the term:</strong> a Congress starts on January 3 of an odd year; "day N" is N days after that, so each Congress is compared with the last two at the same stage of their two-year terms.</li>
-              <li><strong>Bills</strong> are measures that can become law (H.R., S., H.J.Res., S.J.Res.), counted by introduction date. <strong>Passed a chamber / both:</strong> the first "Passed/agreed to in House" or "in Senate" action. "Both" means each chamber passed a version; if the second changed the text, the two still have to agree before the bill goes to the President. <strong>Laws:</strong> the "Became Public/Private Law" action, including bills signed after a term ended.</li>
+              <li><strong>Bills</strong> are the kinds that can become law (H.R., S., H.J.Res., S.J.Res.), counted by introduction date. <strong>Passed a chamber / both:</strong> the first "Passed/agreed to in House" or "in Senate" action. "Both" means each chamber passed a version; if the second changed the text, the two still have to agree before the bill goes to the President. <strong>Laws:</strong> the "Became Public/Private Law" action, including bills signed after a term ended.</li>
               <li><strong>Parties split:</strong> most Democrats voted the opposite way from most Republicans (Yea vs Nay); ties, quorum calls and Speaker elections are left out.</li>
               <li><strong>Sources:</strong> GovInfo's bill status files (the bulk record of every bill's actions) and Congress.gov for bills; the House Clerk and senate.gov for votes and party totals. The current Congress is updated nightly from Congress.gov.</li>
             </ul>
           </section>
 
           <section>
-            <h3>Roll-call votes</h3>
+            <h3>Recorded votes</h3>
             <ul>
+              <li>A <strong>recorded vote</strong> (officially a roll-call vote) lists how each member voted by name.</li>
               <li>Every recorded House and Senate vote of the current Congress. "Aye" and "No" (used on some House votes) are counted as Yea and Nay.</li>
-              <li><strong>When a new Congress begins</strong> (January 3 of odd-numbered years): for the first weeks, totals, charts, topics and the weekly summary keep describing the previous Congress until the new one has 25 roll-call votes. The previous Congress's last votes and the bills signed after it ended keep being added for 45 days. Voting records start over for each Congress.</li>
+              <li><strong>When a new Congress begins</strong> (January 3 of odd-numbered years): for the first weeks, totals, charts, topics and the weekly summary keep describing the previous Congress until the new one has 25 recorded votes. The previous Congress's last votes and the bills signed after it ended keep being added for 45 days. Voting records start over for each Congress.</li>
               <li>Times are converted from Eastern time. Senate nomination votes show the nominee but have no bill.</li>
               <li><strong>Vote types</strong> are grouped from the official question text: cloture (ending debate), nominations, passage (bills and resolutions, including suspension votes, concurring in the other chamber's changes and veto overrides), amendments, procedural motions, and other.</li>
-              <li><strong>Key votes</strong> (the Votes tab's default, and the home page): final votes on passing a bill or resolution and on nominations. House "rules" (resolutions that only set the terms of debate for another bill) are left out even though they are resolutions; they, cloture, amendments and procedural motions are under All roll calls.</li>
-              <li><strong>Headlines</strong> such as "House passed the … Act" are written from the official question, result and bill title by fixed rules; the official question and record are always shown with them. Only a final vote says a measure passed: a cloture vote reads "voted to end debate on …", an amendment vote "adopted an amendment to …", and so on. Bills are labeled the way Congress writes them (H.R. 2102, H.Res. 1247, S. 5).</li>
+              <li><strong>Key votes</strong> (the Votes tab's default, and the home page): final votes on passing a bill or resolution and on nominations. House "rules" (resolutions that only set the terms of debate for another bill) are left out even though they are resolutions; they, cloture, amendments and procedural motions are under All recorded votes.</li>
+              <li><strong>Headlines</strong> such as "House passed the … Act" are written from the official question, result and bill title by fixed rules; the official question and record are always shown with them. Only a final vote says a bill or resolution passed: a cloture vote reads "voted to end debate on …", an amendment vote "adopted an amendment to …", and so on. Bills are labeled the way Congress writes them (H.R. 2102, H.Res. 1247, S. 5).</li>
               <li><strong>Outcomes:</strong> "succeeded" means the official result says passed, agreed to, confirmed, adopted or sustained. A failed procedural motion can still be a win for the side that opposed it.</li>
             </ul>
           </section>
@@ -418,9 +422,9 @@
               <li><strong>Committees</strong> (member pages): current committee and subcommittee seats and titles (Chair, Ranking Member …) from the public-domain congress-legislators dataset, updated nightly.</li>
               <li><strong>Term and election</strong> (member pages): when the current term ends (and the Senate class) from the same dataset. The election date is worked out from it: terms end January 3, and federal elections are held the Tuesday after the first Monday in November of the year before. Once that election has been held we don't say who won; the winner takes office when the term ends. After a term ends, these lines stay hidden until the dataset lists the new term.</li>
               <li><strong>Voted on</strong> = Yea, Nay or Present. <strong>Voted with their party's majority</strong> compares their Yea or Nay with their party's majority position on that vote (as above); Independents aren't compared.</li>
-              <li><strong>Missed votes</strong> = roll calls where the official record lists the member as Not Voting, out of the roll calls held while they served (Present is not a missed vote). Shown on member cards, in the member window and on Home.</li>
-              <li><strong>Month by month</strong> (Voting Record): the same counts by the month of each vote (Eastern time): the share of roll calls missed, and how often their Yea or Nay matched their party's majority (months with fewer than 5 such votes are left out). A member is compared only with themselves.</li>
-              <li><strong>Typical member</strong> = the median missed-vote share of the chamber's members (half missed less, half more), for context. Members with fewer than 20 roll calls (just sworn in) and delegates are left out of it. Delegates may vote only on some amendments, so we don't show them a missed-vote share.</li>
+              <li><strong>Missed votes</strong> = recorded votes where the official record lists the member as Not Voting, out of the recorded votes held while they served (Present is not a missed vote). Shown on member cards, in the member window and on Home.</li>
+              <li><strong>Month by month</strong> (Voting Record): the same counts by the month of each vote (Eastern time): the share of recorded votes missed, and how often their Yea or Nay matched their party's majority (months with fewer than 5 such votes are left out). A member is compared only with themselves.</li>
+              <li><strong>Typical member</strong> = the median missed-vote share of the chamber's members (half missed less, half more), for context. Members with fewer than 20 recorded votes (just sworn in) and delegates are left out of it. Delegates may vote only on some amendments, so we don't show them a missed-vote share.</li>
               <li>The official record doesn't say why a vote was missed: illness, family, travel, campaigning and other duties look the same, so we don't suggest a reason.</li>
               <li>We don't score, rank or rate members, and AI is never used to judge them. Missed votes are never sorted or listed as a ranking.</li>
             </ul>
@@ -429,8 +433,8 @@
           <section>
             <h3>Issues pages</h3>
             <ul>
-              <li><strong>Month by month</strong>: recorded votes on the topic's measures by the month they were held (Eastern time), and laws by the month they were signed.</li>
-              <li>A topic's <strong>measures</strong> are bills with that CRS policy area that became law or got a recorded floor vote this Congress. Bills that never reached the floor aren't counted: most bills are never taken up, which isn't the same as being rejected.</li>
+              <li><strong>Month by month</strong>: recorded votes on the topic's bills and resolutions by the month they were held (Eastern time), and laws by the month they were signed.</li>
+              <li>A topic's <strong>bills and resolutions</strong> are those with that CRS policy area that became law or got a recorded floor vote this Congress. Bills that never reached the floor aren't counted: most bills are never taken up, which isn't the same as being rejected.</li>
               <li><strong>Watchlists</strong> (Economy: tariffs &amp; trade, taxes, budget &amp; debt; Healthcare: coverage &amp; costs, veterans' health, mental health &amp; substance use; Foreign Affairs: Iran, Israel, foreign aid; Immigration: border security, legal status, visas &amp; citizenship, asylum &amp; refugees; Defense: troops &amp; military families, veterans' benefits, defense budget &amp; weapons, intelligence &amp; surveillance) include a bill if CRS tagged it with a matching subject or its title names the topic, so they can include bills from other policy areas, such as defense, veterans' and spending bills. Each watchlist prints its exact rule.</li>
               <li>A watchlist bill is <strong>focused</strong> if its title names the topic or CRS gave it 10 or fewer subjects; otherwise it's a <strong>broad</strong> bill (like an annual spending or defense bill) that includes the topic among many others.</li>
             </ul>
@@ -447,11 +451,11 @@
           <section>
             <h3>What Congress did each week</h3>
             <ul>
-              <li>Weeks run Monday to Sunday, Eastern time. The Overview shows the latest week with any roll-call vote or new law; each week has its own page and link.</li>
-              <li><strong>Became law:</strong> bills whose "Became Public Law" action is dated that week. <strong>Passed / failed:</strong> roll-call votes on passage of a bill or resolution, by the official result. House rules (resolutions that only set the terms of debate for another bill) are listed apart under "Debate rules" and not counted as passed; their result reads "Agreed to". Bills that pass by voice vote or unanimous consent have no roll call, so they show up when they become law.</li>
+              <li>Weeks run Monday to Sunday, Eastern time. The Overview shows the latest week with any recorded vote or new law; each week has its own page and link.</li>
+              <li><strong>Became law:</strong> bills whose "Became Public Law" action is dated that week. <strong>Passed / failed:</strong> recorded votes on passage of a bill or resolution, by the official result. House rules (resolutions that only set the terms of debate for another bill) are listed apart under "Debate rules" and not counted as passed; their result reads "Agreed to". Bills that pass by voice vote or unanimous consent have no recorded vote, so they show up when they become law.</li>
               <li><strong>Closest votes:</strong> the three smallest Yea–Nay margins among passage, cloture, nomination and amendment votes; procedural motions are left out. <strong>Nominations:</strong> every Senate vote on a nomination, with the nominee as named in the vote record.</li>
               <li><strong>Key votes on the home page:</strong> the latest final votes on bills, resolutions and nominations in the latest week with votes. House "rules" (votes that set the terms of debate for another bill) and other procedural votes are left out; they're on the week page.</li>
-              <li><strong>Your members</strong> come from the address you enter (looked up as described below) and are remembered only in your browser; their positions on key votes come from the official roll calls.</li>
+              <li><strong>Your members</strong> come from the address you enter (looked up as described below) and are remembered only in your browser; their positions on key votes come from the official recorded votes.</li>
               <li>Nothing is picked by hand or by AI: every item follows these rules.</li>
             </ul>
           </section>
@@ -461,7 +465,7 @@
             <ul>
               <li>Your address is sent to the U.S. Census Bureau's geocoder to find your congressional district, using the district map of the Congress now in office. We don't store or log the address.</li>
               <li>Phone numbers, websites and contact forms come from the public-domain <a href="https://github.com/unitedstates/congress-legislators" class="text-accent hover:underline" target="_blank" rel="noopener">congress-legislators</a> dataset (each member's current term), updated nightly. Phone numbers are their Washington offices; not every member has a separate contact form, and their website links to one.</li>
-              <li><strong>Your members on a bill</strong> (bill pages, once you've entered an address): whether they sponsored or cosponsored it (Congress.gov's cosponsor list, including withdrawn cosponsors; only members of the bill's own chamber can), and how they voted on its final roll calls: passage, accepting the other chamber's changes, veto overrides. Procedural steps (cloture, amendments, rules) aren't listed there; they're on the bill's Votes tab.</li>
+              <li><strong>Your members on a bill</strong> (bill pages, once you've entered an address): whether they sponsored or cosponsored it (Congress.gov's cosponsor list, including withdrawn cosponsors; only members of the bill's own chamber can), and how they voted on its final recorded votes: passage, accepting the other chamber's changes, veto overrides. Procedural steps (cloture, amendments, rules) aren't listed there; they're on the bill's Votes tab.</li>
             </ul>
           </section>
 
@@ -469,7 +473,7 @@
             <h3>Following and "Since you last looked"</h3>
             <ul>
               <li>Follow a bill, a member or an Issues topic (up to 20 bills, 10 members, 10 topics). What you follow is saved only in this browser; nothing is sent to us, and clearing your browser data removes it.</li>
-              <li>Following saves what the item looked like then. Home compares that with today's data: a bill's new stage or latest action, a member's new roll-call votes and how many they missed (with their latest positions), a topic's new laws and measures. "Mark all as seen" saves today's state instead.</li>
+              <li>Following saves what the item looked like then. Home compares that with today's data: a bill's new stage or latest action, a member's new recorded votes and how many they missed (with their latest positions), a topic's new laws and the bills and resolutions voted on. "Mark all as seen" saves today's state instead.</li>
             </ul>
           </section>
 
@@ -517,8 +521,8 @@
         <p class="font-semibold text-white">Data sources</p>
         <ul class="mt-2 space-y-1">
           <li><a class="underline decoration-accent/50 hover:text-white" href="https://api.congress.gov/" target="_blank" rel="noopener">Congress.gov API</a>: bills, actions, CRS summaries, members</li>
-          <li><a class="underline decoration-accent/50 hover:text-white" href="https://clerk.house.gov/Votes" target="_blank" rel="noopener">Office of the Clerk, U.S. House</a>: House roll-call votes</li>
-          <li><a class="underline decoration-accent/50 hover:text-white" href="https://www.senate.gov/legislative/votes_new.htm" target="_blank" rel="noopener">U.S. Senate (senate.gov)</a>: Senate roll-call votes</li>
+          <li><a class="underline decoration-accent/50 hover:text-white" href="https://clerk.house.gov/Votes" target="_blank" rel="noopener">Office of the Clerk, U.S. House</a>: House recorded votes</li>
+          <li><a class="underline decoration-accent/50 hover:text-white" href="https://www.senate.gov/legislative/votes_new.htm" target="_blank" rel="noopener">U.S. Senate (senate.gov)</a>: Senate recorded votes</li>
           <li><a class="underline decoration-accent/50 hover:text-white" href="https://api.open.fec.gov/developers/" target="_blank" rel="noopener">FEC (OpenFEC)</a>: campaign finance filings</li>
           <li><a class="underline decoration-accent/50 hover:text-white" href="https://github.com/unitedstates/congress-legislators" target="_blank" rel="noopener">congress-legislators</a>: member ↔ FEC and Senate id mapping</li>
         </ul>

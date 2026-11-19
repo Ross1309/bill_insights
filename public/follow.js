@@ -61,7 +61,7 @@ export function memberChange(base, rec) {
   const missed = fresh ? rec.totals.not_voting : rec.totals.not_voting - (base.missed || 0);
   const recent = (rec.recent || []).filter(e => !base.last || fresh || e.date > base.last).slice(0, 3);
   return {
-    what: `${newVotes} new roll-call vote${newVotes === 1 ? "" : "s"}${missed > 0 ? `, ${missed} missed` : ""}`,
+    what: `${newVotes} new recorded vote${newVotes === 1 ? "" : "s"}${missed > 0 ? `, ${missed} missed` : ""}`,
     votes: recent.map(e => ({ id: e.id, position: e.position, headline: voteHeadline({ chamber: e.chamber, question: e.question, outcome: outcomeOf(e.result), result: e.result,
       bill: e.bill_id ? { id: e.bill_id, label: e.legislation || e.bill_id, title: null } : null, legislation: e.legislation }) })),
   };
@@ -71,7 +71,7 @@ export function topicChange(base, t) {
   if (!t) return null;
   const laws = (t.law ?? 0) - (base.law || 0), measures = (t.measures ?? 0) - (base.measures || 0);
   if (laws <= 0 && measures <= 0) return null;
-  return { what: [laws > 0 && `${laws} new law${laws === 1 ? "" : "s"}`, measures > 0 && `${measures} more measure${measures === 1 ? "" : "s"} voted on or enacted`].filter(Boolean).join(", ") };
+  return { what: [laws > 0 && `${laws} new law${laws === 1 ? "" : "s"}`, measures > 0 && `${measures} more ${measures === 1 ? "bill or resolution" : "bills or resolutions"} voted on or enacted`].filter(Boolean).join(", ") };
 }
 
 // --- Follow button (bill/member window headers, Issues topic pages) ---------------------
