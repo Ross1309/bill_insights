@@ -193,3 +193,11 @@ export function outcomeOf(result = "") {
   if (/passed|agreed|confirmed|adopted|sustained|well taken/.test(r)) return "succeeded";
   return "other";
 }
+
+// A member's record (member_votes.recent, newest first): their latest final votes on bills,
+// resolutions and nominations, and votes where their Yea or Nay went against most of their
+// own party. For the My members page.
+const FINAL_KINDS = new Set(["passage", "nomination", "concur", "override"]);
+export const finalVotes = (rec, n = 5) => (rec?.recent || []).filter(e => FINAL_KINDS.has(questionKind(e.question))).slice(0, n);
+export const againstParty = (rec, n = 5) => (rec?.recent || [])
+  .filter(e => (e.group === "yea" || e.group === "nay") && e.party_majority && e.party_majority !== e.group).slice(0, n);

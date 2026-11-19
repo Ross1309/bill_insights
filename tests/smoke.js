@@ -205,6 +205,9 @@ try {
     await waitText('#home-hero', /Your members for WA-7[\s\S]*Jayapal/, 'Home: find your members by address');
     await waitText('#home-keyvotes', /Your members \(WA-7\)[\s\S]*(Yea|Nay|Not Voting|None of your members)/, 'Home: how your members voted');
     await waitText('#home-hero', /Call 202-\d{3}-\d{4}/, 'Home: your members have a phone number');
+    await page.click('#home-hero a[href="#my-members"]');
+    await waitText('#mine-container', /My members · WA-7[\s\S]*What to say[\s\S]*Jayapal[\s\S]*Latest final votes[\s\S]*Voted against most of their party[\s\S]*Bills they sponsored that moved/, 'My members page: each member\'s record');
+    await page.click('#nav-overview');
     await openDetail('bill', 'hr2102-119');
     await waitText('#modal-root', /Your members \(WA-7\) on this bill[\s\S]*Cosponsor[\s\S]*House passed[^\n]*: Yea/, 'Bill window: your members (cosponsor + final vote)');
     await closeModal();

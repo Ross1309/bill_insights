@@ -92,6 +92,7 @@ netlify/lib/congress-stats.js      stats/congress-<n> daily series: GovInfo pars
 netlify/functions/sync-congress-stats.js  Nightly 11:00 UTC: new bills + passage for the current Congress
 scripts/build-congress-stats.js    Backfill stats/congress-<n> (GovInfo bulk + votes; seeds upkeep state)
 public/week.js                     Weekly digest: #week/<Monday> page (rendering only)
+public/mine.js                     My members (#my-members): your three members' records, contacts, what to say
 public/follow.js                   Follow bills/members/topics on the device; what changed since
 public/home.js                     Home tab: your members, this week, issues, key votes, laws, numbers
 public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
@@ -968,6 +969,17 @@ filtered or listed as a ranking (footer promise); neutral gray text, no warning 
   closest votes). "concurrent resolution" is not "concur". Generic Senate "On the Motion"
   (79 votes) stays generic: the record doesn't say more. Vote window: "What this vote was".
 - Page leads say what each page is for; headings match the tab names.
+
+## My members (#my-members, 2026-11-19)
+
+- `public/mine.js` (view `view-mine`, tab key `mine`, no tab button; linked from Home's members card
+  and Your representatives): per member, on their own record (never compared or ranked): missed
+  votes + typical, with-party share, latest final votes and votes against their party
+  (`finalVotes`/`againstParty` in plain.js, from member_votes.recent = latest 50), bills they
+  sponsored that passed a chamber (bills `where sponsor.bioguideId ==`, current Congress), newest
+  bills (member-profile), committees, term, contacts. Address form when none is saved.
+- **What to say** (`callScriptHtml` in util.js): neutral call/write script, same for support or
+  oppose; on My members, Home's members card and the bill window's "Your members" (with the bill).
 
 ## Follow + "Since you last looked" (2026-11-15)
 

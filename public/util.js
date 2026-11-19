@@ -93,6 +93,21 @@ export function contactLinks(c, { label = "" } = {}) {
   return parts.length ? `${label}${parts.join(`<span class="text-gray-400" aria-hidden="true"> · </span>`)}` : "";
 }
 
+// "What to say" when calling or writing a member's office: a neutral script, the same for
+// supporting or opposing. code: "WA-7"; bill: "H.R. 2102" when the page is about one.
+export function callScriptHtml({ code = "", bill = "" } = {}) {
+  const ph = t => `<span class="text-gray-500">[${escapeHtml(t)}]</span>`;
+  return `
+    <details class="text-sm">
+      <summary class="cursor-pointer py-1 font-semibold text-accent">What to say when you call or write</summary>
+      <div class="mt-2 space-y-2 text-gray-700">
+        <p>A staff member usually answers and notes what you're calling about. A short message works best:</p>
+        <blockquote class="border-l-2 border-accent/40 pl-3 text-gray-900">Hi, my name is ${ph("your name")} and I live in ${ph("city and ZIP code")}${code ? `, in ${escapeHtml(code)}` : ""}. I'm calling about ${bill ? escapeHtml(bill) : ph("the bill number or issue")}. I ${ph("support / oppose")} it because ${ph("one reason in your own words")}. Thank you.</blockquote>
+        <p class="text-xs text-gray-500">Giving your ZIP code shows you're a constituent. One issue per call is easiest to log. Contact forms ask for your address and carry the same message.</p>
+      </div>
+    </details>`;
+}
+
 // "Hide ceremonial" is one setting for the Bills and Votes tabs: flipping it on one tab
 // updates the other (onHideCeremonial) and is remembered in this browser.
 export const hideCeremonialOn = () => store.get("cw-hide-ceremonial", "0") === "1";

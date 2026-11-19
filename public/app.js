@@ -13,6 +13,7 @@ import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
 import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, lookupDistrict, myReps, rememberMyReps, repsFor, withContacts, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
 import { renderWeekPage } from "./week.js";
+import { loadMine, setupMine } from "./mine.js";
 import { renderHome, upcomingHtml } from "./home.js";
 import { setupSearch } from "./search.js";
 import { onTabArg, setRouteHandlers, shareUrl, startRouter, tabArg, replaceTab } from "./router.js";
@@ -396,6 +397,7 @@ async function init() {
   onTabOpen.bills = startBills;
   onTabOpen.votes = () => { if (!votesLoaded) fetchVotes(); };
   onTabOpen.members = showDirectory;
+  onTabOpen.mine = loadMine;
   // URL arguments (see router.js): Issues topic, Legislators state / district.
   tabArg.issues = () => currentIssue;
   // Before the first load starts, just choose the topic (the tab's loader loads it).
@@ -426,6 +428,7 @@ async function init() {
   setupModals();
   setupIssues();
   setupHome();
+  setupMine();
   setupFollow();
   setupSearch();
   setupGlossary();

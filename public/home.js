@@ -4,7 +4,7 @@
 // come from their member_votes docs (3 reads, only once an address was given).
 // Pure rendering: app.js loads the data and wires the address form.
 
-import { contactLinks, escapeHtml as esc, formatDay, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
+import { callScriptHtml, contactLinks, escapeHtml as esc, formatDay, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
 import { voteHeadline, partyWords, weekBrief } from "./plain.js";
 import { voteCardHtml } from "./vote-card.js";
 import { weekRange } from "./week.js";
@@ -121,9 +121,9 @@ function repsCard(reps, participation) {
         <p class="text-sm text-gray-600 mt-1">Your members for ${esc(reps.code)}${reps.state && STATE_NAMES[reps.state] ? ` (${esc(STATE_NAMES[reps.state])}${reps.district ? `'s ${esc(ordinal(reps.district))} district` : ""})` : ""}:</p>
         <div class="mt-3 space-y-3">${reps.members.map(m => memberRow(m, participation)).join("")}</div>
         ${typicalLine(participation)}
-        <p class="text-[11px] text-gray-500 mt-2">Calls and messages reach their Washington offices. Saying which bill or vote you mean, and that you live in their state or district, helps staff log it.</p>
+        <div class="mt-2">${callScriptHtml({ code: reps.code })}</div>
         <div class="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <a href="#legislators/${esc(reps.code)}" class="font-semibold text-accent hover:underline">All about them →</a>
+          <a href="#my-members" class="font-semibold text-accent hover:underline">What they've done →</a>
           <button type="button" data-home-change class="text-gray-500 hover:text-gray-800 underline">Change address</button>
         </div>
         <div data-home-change-form class="hidden">${form}</div>`

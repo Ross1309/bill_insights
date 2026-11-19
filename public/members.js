@@ -216,7 +216,8 @@ function renderYourReps(members) {
         ${rep ? repCard(rep) : `<div class="border border-dashed border-gray-300 rounded-xl p-5 text-sm text-gray-500">This House seat is currently vacant.</div>`}
       </div>
       ${delegateOnly ? `<p class="text-xs text-gray-500 mt-2">${escapeHtml(STATE_NAMES[state])} has no senators. Its delegate can vote in committee but not on final passage of bills.</p>` : ""}
-      <p class="text-xs text-gray-500 mt-3">All members from ${escapeHtml(STATE_NAMES[state])} are listed below.</p>
+      <p class="text-sm mt-3"><a href="#my-members" class="font-semibold text-accent hover:underline">What they've done: votes, bills and committees →</a></p>
+      <p class="text-xs text-gray-500 mt-1">All members from ${escapeHtml(STATE_NAMES[state])} are listed below.</p>
     </div>`;
 }
 

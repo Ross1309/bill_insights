@@ -435,3 +435,19 @@ test('isCeremonial: naming, medals and coins, marked days; never political state
   for (const b of yes) assert.equal(c(b), true, b.title);
   for (const b of no) assert.equal(c(b), false, b.title);
 });
+
+test('finalVotes / againstParty: from a member record, newest first', async () => {
+  const { finalVotes, againstParty, voteHeadline, outcomeOf } = await import('../public/plain.js');
+  const e = (id, question, group, party_majority) => ({ id, question, group, party_majority, chamber: 'House', result: 'Passed' });
+  const rec = { recent: [
+    e('a', 'On Passage', 'yea', 'yea'), e('b', 'On Ordering the Previous Question', 'nay', 'yea'),
+    e('c', 'On Motion to Concur in the Senate Amendment', 'nay', 'yea'), e('d', 'On the Nomination', 'not_voting', null),
+    e('e', 'On Motion to Suspend the Rules and Pass', 'yea', null),
+  ] };
+  assert.deepEqual(finalVotes(rec).map(x => x.id), ['a', 'c', 'd', 'e']);
+  assert.deepEqual(againstParty(rec).map(x => x.id), ['b', 'c']);
+  assert.deepEqual(finalVotes(null), []);
+  // Headlines from a record entry (no bill title stored there) still read plainly.
+  assert.equal(voteHeadline({ chamber: 'House', question: 'On Passage', outcome: outcomeOf('Passed'), result: 'Passed', bill: { id: 'hr4464-119', label: 'HR 4464', title: null } }), 'House passed H.R. 4464');
+  assert.match(voteHeadline({ chamber: 'Senate', question: 'On the Nomination', outcome: outcomeOf('Nomination Confirmed'), result: 'Nomination Confirmed', bill: null, legislation: 'PN 1181' }), /Senate confirmed/);
+});

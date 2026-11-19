@@ -3,7 +3,7 @@
 // vote -> member -> bill and back. Server data (Congress.gov via Netlify functions)
 // is optional: if it fails, the modal still shows Firestore data plus a Retry button.
 import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesForBill, loadParticipation } from "./data.js";
-import { billName, contactLinks, sponsorName, errorBlock, escapeHtml, externalLink, factList, formatDay, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
+import { billName, callScriptHtml, contactLinks, sponsorName, errorBlock, escapeHtml, externalLink, factList, formatDay, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
 import { asVote, divisionTags, tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
@@ -441,13 +441,14 @@ function yourMembersHtml(e) {
     <section class="mt-5 bg-gray-50 border border-gray-200 rounded-lg p-3">
       <h3 class="text-sm font-bold text-gray-900">Your members (${escapeHtml(reps.code)}) on this bill</h3>
       <ul class="divide-y divide-gray-200">${rows}</ul>
+      <div class="mt-2">${callScriptHtml({ code: reps.code, bill: billRef.label ? officialLabel(billRef.label) : "" })}</div>
       <p class="text-[11px] text-gray-500 mt-1">Sponsors and cosponsors from Congress.gov; votes are the final recorded votes on the bill itself (not procedural steps). A bill passed by voice vote has no recorded positions.</p>
     </section>`;
 }
 
 // The member's committee seats (members.committees, from congress-legislators). Absent on
 // records synced before committees were stored: then nothing is shown.
-function committeesHtml(list) {
+export function committeesHtml(list) {
   if (!Array.isArray(list)) return "";
   const role = t => (t ? ` <span class="text-xs font-semibold text-gray-700 bg-gray-100 rounded px-1.5 py-0.5">${escapeHtml(t)}</span>` : "");
   return `

@@ -261,6 +261,11 @@
 
     <!-- How a bill becomes law (#how-laws-are-made; no tab-bar button). Linked from the
          stage tracker, the glossary, the Bills tab and This Congress. Our own words. -->
+    <!-- MY MEMBERS (#my-members; no tab-bar button): your three members' records (mine.js) -->
+    <section id="view-mine" class="tab-view hidden">
+      <div id="mine-container" class="min-h-screen"></div>
+    </section>
+
     <section id="view-process" class="tab-view hidden">
       <div class="max-w-3xl">
         <h2 class="font-serif text-3xl font-bold text-gray-900">How a bill becomes law</h2>
@@ -466,6 +471,16 @@
               <li>Your address is sent to the U.S. Census Bureau's geocoder to find your congressional district, using the district map of the Congress now in office. We don't store or log the address.</li>
               <li>Phone numbers, websites and contact forms come from the public-domain <a href="https://github.com/unitedstates/congress-legislators" class="text-accent hover:underline" target="_blank" rel="noopener">congress-legislators</a> dataset (each member's current term), updated nightly. Phone numbers are their Washington offices; not every member has a separate contact form, and their website links to one.</li>
               <li><strong>Your members on a bill</strong> (bill pages, once you've entered an address): whether they sponsored or cosponsored it (Congress.gov's cosponsor list, including withdrawn cosponsors; only members of the bill's own chamber can), and how they voted on its final recorded votes: passage, accepting the other chamber's changes, veto overrides. Procedural steps (cloture, amendments, rules) aren't listed there; they're on the bill's Votes tab.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>My members</h3>
+            <ul>
+              <li>One page about the senators and representative for the address saved in your browser, each on their own record. Members aren't compared with each other or ranked.</li>
+              <li><strong>Latest final votes:</strong> their most recent votes on passing bills and resolutions, accepting the other chamber's changes, overriding vetoes and confirming nominees. <strong>Voted against most of their party:</strong> votes among their latest 50 where their Yea or Nay differed from most of their own party; the record doesn't say why.</li>
+              <li><strong>Bills they sponsored that moved:</strong> bills they sponsored this Congress that passed at least one chamber. <strong>Newest bills they introduced:</strong> from Congress.gov. <strong>Committees and term:</strong> from the public congress-legislators dataset.</li>
+              <li><strong>What to say:</strong> a short, neutral script for calling or writing, the same whether you support or oppose something.</li>
             </ul>
           </section>
 

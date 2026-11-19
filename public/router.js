@@ -16,7 +16,7 @@
 // changes inside a tab (topic, state) replace the current one. Modules register how
 // to show a tab argument (onTabArg) and what their current argument is (tabArg).
 
-const TAB_URL = { overview: "overview", issues: "issues", bills: "bills", votes: "votes", members: "legislators", methodology: "methodology", process: "how-laws-are-made", week: "week", charts: "congress" };
+const TAB_URL = { overview: "overview", issues: "issues", bills: "bills", votes: "votes", members: "legislators", methodology: "methodology", process: "how-laws-are-made", week: "week", charts: "congress", mine: "my-members" };
 const URL_TAB = { ...Object.fromEntries(Object.entries(TAB_URL).map(([tab, url]) => [url, tab])), charts: "charts" };
 const DETAIL_KINDS = new Set(["bill", "member", "vote"]);
 
