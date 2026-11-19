@@ -10,6 +10,10 @@ import { escapeHtml as esc } from "./util.js";
 
 // key: [term as shown in the popover, definition, phrases that mark it in official text]
 export const TERMS = {
+  close_vote: ["Close vote", "The difference between Yea and Nay was 5% or less of all Yea and Nay votes.", ["close vote"]],
+  party_line: ["Split along party lines", "Most Democrats and most Republicans voted on opposite sides, with at least 90% of each party on its side.", ["split along party lines"]],
+  broad_agreement: ["Broad agreement", "Most Democrats and most Republicans voted the same way, with at least two-thirds of each party on that side.", ["broad agreement"]],
+  mixed_support: ["Mixed support", "The vote wasn't close, and it didn't meet our rules for broad agreement or a split along party lines: at least one party was noticeably divided.", ["mixed support"]],
   cloture: ["Cloture", "A Senate vote to end debate so a final vote can happen. Most legislation needs 60 of 100 senators; nominations need a simple majority.", ["cloture"]],
   suspension: ["Suspension of the rules", "A House fast track for less controversial bills: 40 minutes of debate, no amendments, and two-thirds of those voting needed to pass.", ["suspend the rules", "suspension of the rules"]],
   recommit: ["Motion to recommit", "A motion, usually offered by the minority party, to send a bill back to committee instead of passing it now. It's the last vote before final passage.", ["motion to recommit", "recommit"]],

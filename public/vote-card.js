@@ -9,8 +9,8 @@
 
 import { escapeHtml as esc, formatVoteDate, officialLabel, PARTY_BADGES, safeHref } from "./util.js";
 import { explainQuestion } from "./issues.js";
-import { voteHeadline, resultWord, partyWords, outcomeOf, isRule } from "./plain.js";
-import { termize } from "./glossary.js";
+import { voteHeadline, resultWord, partyWords, outcomeOf, isRule, voteDivision } from "./plain.js";
+import { termize, termButton, TERMS } from "./glossary.js";
 
 const SOURCE = { House: "House Clerk record", Senate: "Senate.gov record" };
 // Key votes: final votes on bills/resolutions and nominations (vote_summaries.kind).
@@ -43,6 +43,13 @@ export function partyBar(label, c, cls) {
       </span>
       <span class="w-28 shrink-0 text-right tabular-nums text-gray-700 whitespace-nowrap">${c?.yea ?? 0} Yea · ${c?.nay ?? 0} Nay</span>
     </div>`;
+}
+
+// "Close vote", "Split along party lines"…: neutral tags (not the Yea/Nay or party colors);
+// tapping one explains the rule.
+export function divisionTags(v) {
+  const tags = voteDivision(v);
+  return tags.length ? `<p class="flex flex-wrap gap-1.5 mt-2">${tags.map(k => `<span class="inline-block text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded px-2 py-1">${termButton(k, esc(TERMS[k][0]))}</span>`).join("")}</p>` : "";
 }
 
 // What the measure voted on does: the first point of its AI summary, labeled with its source.
@@ -80,6 +87,7 @@ export function voteCardHtml(raw, { yours = "", margin = null, billSummary = tru
       <div class="mt-3 space-y-1.5">${partyBar("Democrats", v.parties?.D, PARTY_BADGES.Democratic)}${partyBar("Republicans", v.parties?.R, PARTY_BADGES.Republican)}</div>
       ${independents}
       ${tieLine(v)}
+      ${divisionTags(v)}
       ${partyWords(v.parties) ? `<p class="text-xs text-gray-500 mt-2">${esc(partyWords(v.parties))}.</p>` : ""}
       <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs">
         <button type="button" data-open="vote" data-id="${esc(v.id)}" class="font-semibold text-accent hover:underline">How each member voted →</button>

@@ -377,3 +377,17 @@ test('nextStep: the rules of the process for the current stage, never a predicti
   assert.match(nextStep(bill({ congress: n - 2, vetoed: true })).text, /veto stands/);
   assert.equal(nextStep({ type: 'HR' }), null);
 });
+
+test('voteDivision: close, party lines, broad agreement, mixed', async () => {
+  const { voteDivision: d } = await import('../public/plain.js');
+  const P = (dy, dn, ry, rn) => ({ D: { yea: dy, nay: dn }, R: { yea: ry, nay: rn } });
+  assert.deepEqual(d({ yea: 218, nay: 214, parties: P(0, 212, 218, 2) }), ['close_vote', 'party_line']);
+  assert.deepEqual(d({ yea: 49, nay: 27, parties: P(0, 27, 49, 0) }), ['party_line']);
+  assert.deepEqual(d({ yea: 392, nay: 18, parties: P(210, 0, 181, 18) }), ['broad_agreement']);
+  assert.deepEqual(d({ yea: 295, nay: 128, parties: P(83, 128, 211, 0) }), ['mixed_support']);
+  assert.deepEqual(d({ yea: 50, nay: 50, parties: P(25, 25, 25, 25) }), ['close_vote']);       // tied party: no party tag
+  assert.deepEqual(d({ yea: 105, nay: 95 }), ['close_vote']);                                    
+  assert.deepEqual(d({ yea: 106, nay: 94 }), []);                                                  // no party data: nothing to say
+  assert.deepEqual(d({ yea: 0, nay: 0 }), []);                                                     // quorum calls
+  assert.deepEqual(d({ yea: 60, nay: 5, parties: P(5, 0, 55, 5) }), []);                           // too few Democrats voted to tag
+});

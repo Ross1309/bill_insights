@@ -5,7 +5,7 @@
 import { fetchFunction, getBill, getMember, getMemberVotes, getVote, getVotesForBill, loadParticipation } from "./data.js";
 import { billName, contactLinks, sponsorName, errorBlock, escapeHtml, externalLink, factList, formatDay, formatVoteDate, memberLink, officialLabel, ordinal, PARTY_BADGES, PARTY_NAMES, PARTY_TEXT, POSITION_BADGES, safeHref, spinner, STATE_NAMES } from "./util.js";
 import { SUMMARY_SOURCE_LABELS, billLabel, noSummaryText } from "./bills.js";
-import { tieLine, voteCardHtml } from "./vote-card.js";
+import { asVote, divisionTags, tieLine, voteCardHtml } from "./vote-card.js";
 import { followButtonHtml } from "./follow.js";
 import { stageFromDetail, stageTrackerHtml } from "./stage.js";
 import { termize } from "./glossary.js";
@@ -345,6 +345,7 @@ const voteModal = {
         ${v.vote_type ? `<p class="text-xs text-gray-400 mt-1">${termize(escapeHtml(v.vote_type))}</p>` : ""}
         ${voteTalliesHtml(v)}
         ${tieLine({ ...v, yea: v.tallies?.yea, nay: v.tallies?.nay })}
+        ${divisionTags(asVote(v))}
         <div class="flex flex-wrap gap-4 mt-4 text-sm">${externalLink(v.source_url, sourceLabel(v))}</div>`;
     }],
     ["members", "How members voted", e => {

@@ -814,6 +814,9 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - **What the bill does** on vote cards: first point of the bill's CRS-based AI summary, labeled
   with its source (`billSummaryLine`; `vote_summaries.bill_summary`, digest `bill.summary`).
   sync-bills copies a new summary onto stored cards (`refreshVoteSummaryLines`); not on House rules.
+- **How divided** tags (`voteDivision` in plain.js, `divisionTags` in vote-card.js, rules in the
+  glossary and How we count): close vote (margin <= 5%), party lines (90% of each party on
+  opposite sides), broad agreement (two-thirds of each on the same side), mixed support.
 - `vote_summaries.kind` (`voteKind` in vote-index.js: `rule` for House rules, else
   `voteCategory`) and `bill_title` (read from `bills` when summaries are written).
   **Key votes** = kind passage | nomination; the Votes tab defaults to them (filtered in

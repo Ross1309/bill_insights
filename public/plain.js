@@ -136,6 +136,25 @@ export function partyWords(p) {
   return "";
 }
 
+// How divided a vote was: glossary keys for its tags, by published rules (How we count).
+// Close: the margin is 5% or less of all Yea and Nay votes. Party lines: most of each party
+// on opposite sides, with at least 90% of each party on its side. Broad agreement: most of
+// each party on the same side, with at least two-thirds of each. Otherwise mixed support.
+// Party tags need at least 10 Yea or Nay votes from each party.
+export function voteDivision({ yea, nay, parties } = {}) {
+  const total = (yea || 0) + (nay || 0);
+  if (!total) return [];
+  const close = Math.abs(yea - nay) * 20 <= total;
+  const side = c => { const n = (c?.yea || 0) + (c?.nay || 0); return n >= 10 && c.yea !== c.nay ? { yea: c.yea > c.nay, top: Math.max(c.yea, c.nay), n } : null; };
+  const counted = c => ((c?.yea || 0) + (c?.nay || 0)) >= 10;
+  const d = side(parties?.D), r = side(parties?.R);
+  let party = null;
+  if (d && r && d.yea !== r.yea && d.top * 10 >= d.n * 9 && r.top * 10 >= r.n * 9) party = "party_line";
+  else if (d && r && d.yea === r.yea && d.top * 3 >= d.n * 2 && r.top * 3 >= r.n * 2) party = "broad_agreement";
+  else if (counted(parties?.D) && counted(parties?.R) && !close) party = "mixed_support";
+  return [close && "close_vote", party].filter(Boolean);
+}
+
 // 'succeeded' | 'failed' | 'other' from the official result text (same rule as the
 // server's voteOutcome in netlify/lib/vote-stats.js; negatives checked first).
 export function outcomeOf(result = "") {
