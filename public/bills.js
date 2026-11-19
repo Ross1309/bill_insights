@@ -1,7 +1,7 @@
 // Bills & Summaries tab: paged query by latest action, category filters, search.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db, getOverviewDoc, loadBillIndex } from "./data.js";
-import { billName, escapeHtml, formatDay, officialLabel, ordinal, safeHref, store } from "./util.js";
+import { billName, escapeHtml, formatDay, hideCeremonialOn, officialLabel, onHideCeremonial, ordinal, safeHref, setHideCeremonial } from "./util.js";
 import { ceremonialTag, isCeremonial, isRuleBill, MOVING_STAGES, stageTrackerHtml } from "./stage.js";
 import { setChipGroup } from "./members.js";
 
@@ -30,7 +30,7 @@ let billsError = null;   // message shown instead of bills until the next reset
 // and (category, stage, latest_action_date) indexes. Without them pages are filtered in
 // the browser (bigger pages, so each still shows something).
 let billScope = "moving";
-let hideCeremonial = store.get("cw-hide-ceremonial", "0") === "1";
+let hideCeremonial = hideCeremonialOn();
 let movingIndexReady = true;
 const SCOPE_NOTE = {
   moving: "Passed at least one chamber, newest action first (House rules left out). Most bills never get a vote: All bills shows the rest.",
@@ -244,10 +244,11 @@ export function setupBillFilters() {
   const hide = document.getElementById("bills-hide-ceremonial");
   if (hide) {
     hide.checked = hideCeremonial;
-    hide.addEventListener("change", () => {
-      hideCeremonial = hide.checked;
-      store.set("cw-hide-ceremonial", hideCeremonial ? "1" : "0");
-      loadBills({ reset: true });
+    hide.addEventListener("change", () => setHideCeremonial(hide.checked));
+    onHideCeremonial(on => {
+      if (on === hideCeremonial) return;
+      hideCeremonial = hide.checked = on;
+      if (allBills.length || billsLoading) loadBills({ reset: true });
     });
   }
 

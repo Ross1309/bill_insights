@@ -93,6 +93,16 @@ export function contactLinks(c, { label = "" } = {}) {
   return parts.length ? `${label}${parts.join(`<span class="text-gray-400" aria-hidden="true"> · </span>`)}` : "";
 }
 
+// "Hide ceremonial" is one setting for the Bills and Votes tabs: flipping it on one tab
+// updates the other (onHideCeremonial) and is remembered in this browser.
+export const hideCeremonialOn = () => store.get("cw-hide-ceremonial", "0") === "1";
+const hideCeremonialListeners = [];
+export const onHideCeremonial = fn => hideCeremonialListeners.push(fn);
+export function setHideCeremonial(on) {
+  store.set("cw-hide-ceremonial", on ? "1" : "0");
+  hideCeremonialListeners.forEach(fn => fn(on));
+}
+
 export function factList(facts) {
   return `<dl>${facts.filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v, raw]) =>
     `<div class="flex gap-3 py-1.5 border-b border-gray-100 text-sm"><dt class="w-36 shrink-0 text-gray-500">${escapeHtml(k)}</dt><dd class="text-gray-900 min-w-0">${raw ? v : escapeHtml(String(v))}</dd></div>`).join("")}</dl>`;

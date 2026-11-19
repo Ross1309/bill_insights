@@ -1,7 +1,7 @@
 // Roll-Call Votes tab: paged votes, chamber filter, vote display helpers.
 import { collection, getDocs, limit, orderBy, query, startAfter, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { billCache, db } from "./data.js";
-import { billName, escapeHtml, loadErrorHtml, officialLabel, ordinal, PARTY_NAMES, partyChip, store } from "./util.js";
+import { billName, escapeHtml, hideCeremonialOn, loadErrorHtml, officialLabel, onHideCeremonial, ordinal, PARTY_NAMES, partyChip, setHideCeremonial } from "./util.js";
 import { voteCardHtml, isKeyVote } from "./vote-card.js";
 import { billLabel } from "./bills.js";
 import { setChipGroup } from "./members.js";
@@ -23,7 +23,7 @@ let voteChamber = "";
 // "key": final votes on bills, resolutions and nominations (vote_summaries.kind; filtered
 // in the browser, so no extra index); "all": every roll call.
 let voteScope = "key";
-let hideCeremonial = store.get("cw-hide-ceremonial", "0") === "1";
+let hideCeremonial = hideCeremonialOn();
 const SCOPE_NOTE = {
   key: "Final votes on bills, resolutions and nominations. Procedural steps, amendments and House rules are under All recorded votes.",
   all: "Every recorded vote, including procedural motions, cloture votes, amendments and House rules.",
@@ -248,10 +248,11 @@ export function setupVoteFilters() {
   const hide = document.getElementById("votes-hide-ceremonial");
   if (hide) {
     hide.checked = hideCeremonial;
-    hide.addEventListener("change", () => {
-      hideCeremonial = hide.checked;
-      store.set("cw-hide-ceremonial", hideCeremonial ? "1" : "0");
-      fetchVotes();
+    hide.addEventListener("change", () => setHideCeremonial(hide.checked));
+    onHideCeremonial(on => {
+      if (on === hideCeremonial) return;
+      hideCeremonial = hide.checked = on;
+      if (votesLoaded) fetchVotes();
     });
   }
   document.getElementById("vote-chamber-filters")?.addEventListener("click", e => {

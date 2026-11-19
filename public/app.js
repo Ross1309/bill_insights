@@ -134,7 +134,7 @@ async function loadWeek(monday) {
     if (request !== weekRequest) return;
     const w = weekDocs.get(target);
     if (!w) {
-      container.innerHTML = `<p class="text-center text-gray-500 py-12">No recorded votes or new laws are recorded for the week of ${escapeHtml(target)}. <a href="#week/latest" class="text-accent hover:underline">Go to the latest week</a></p>`;
+      container.innerHTML = `<p class="text-center text-gray-500 py-12">No votes or new laws are recorded for the week of ${escapeHtml(target)}. <a href="#week/latest" class="text-accent hover:underline">Go to the latest week</a></p>`;
       return;
     }
     if (!monday) { currentWeek = target; replaceTab("week"); }   // #week -> #week/<that Monday>

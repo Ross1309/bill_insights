@@ -271,6 +271,7 @@ try {
   await page.check('#bills-hide-ceremonial');
   await waitText('#bills-container', /Latest action/, 'Bills tab still lists bills with ceremonial ones hidden');
   check(!(await page.$('#bills-container [data-term="ceremonial"]')), 'Hide ceremonial removes them from the list');
+  check(await page.$eval('#votes-hide-ceremonial', el => el.checked), 'Hide ceremonial is one setting for Bills and Votes');
   await page.uncheck('#bills-hide-ceremonial');
   await waitText('#bills-container', /Latest action/, 'Bills tab lists bills again');
   await page.click('footer a[href="#methodology"]');
