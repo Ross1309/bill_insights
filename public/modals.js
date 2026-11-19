@@ -13,6 +13,7 @@ import { voteHeadline, outcomeOf, questionKind, resultWord } from "./plain.js";
 import { explainQuestion } from "./issues.js";
 import { missedLong } from "./participation.js";
 import { termFacts } from "./terms.js";
+import { billStory, recordedVoteId } from "./story.js";
 import { memberTrendsHtml } from "./member-trends.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole, myReps } from "./members.js";
@@ -24,12 +25,6 @@ let modalStack = [];   // entries: { kind, id, tab, data: {}, errors: {}, filter
 let lastFocused = null;
 
 // Vote doc id for an action's recorded vote, matching ingest-votes.js.
-function recordedVoteId(rv) {
-  const chamber = { House: "house", Senate: "senate" }[rv.chamber];
-  if (!chamber || !rv.congress || !rv.session || !rv.rollNumber) return null;
-  return `${rv.congress}-${rv.session}-${chamber}-vote-${rv.rollNumber}`;
-}
-
 const memberModal = {
   load(e) {
     loadInto(e, "member", getMember(e.id));
@@ -231,6 +226,7 @@ const billModal = {
         ${staged ? stageTrackerHtml(staged) : ""}
         ${factList(facts)}
         ${ai}
+        ${storyHtml(e)}
         ${yourMembersHtml(e)}
         ${crs}
         <div class="flex flex-wrap gap-4 mt-5 text-sm">${externalLink(bill.congress_gov_url, "View on Congress.gov")}</div>`;
@@ -368,6 +364,28 @@ const voteModal = {
 };
 
 // --- modal shell
+
+// --- The bill's story so far (bill window, Summary): milestones of the official actions --
+function storyHtml(e) {
+  const b = e.data.bill, d = e.data.detail;
+  if (!d?.actions) return "";
+  const steps = billStory(b || d, d.actions, e.data.votes || []);
+  if (steps.length < 2) return "";
+  return `
+    <section class="mt-5">
+      <h3 class="text-sm font-bold text-gray-900">The story so far</h3>
+      <ol class="relative border-l border-gray-200 ml-1.5 mt-2">
+        ${steps.map(s => `
+          <li class="ml-4 pb-3 last:pb-0">
+            <span class="absolute -left-1.5 mt-1 w-3 h-3 rounded-full bg-accent/70 border-2 border-surface" aria-hidden="true"></span>
+            <p class="text-xs text-gray-500">${escapeHtml(formatDay(s.date))}</p>
+            <p class="text-sm text-gray-900">${escapeHtml(s.text)}</p>
+            ${s.detail ? `<p class="text-xs text-gray-600">${s.voteId ? `<button type="button" data-open="vote" data-id="${escapeHtml(s.voteId)}" class="py-1 text-left text-accent hover:underline">${escapeHtml(s.detail)}</button>` : escapeHtml(s.detail)}</p>` : ""}
+          </li>`).join("")}
+      </ol>
+      <p class="text-[11px] text-gray-500 mt-2">Milestones from the official action history; the Actions tab has every step.${d.actionsCount > 100 ? " This bill's history is long, so early steps may be missing here." : ""}</p>
+    </section>`;
+}
 
 // --- "Your members on this bill" (bill window, Summary) -------------------------------
 // Final roll calls only (passage, accepting the other chamber's changes, veto overrides),

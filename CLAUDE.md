@@ -96,6 +96,7 @@ public/follow.js                   Follow bills/members/topics on the device; wh
 public/home.js                     Home tab: your members, this week, issues, key votes, laws, numbers
 public/plain.js                    Plain-language vote headlines (rules, confirmed/passed/adopted), party words
 public/search.js                   Header search: members, bill numbers, topics, Bills-tab fallback
+public/story.js                    A bill's story: milestones of its official actions (bill window)
 public/glossary.js                 Plain definitions of official terms + tap-to-explain (termize)
 netlify/lib/bill-index.js          stats/bill-titles: all stored bills' numbers + titles (Bills word search)
 public/participation.js            Missed-vote wording (cards, member window, Home); loadParticipation in data.js
@@ -798,6 +799,9 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   bill-detail's `cosponsors` [{ id, original, withdrawn }] (+ `cosponsorsComplete`; 2 pages of
   250 max) and their positions on the bill's final roll calls (`FINAL_KINDS` passage/concur/
   override via questionKind, <= 4 full vote docs, cached), plus contact links.
+- **The story so far** (bill Summary; `billStory` in story.js): milestones recognized in the
+  official actions (introduced, committee, floor results, settling differences, President, law);
+  anything unrecognized stays on the Actions tab only.
 - Dates in bills/actions are written by hand with `formatDay` (util.js): "May 20, 2025". The
   vote window also reads the bill (cached) for its name; labels go through officialLabel.
 - Functions are cached per id in the page and for 1h via `Cache-Control`. If they fail,
