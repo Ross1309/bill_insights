@@ -40,13 +40,22 @@ export const billCache = new Map();
 
 // Home's docs (stats/overview, health, floor, participation): from /api/home (CDN-cached,
 // no Firebase needed), else straight from Firestore. One request per visit.
+// The endpoint gets 5 s (a slow function shouldn't hold Home on "Loading"); a failed
+// Firestore read of the overview passes its own error on, so a visitor whose blocker stopped
+// App Check's reCAPTCHA gets that explanation (loadErrorHtml), not a generic one.
 let homePromise = null;
+const HOME_TIMEOUT_MS = 5000;
 export function getHome() {
-  homePromise ??= fetch("/api/home")
+  if (homePromise) return homePromise;
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), HOME_TIMEOUT_MS);
+  homePromise = fetch("/api/home", { signal: abort.signal })
     .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    .finally(() => clearTimeout(timer))
     .catch(async () => {
-      const read = id => getDoc(doc(firestore(), "stats", id)).then(s => (s.exists() ? s.data() : null)).catch(() => null);
-      const [overview, health, floor, participation] = await Promise.all(["overview", "health", "floor", "participation"].map(read));
+      const read = id => getDoc(doc(firestore(), "stats", id)).then(s => (s.exists() ? s.data() : null));
+      const optional = id => read(id).catch(() => null);
+      const [overview, health, floor, participation] = await Promise.all([read("overview"), optional("health"), optional("floor"), optional("participation")]);
       if (!overview) throw new Error("The home page data isn't available right now.");
       return { overview, health, floor, participation };
     })

@@ -1012,8 +1012,11 @@ page); dots in crowded timeline stretches overlap (each vote is also listed belo
 
 - Home's four docs (stats/overview, health, floor, participation) come from `/api/home`
   (netlify/functions/home.js: firebase-admin, Timestamps -> ISO, CDN 5 min + stale 1 h).
-  `getHome()` in data.js falls back to reading them from Firestore (the local smoke test has
-  no functions). `getOverviewDoc()` returns a snapshot-like `{ exists(), data() }`.
+  `getHome()` in data.js gives the endpoint 5 s, then reads them from Firestore (the local smoke
+  test has no functions); a failed overview read passes its own error on, so blocked visitors get
+  the reCAPTCHA explanation. Query strings don't vary the cache (`Netlify-Vary`).
+  `getOverviewDoc()` returns a snapshot-like `{ exists(), data() }`. Verified 2026-11-19: Home
+  shows with App Check failing; endpoint hanging -> Firestore after ~6 s; both down -> message.
 - **App Check starts on the first Firestore read** (`firestore()` in data.js, used instead of a
   shared `db`), so a Home-only visit never loads reCAPTCHA. Use `firestore()` for every query.
 - Measured (phone profile, 4x CPU): Home 4,010 KB -> 1,392 KB uncompressed, no reCAPTCHA.

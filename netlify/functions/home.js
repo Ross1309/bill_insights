@@ -9,7 +9,9 @@ import { json } from '../lib/http.js';
 
 // Docs change nightly (and when an owner runs a script): 5 minutes at the CDN, served stale
 // for up to an hour while it refreshes, 1 minute in browsers.
-const CACHE = { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=300, stale-while-revalidate=3600', 'Cache-Control': 'public, max-age=60' };
+// Query strings are left out of the cache key (Netlify-Vary on a parameter nobody sends), so
+// /api/home?x=1 can't force a fresh function run and Firestore reads.
+const CACHE = { 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=300, stale-while-revalidate=3600', 'Cache-Control': 'public, max-age=60', 'Netlify-Vary': 'query=cw-no-param' };
 const DOCS = ['overview', 'health', 'floor', 'participation'];
 
 // Firestore Timestamps -> ISO strings (JSON has no timestamp type).
