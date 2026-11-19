@@ -16,6 +16,9 @@ test('termFacts: upcoming vs already held, never who won', () => {
   assert.deepEqual(termFacts({ end: '2029-01-03', class: 3 }, now), { termEnds: 'January 3, 2029', election: 'November 7, 2028', held: false, class: 3 });
   assert.deepEqual(termFacts({ end: '2027-01-03', class: null }, now), { termEnds: 'January 3, 2027', election: 'November 3, 2026', held: true, class: null });
   assert.equal(termFacts(null, now), null);
+  // Appointed senators: the term in the data ends at the special election.
+  assert.deepEqual(termFacts({ end: '2026-11-03', class: 3 }, new Date('2026-06-01T12:00:00Z')), { termEnds: null, election: 'November 3, 2026', held: false, special: true, class: 3 });
+  assert.equal(termFacts({ end: '2026-11-03', class: 3 }, new Date('2026-11-19T12:00:00Z')), null);
   // After January 3 the dataset may still list the old term: show nothing rather than a past date.
   assert.equal(termFacts({ end: '2027-01-03' }, new Date('2027-01-04T15:00:00Z')), null);
   // The term runs until noon Eastern on January 3.

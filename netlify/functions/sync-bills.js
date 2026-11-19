@@ -333,7 +333,8 @@ async function syncBills(request, started) {
 // take turns (run-lock.js), each with the time it has left out of its own 30 s.
 export default async request => {
   const started = Date.now();
-  const lock = await acquireRunLock(getDb(), 'sync-bills', started + 30_000);
+  // Its first steps (recent bills, details) don't check the clock: needs 15 s to be useful.
+  const lock = await acquireRunLock(getDb(), 'sync-bills', started + 30_000, { minWorkMs: 15_000 });
   if (!lock) {
     console.log('sync-bills: an earlier copy is still working and this one has too little time left; stopping');
     return json({ skipped: 'an earlier copy is still working' });

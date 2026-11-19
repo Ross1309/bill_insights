@@ -40,7 +40,8 @@ export const billCache = new Map();
 
 // Home's docs (stats/overview, health, floor, participation): from /api/home (CDN-cached,
 // no Firebase needed), else straight from Firestore. One request per visit.
-// The endpoint gets 5 s (a slow function shouldn't hold Home on "Loading"); a failed
+// The endpoint gets 5 s to start answering (a slow function shouldn't hold Home on "Loading";
+// a slow connection downloading the answer isn't cut off); a failed
 // Firestore read of the overview passes its own error on, so a visitor whose blocker stopped
 // App Check's reCAPTCHA gets that explanation (loadErrorHtml), not a generic one.
 let homePromise = null;
@@ -50,7 +51,7 @@ export function getHome() {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), HOME_TIMEOUT_MS);
   homePromise = fetch("/api/home", { signal: abort.signal })
-    .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    .then(res => { clearTimeout(timer); return res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)); })
     .finally(() => clearTimeout(timer))
     .catch(async () => {
       const read = id => getDoc(doc(firestore(), "stats", id)).then(s => (s.exists() ? s.data() : null));

@@ -388,7 +388,8 @@ committees [{ id ("HSJU"), name, title (Chair/Ranking Member/… or null), subco
 title }] }] (congress-legislators committee files, netlify/lib/committees.js; titled seats first;
 member window Overview), term { start, end, class } (current term, same dataset;
 public/terms.js `termFacts` -> term end + election date, "held" between Election Day and the
-term end; never who won), current (bool), updatedAt
+term end; never who won; appointed senators' terms end on the special election's date, shown
+as "special election; appointed until then"), current (bool), updatedAt
 ```
 Synced from `/member?currentMember=true` (3 pages, ~539 incl. 6 delegates). Members no
 longer in that list are set `current: false`, never deleted; the UI queries
@@ -424,7 +425,9 @@ per-state `members` query and says nationwide search is unavailable.
   (~8 s) ran once. Fix: `acquireRunLock` (netlify/lib/run-lock.js, `sync_state/locks.<job>`): copies
   take turns, each working with the time left of its own 30 s, so the repeats still add capacity
   (sync-bills refreshed 7 of 52, then the rest) without overlapping. The lock expires at its
-  holder's 30 s, so a crash can't block the next copy or night. Verified with two real
+  holder's 30 s, so a crash can't block the next copy or night. A Firestore error on the lock
+  itself runs the job without it (fail open). Later copies start only with enough time left
+  (`minWorkMs`: ingest 20 s, sync-bills 15 s, others 8 s). Verified with two real
   run-ingest.js copies 3 s apart: the second waited 16 s, then ran. Rehearsals capture lock writes.
 - **Public functions:** `member-profile`, `bill-detail` (rate limit 60/min per visitor; the
   plan allows 2 rules, both used; rate-limited functions need explicit paths, hence
@@ -496,6 +499,14 @@ per-state `members` query and says nationwide search is unavailable.
 **Firestore read budget (free tier: 50k/day).** A visit costs ~2 reads (stats/overview,
 stats/health); Bills loads on its tab, the 100 KB directory on Legislators. Nightly runs
 cost ~1,000: mostly the member_votes docs of members who voted (~540 on a voting day).
+
+### Review round 3 (2026-11-19): everything since round 2 (31 commits, ~2,450 lines)
+Data reconciled: all 1,616 vote summaries match their bills (title, summary line, ceremonial),
+all votes applied, member_votes monthly = totals, 539/539 members with contact/term/committees.
+Fixed: run lock fails open on a Firestore error and needs per-job working time; /api/home's
+5 s limit covers only the server's first answer (not a slow download); My members caches its
+bill query; appointed senators (Husted, Moody: terms ending at the Nov 3 special election) no
+longer get an election date a year early; a misplaced comment in bills.js.
 
 ### Review round 2 (2026-11-16): a fresh reviewer on the round-1 diff + the product review
 - sync-congress-stats window redesigned again: lists `/bill/{congress}` (this Congress only),

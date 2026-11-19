@@ -10,20 +10,32 @@
 // nothing (its predecessor records the run).
 
 const LOCK_DOC = ['sync_state', 'locks'];
-const MIN_WORK_MS = 8000;        // not worth starting with less time than this
+const MIN_WORK_MS = 8000;        // default: not worth starting with less time than this
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Pure: may `id` take `name`'s lock now? (cur: the stored lock or undefined)
 export const lockFree = (cur, now) => !cur || !(cur.until > now);
 
 // -> { release(), waitedMs } or null when there's no time left to work.
-// deadline: ms timestamp when this copy will be stopped (its start + 30 s).
-export async function acquireRunLock(db, name, deadline, { now = () => Date.now(), pause = sleep } = {}) {
+// deadline: ms timestamp when this copy will be stopped (its start + 30 s). minWorkMs: the
+// least time this job needs to do anything useful (jobs without their own time checks need
+// more). If the lock itself can't be read or written (a Firestore error), the copy runs
+// without it: skipping the night would be worse than a rare overlap.
+export async function acquireRunLock(db, name, deadline, { now = () => Date.now(), pause = sleep, minWorkMs = MIN_WORK_MS } = {}) {
+  try {
+    return await takeTurn(db, name, deadline, { now, pause, minWorkMs });
+  } catch (err) {
+    console.warn(`${name}: run lock unavailable (${err.message}); running without it`);
+    return { waitedMs: 0, release: async () => {} };
+  }
+}
+
+async function takeTurn(db, name, deadline, { now, pause, minWorkMs }) {
   const ref = db.collection(LOCK_DOC[0]).doc(LOCK_DOC[1]);
   const id = `${now()}-${Math.random().toString(36).slice(2, 8)}`;
   let waitedMs = 0;   // time spent waiting for another copy (not the lock's own round trips)
   for (;;) {
-    if (deadline - now() < MIN_WORK_MS) return null;
+    if (deadline - now() < minWorkMs) return null;
     const got = await db.runTransaction(async tx => {
       const cur = (await tx.get(ref)).data()?.[name];
       if (!lockFree(cur, now())) return false;

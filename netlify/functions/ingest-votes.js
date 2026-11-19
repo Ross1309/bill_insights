@@ -40,7 +40,8 @@ const isScheduled = event => {
 // take turns (run-lock.js), each with the time it has left out of its own 30 s.
 export async function handler(event) {
   const started = Date.now();
-  const lock = await acquireRunLock(db, "ingest-votes", started + 30_000);
+  // No time checks of its own, so a later copy starts only with most of its 30 s left.
+  const lock = await acquireRunLock(db, "ingest-votes", started + 30_000, { minWorkMs: 20_000 });
   if (!lock) {
     console.log("ingest-votes: an earlier copy is still working and this one has too little time left; stopping");
     return { statusCode: 200, body: JSON.stringify({ skipped: "an earlier copy is still working" }) };

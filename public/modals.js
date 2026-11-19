@@ -59,7 +59,8 @@ const memberModal = {
       // Role, state, party, phone and website are in the window's header: not repeated here.
       // Term end and the election for the seat (members.term, congress-legislators).
       const t = m && m.current !== false ? termFacts(m.term) : null;
-      if (t) facts.push(["Current term ends", `${t.termEnds}${t.class ? ` (Senate class ${t.class})` : ""}`],
+      if (t?.special) facts.push(["Election for this seat", `${t.election} (special election; appointed until then)`]);
+      else if (t) facts.push(["Current term ends", `${t.termEnds}${t.class ? ` (Senate class ${t.class})` : ""}`],
         ["Election for this seat", t.held ? `Held ${t.election}. The winner takes office ${t.termEnds}.` : t.election]);
       if (p) facts.push(["First took office", p.firstTermStart], ["Born", p.birthYear], ["Office", p.office?.address]);
       if (m && m.current === false) facts.push(["Status", "No longer serving"]);

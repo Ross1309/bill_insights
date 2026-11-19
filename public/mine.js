@@ -38,7 +38,13 @@ const section = (title, body, note = "") => `
     ${note ? `<p class="text-[11px] text-gray-500 mt-1">${note}</p>` : ""}
   </section>`;
 
-async function movedBills(id) {
+// Cached per page view: reopening My members doesn't repeat the query (one read per bill).
+const movedCache = new Map();
+function movedBills(id) {
+  if (!movedCache.has(id)) movedCache.set(id, queryMovedBills(id).catch(err => { movedCache.delete(id); throw err; }));
+  return movedCache.get(id);
+}
+async function queryMovedBills(id) {
   const congress = currentCongress().congress;
   const snap = await getDocs(query(collection(firestore(), "bills"), where("sponsor.bioguideId", "==", id)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -89,7 +95,7 @@ async function memberHtml(saved, participation) {
               <span class="block text-xs text-gray-500">Introduced ${esc(formatDay(s.introducedDate))}${s.latestAction?.text ? ` · ${esc(s.latestAction.text)}` : ""}</span></li>`).join("")}</ul>`
           : `<p class="text-sm text-gray-500 mt-1">${profile ? "None listed by Congress.gov." : "Not available right now."}</p>`)}
         ${member.committees ? committeesHtml(member.committees) : ""}
-        ${term ? section("Term", `<p class="text-sm text-gray-800 mt-1">Current term ends ${esc(term.termEnds)}${term.class ? ` (Senate class ${term.class})` : ""}. ${term.held ? `The election for this seat was held ${esc(term.election)}.` : `Next election for this seat: ${esc(term.election)}.`}</p>`) : ""}
+        ${term ? section("Term", `<p class="text-sm text-gray-800 mt-1">${term.special ? `Appointed until a special election on ${esc(term.election)}.` : `Current term ends ${esc(term.termEnds)}${term.class ? ` (Senate class ${term.class})` : ""}. ${term.held ? `The election for this seat was held ${esc(term.election)}.` : `Next election for this seat: ${esc(term.election)}.`}`}</p>`) : ""}
       </div>
     </div>`;
 }

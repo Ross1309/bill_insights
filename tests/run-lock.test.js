@@ -37,6 +37,22 @@ test('a second copy waits until the first releases, then works', async () => {
   assert.equal(db.store.locks['sync-bills'].until, 31_000);
 });
 
+test('a Firestore error on the lock: the copy runs without it', async () => {
+  const db = { collection: () => ({ doc: () => ({}) }), runTransaction: async () => { throw new Error('RESOURCE_EXHAUSTED'); } };
+  const lock = await acquireRunLock(db, 'sync-bills', Date.now() + 30_000);
+  assert.ok(lock);
+  await lock.release();
+});
+
+test('a job can ask for more working time than the default', async () => {
+  const db = fakeDb();
+  let t = 0;
+  const clock = { now: () => t, pause: async ms => { t += ms; } };
+  await acquireRunLock(db, 'ingest-votes', 30_000, clock);
+  t = 12_000;
+  assert.equal(await acquireRunLock(db, 'ingest-votes', 42_000, { ...clock, minWorkMs: 20_000 }), null, 'only 18 s left after waiting');
+});
+
 test('a copy without enough time left stops; other jobs are not blocked; expired locks free', async () => {
   const db = fakeDb();
   let t = 0;

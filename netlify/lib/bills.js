@@ -260,8 +260,6 @@ export async function summaryUpdate(bill, existingSummary, keys) {
 
 // Stage + flags from the action history: shared with the page (public/stage.js).
 
-// Extra fields for the issue tracker (3 Congress.gov requests: detail is passed in,
-// plus subjects and actions). `detail` is the bill-detail response's `bill`.
 // The bill's common name from Congress.gov's titles list ("One Big Beautiful Bill Act" for
 // H.R. 1, whose display title is "An act to provide for reconciliation …"), or null when
 // it has none. Only for display titles that are a sentence ("To …", "An act …"): when
@@ -284,6 +282,8 @@ export function pickShortTitle(titles, displayTitle) {
   return null;
 }
 
+// Extra fields for the issue tracker (Congress.gov requests: detail is passed in, plus
+// subjects, actions and titles). `detail` is the bill-detail response's `bill`.
 export async function fetchBillEnrichment(detail, apiKey) {
   const congress = detail.congress;
   const type = String(detail.type || '').toLowerCase();
