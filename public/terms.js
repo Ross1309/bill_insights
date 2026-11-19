@@ -11,11 +11,14 @@ export function electionDay(year) {
   return new Date(Date.UTC(year, 10, firstMonday + 1));
 }
 
-// -> { termEnds: "January 3, 2029", election: "November 7, 2028", held: bool, class } or null.
+// -> { termEnds: "January 3, 2029", election: "November 7, 2028", held: bool, class }, or null
+// without a term or once it has ended: for a few days after January 3 the public dataset can
+// still list the old term, and a past date must not read as the "current term".
 export function termFacts(term, today = new Date()) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(term?.end || "");
   if (!m) return null;
   const end = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  if (today >= end) return null;
   const vote = electionDay(+m[1] - 1);
-  return { termEnds: day(end), election: day(vote), held: today >= vote && today < end, class: term.class ?? null };
+  return { termEnds: day(end), election: day(vote), held: today >= vote, class: term.class ?? null };
 }
