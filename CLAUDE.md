@@ -800,7 +800,8 @@ numbers, new buildings and typos (27 typical inputs: 13 failed).
 - **Suggestions** (`public/address.js`): debounced 300 ms, only after a house number + 2
   letters, stale requests aborted, cached per text; ARIA combobox (arrows, Enter picks and
   submits, Escape closes); Geoapify / OSM attribution under the list (required). Geoapify
-  answers in 0.4-7 s.
+  answers in 0.4-7 s (vague text is slowest), so the function waits up to 8 s; suggestions are biased
+  to the visitor's area from Netlify `context.geo` (Geoapify otherwise ranks near the caller: our server).
 - Census sends no CORS headers, hence the function. No rate limit (the plan's 2 rules are
   used by member-profile and bill-detail); input is capped at 200 characters.
 - The function asks for the **current Congress's** layer: ACS2025_Current has the 119th,

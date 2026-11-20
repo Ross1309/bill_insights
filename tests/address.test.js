@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isZipOnly, stateAtEnd, stateDistricts, zipDistricts, zipIn } from '../netlify/lib/zip-districts.js';
+import { isZipOnly, stateAtEnd, stateDistricts, withoutUnit, zipDistricts, zipIn } from '../netlify/lib/zip-districts.js';
 import { agrees, label } from '../netlify/lib/geoapify.js';
-import { withoutUnit } from '../netlify/functions/find-district.js';
 
 test('zipIn / isZipOnly', () => {
   assert.equal(zipIn('400 Broad St, Seattle, WA 98109'), '98109');
@@ -37,6 +36,8 @@ test('stateAtEnd / stateDistricts', () => {
   assert.equal(stateAtEnd('San Juan, Puerto Rico'), 'PR');
   assert.equal(stateAtEnd('Portland or'), null);    // codes only in capitals
   assert.equal(stateAtEnd('1 Main Street'), null);
+  assert.equal(stateAtEnd('Washington D.C.'), 'DC');
+  assert.equal(stateAtEnd('Washington, DC'), 'DC');
   assert.deepEqual(stateDistricts('WY', 119), { districts: [{ state: 'WY', district: 0, share: 100 }] });
   assert.deepEqual(stateDistricts('WA', 119), { state: 'WA', districts: [] });
   assert.deepEqual(stateDistricts('GU', 119), { districts: [{ state: 'GU', district: 0, share: 100 }] });

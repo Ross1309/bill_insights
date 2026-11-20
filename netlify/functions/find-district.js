@@ -27,7 +27,7 @@
 import { getJson, json } from '../lib/http.js';
 import { currentCongress, ordinal } from '../lib/congress.js';
 import { geoapifyKey, locateAddress } from '../lib/geoapify.js';
-import { isZipOnly, stateAtEnd, stateDistricts, zipDistricts, zipIn } from '../lib/zip-districts.js';
+import { isZipOnly, stateAtEnd, stateDistricts, withoutUnit, zipDistricts, zipIn } from '../lib/zip-districts.js';
 
 const CENSUS = 'https://geocoding.geo.census.gov/geocoder/geographies';
 // Newest map last: until Jan 3, 2027 the first one answers (1 request per lookup).
@@ -46,11 +46,6 @@ const FIPS = {
   '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV', '55': 'WI', '56': 'WY',
   '60': 'AS', '66': 'GU', '69': 'MP', '72': 'PR', '78': 'VI',
 };
-
-// "Apt 4B", "Unit 12", "Suite 300", "#5", "Floor 2" (not "Fl": Florida): the Census geocoder matches buildings and
-// often rejects an address with one of these.
-const UNIT = /(?:,\s*|\s+)(?:(?:apt|apartment|unit|ste|suite|floor|rm|room|bldg|lot|trlr)\b\.?\s*#?\s*|#\s*)(?!\d{5}\b)[a-z0-9-]+(?=[\s,]|$)/gi;
-export const withoutUnit = address => address.replace(UNIT, '').replace(/\s{2,}/g, ' ').trim();
 
 // One Census answer for the current Congress's layer: { cd, matched } | { cd: null } (no
 // match) | null (this vintage lacks that Congress's map: try the next).

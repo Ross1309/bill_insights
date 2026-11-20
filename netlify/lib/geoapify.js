@@ -39,8 +39,12 @@ export function agrees(r, text) {
 
 // Typed text -> up to 5 { label, lat, lon }: addresses with a house number only (a street
 // or town can span districts; a bare ZIP is looked up directly).
-export async function suggestAddresses(text, { timeoutMs = 3000 } = {}) {
-  const data = await getJson(url('autocomplete', text, '&limit=5'), { timeoutMs, retries: 0 });
+// near: { lat, lon } to rank nearby addresses first (else Geoapify ranks near the caller:
+// our server, not the visitor).
+export async function suggestAddresses(text, { timeoutMs = 3000, near = null } = {}) {
+  const bias = near && Number.isFinite(near.lat) && Number.isFinite(near.lon)
+    ? `&bias=proximity:${near.lon.toFixed(2)},${near.lat.toFixed(2)}` : '&bias=countrycode:us';
+  const data = await getJson(url('autocomplete', text, `&limit=5${bias}`), { timeoutMs, retries: 0 });
   const seen = new Set();
   return (data.results || []).map(r => ({
     label: label(r),

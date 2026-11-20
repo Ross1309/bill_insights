@@ -19,6 +19,11 @@ export function isZipOnly(text) {
   return /^\s*\d{5}(?:-\d{4})?\s*$/.test(String(text));
 }
 
+// "Apt 4B", "Unit 12", "Suite 300", "#5", "Floor 2" (not "Fl": Florida): the Census geocoder matches buildings and
+// often rejects an address with one of these.
+const UNIT = /(?:,\s*|\s+)(?:(?:apt|apartment|unit|ste|suite|floor|rm|room|bldg|lot|trlr)\b\.?\s*#?\s*|#\s*)(?!\d{5}\b)[a-z0-9-]+(?=[\s,]|$)/gi;
+export const withoutUnit = address => address.replace(UNIT, '').replace(/\s{2,}/g, ' ').trim();
+
 const parse = code => ({ state: code.slice(0, 2), district: Number(code.slice(2)) });
 
 // -> { districts: [{ state, district, share }] (largest land share first), exact: true }
@@ -53,7 +58,8 @@ export function zipDistricts(zip, congress) {
 // The state named at the end of the text ("Seattle, WA", "Cheyenne Wyoming"), or null.
 // Codes count only in capitals: "or", "in" and "me" are words too.
 export function stateAtEnd(text) {
-  const t = String(text).trim().replace(/[.,\s]+$/, '').replace(/,?\s*(USA|US|United States)$/i, '');
+  const t = String(text).trim().replace(/[.,\s]+$/, '').replace(/,?\s*(USA|US|United States)$/i, '')
+    .replace(/(^|[\s,])D\.\s?C$/i, '$1DC');
   const code = t.match(/(?:^|[\s,])([A-Z]{2})$/)?.[1];
   if (code && Object.values(STATE_CODES).includes(code)) return code;
   const lower = t.toLowerCase();
