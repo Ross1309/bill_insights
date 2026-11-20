@@ -9,7 +9,7 @@ export class HttpError extends Error {
   }
 }
 
-const redact = url => String(url).replace(/(api_key=)[^&]+/, '$1***');
+const redact = url => String(url).replace(/((?:api_key|apiKey)=)[^&]+/gi, '$1***');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 export async function fetchWithRetry(url, { timeoutMs = 15000, retries = 2, ...init } = {}) {

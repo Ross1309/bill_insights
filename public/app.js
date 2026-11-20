@@ -10,7 +10,8 @@ import { renderCongressPage } from "./congress-page.js";
 import { glossaryHtml, setupGlossary } from "./glossary.js";
 import { setupBillFilters, startBills } from "./bills.js";
 import { fetchVotes, setupVoteFilters, votesLoaded } from "./votes.js";
-import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, forgetMyReps, lookupDistrict, myReps, rememberMyReps, repsFor, withContacts, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
+import { setupAddressSuggest } from "./address.js";
+import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, findAndRemember, forgetMyReps, myReps, withContacts, populateStateSelect, setChipGroup, setMemberFilters, setupMemberFilters, showDirectory } from "./members.js";
 import { setupModals } from "./modals.js";
 import { renderWeekPage } from "./week.js";
 import { loadMine, setupMine } from "./mine.js";
@@ -315,19 +316,8 @@ function setupHome() {
     const form = ev.target.closest("[data-home-find]");
     if (!form) return;
     ev.preventDefault();
-    const address = form.querySelector("input").value.trim();
-    const status = hero.querySelector("[data-home-find-status]");
-    if (!address) return;
-    status.className = "text-sm mt-2 text-gray-500";
-    status.textContent = "Looking up your district…";
-    try {
-      const { state, district } = await lookupDistrict(address);
-      rememberMyReps(state, district, await repsFor(state, district));
-      await showHome((await getOverviewDoc()).data());
-    } catch (err) {
-      status.className = "text-sm mt-2 text-red-600";
-      status.textContent = err.message;
-    }
+    await findAndRemember(form.querySelector("input"), hero.querySelector("[data-home-find-status]"),
+      async () => showHome((await getOverviewDoc()).data()));
   });
   hero.addEventListener("click", ev => {
     if (!ev.target.closest("[data-home-change]")) return;
@@ -440,6 +430,7 @@ async function init() {
   setupIssues();
   setupHome();
   setupMine();
+  setupAddressSuggest();
   setupForgetReps();
   setupFollow();
   setupSearch();

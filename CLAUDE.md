@@ -144,7 +144,13 @@ netlify/functions/member-profile.js  GET /api/member-profile?id={bioguideId}: Co
                                    10 latest sponsored bills/amendments (key stays server-side)
 netlify/functions/member-finance.js GET ?id={bioguideId}: OpenFEC totals, receipt sources,
                                    donation-size buckets, itemized by state (api.data.gov key)
-netlify/functions/find-district.js POST /api/find-district {address}: Census geocoder -> { state, district }
+netlify/functions/find-district.js POST /api/find-district {address, lat?, lon?}: Census geocoder, ZIP tables,
+                                   Geoapify fallback -> { state, district|null, how, districts? }
+netlify/functions/address-suggest.js POST /api/address-suggest {text}: Geoapify suggestions (key server-side)
+netlify/lib/zip-districts.js       ZIP -> district(s) from zip-districts-<119|120>.js (generated)
+netlify/lib/geoapify.js            Geoapify autocomplete + building lookup (agrees(): ZIP or city+state match)
+scripts/build-zip-districts.js     Rebuild the ZIP tables from Census ZCTA-block + district block files
+public/address.js                  Address box markup + suggestion list (combobox); lookup = findAndRemember (members.js)
 netlify/functions/home.js          GET /api/home: stats overview/health/floor/participation via admin (CDN 5 min)
 netlify/functions/health.js        GET /api/health: stats/health via admin (CDN 5 min), for check-health.js
 netlify/functions/share.js         /bill/<id>, /member/<id>, /vote/<id>: the page with that item's title + preview tags
@@ -203,7 +209,8 @@ OpenAI calls 401 there (and `netlify env:get` shows the mask too). Run the bill 
 `node run-sync-bills.js` (uses `.env`) to test summaries locally. Production is unaffected.
 
 Env vars (`.env`): `CONGRESS_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `OPENAI_API_KEY`,
-optional `FEC_API_KEY`. `CONGRESS_API_KEY` is an api.data.gov key, which OpenFEC also
+optional `FEC_API_KEY`, `GEOAPIFY_KEY` (address suggestions + fallback; set in Netlify for all
+contexts, so `netlify dev` injects it; without it the address box works with no suggestions). `CONGRESS_API_KEY` is an api.data.gov key, which OpenFEC also
 accepts, so `member-finance` uses `FEC_API_KEY` if set, else `CONGRESS_API_KEY` (else
 `DEMO_KEY` under `netlify dev` only). Set the same vars in Netlify's site settings.
 
@@ -432,7 +439,7 @@ per-state `members` query and says nationwide search is unavailable.
 - **Public functions:** `member-profile`, `bill-detail` (rate limit 60/min per visitor; the
   plan allows 2 rules, both used; rate-limited functions need explicit paths, hence
   `/api/...`) and `member-finance` set durable `Netlify-CDN-Cache-Control` (404s 1 h).
-  `find-district` is POST-only, uncached, unlimited.
+  `find-district` and `address-suggest` are POST-only, uncached, unlimited (Geoapify free tier: 3,000 requests a day; suggestions ask only after a house number + 2 letters, debounced).
 - **Congress rollover (Jan 3):** `currentCongress()` (public/congress.js, shared with the
   page) derives it from the date per run; nothing hard-codes 119. Stats keep describing
   the previous Congress until the new one has `MIN_VOTES_TO_DISPLAY` (25) votes; when they
@@ -765,22 +772,43 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 - Detail windows trap Tab/Shift+Tab inside the dialog and pull escaped focus back; a
   re-render (data arriving) restores focus to the same control (`focusKey`).
 
-## Find your representatives (Legislators tab)
+## Find your representatives (address box: Home, My members, Members tab)
 
-- Address -> `POST /api/find-district` (POST keeps it out of URLs/logs; not stored, not
-  logged, `Cache-Control: private, no-store`) -> U.S. Census geocoder, layer 54
-  ("<nth> Congressional Districts"). The function asks for the **current Congress's**
-  map: `Current_Current` already has the 120th (redistricted for the 2026 election), so
-  it tries `ACS2025_Current` (119th) first, then newer vintages. From Jan 3, 2027 the
-  120th is picked automatically; reorder `VINTAGES` then to save a request.
+Rebuilt 2026-11-20: the Census geocoder alone rejected ZIP codes, city + state, apartment
+numbers, new buildings and typos (27 typical inputs: 13 failed).
+- **find-district** (POST, address never logged/stored, `no-store`), steps within 8.5 s:
+  1. Bare ZIP -> `zipDistricts` (no request). 2. Census `onelineaddress` on the text, then
+  `withoutUnit` (Apt/Unit/Suite/#/Floor, never "FL" = Florida or a 5-digit ZIP). 3. A picked
+  suggestion's lat/lon, else Geoapify `locateAddress` (house-number match, confidence >= 0.8,
+  and `agrees()`: same ZIP, or city + state typed; "1600 Pennsylvania" alone matched a house
+  in Georgia) -> Census `coordinates` for the district. 4. The ZIP in the text, else the state
+  at its end (`stateAtEnd`; codes only in capitals). `how`: address | location | zip | state.
+- **ZIP tables** (`zip-districts-119.js` / `-120.js`, ~530 KB each, plain modules so any
+  bundler takes them): `node scripts/build-zip-districts.js` from the Census 2020 ZCTA-to-block
+  file (1 GB) + the Redistricting Data Office block equivalency files (cd119.zip, cd120.zip have
+  national files). Blocks build both ZCTAs and districts, so the districts are exact; shares are
+  by **land area** (no population in the files). 119th: 33,774 ZIP areas, 5,829 in more than one
+  district. ZIPs without an area (PO boxes: 30301) use neighbors with the same first three
+  digits: one district (20500 -> DC) or just the state. VI/GU/MP/AS by prefix. A new Congress
+  needs its table (block file under rdo/mapping-files/<year>/); without one, ZIP-only lookups
+  answer "We don't have that ZIP code".
+- **UI** (`findAndRemember` in members.js, one flow for all three forms): exact -> saved as
+  before. Split ZIP -> buttons per district (member name, share of the ZIP's area) + "enter
+  your street address to be sure". State only -> senators (member links), asks for street/ZIP.
+  The Members tab's message lives in `#find-reps-status` (renderYourReps redraws
+  `#find-reps-result` when the directory loads).
+- **Suggestions** (`public/address.js`): debounced 300 ms, only after a house number + 2
+  letters, stale requests aborted, cached per text; ARIA combobox (arrows, Enter picks and
+  submits, Escape closes); Geoapify / OSM attribution under the list (required). Geoapify
+  answers in 0.4-7 s.
 - Census sends no CORS headers, hence the function. No rate limit (the plan's 2 rules are
   used by member-profile and bill-detail); input is capped at 200 characters.
-- Result: `#legislators/WA-7` view = panel with 2 senators + the district's member (at-large
-  and delegates are district 0; members store at-large as `district: null`; "vacant" if
-  none), then the state's full list. Picking another state clears it; it also sets
-  `cw-state` so the Issues tab's "Members from <state>" uses it.
-- Verified 2026-11-12: Seattle -> WA-7 (Jayapal), Cheyenne -> WY-AL, the White House ->
-  DC-AL (delegate, no senators), unknown address -> message.
+- The function asks for the **current Congress's** layer: ACS2025_Current has the 119th,
+  Current_Current the 120th; from Jan 3, 2027 the 120th is picked automatically; reorder
+  `VINTAGES` then to save a request.
+- Verified 2026-11-20 (netlify dev + Playwright, debug token): 98052 -> WA-1/WA-8 choice,
+  "Seattle, WA" -> senators, Apple Park suggestion -> CA-17, 98109 on My members -> WA-7,
+  keyboard, phone width; smoke test passes.
 
 ## Campaign finance (member modal → Campaign Finance tab)
 

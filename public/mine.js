@@ -6,7 +6,8 @@
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { firestore, fetchFunction, getMember, getMemberVotes, loadParticipation } from "./data.js";
 import { billName, callScriptHtml, contactLinks, escapeHtml as esc, formatDay, officialLabel, PARTY_BADGES, POSITION_BADGES, STATE_NAMES } from "./util.js";
-import { lookupDistrict, memberPhoto, memberRole, myReps, rememberMyReps, repsFor, withContacts } from "./members.js";
+import { findAndRemember, memberPhoto, memberRole, myReps, withContacts } from "./members.js";
+import { ADDRESS_NOTE, addressInputHtml } from "./address.js";
 import { missedLong } from "./participation.js";
 import { committeesHtml } from "./modals.js";
 import { termFacts } from "./terms.js";
@@ -103,11 +104,10 @@ async function memberHtml(saved, participation) {
 const form = (label = "Find") => `
   <form data-mine-find class="mt-3 flex gap-2 max-w-xl">
     <label for="mine-address" class="sr-only">Your home address</label>
-    <input id="mine-address" type="text" autocomplete="street-address" maxlength="200" required placeholder="Street address, city, state"
-      class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-surface border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+    ${addressInputHtml({ id: "mine-address", cls: "w-full px-3 py-2 rounded-lg bg-surface border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-accent" })}
     <button type="submit" class="px-3 py-2 rounded-lg bg-cta text-ink text-sm font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent">${label}</button>
   </form>
-  <p class="text-[11px] text-gray-500 mt-2">Sent to the U.S. Census Bureau's geocoder to find your district; not stored by us. Your members are remembered in this browser only.</p>
+  <p class="text-[11px] text-gray-500 mt-2">${esc(ADDRESS_NOTE)}</p>
   <p data-mine-status class="text-sm mt-2 empty:hidden"></p>`;
 
 let request = 0;
@@ -119,7 +119,7 @@ export async function loadMine() {
   if (!reps?.members?.length || reps.stale) {
     el.innerHTML = `
       <h2 class="font-serif text-3xl font-bold text-gray-900">My members</h2>
-      <p class="text-gray-600 mt-2 max-w-2xl">${reps?.stale ? "A new Congress began on January 3, and some district maps changed. Enter your address again to see your current members." : "Your two senators and your representative in one place: how they voted, when they voted against their party, what they sponsored, and how to reach them. Enter your home address to start."}</p>
+      <p class="text-gray-600 mt-2 max-w-2xl">${reps?.stale ? "A new Congress began on January 3, and some district maps changed. Enter your address again to see your current members." : "Your two senators and your representative in one place: how they voted, when they voted against their party, what they sponsored, and how to reach them. Enter your home address or ZIP code to start."}</p>
       ${form()}`;
     return;
   }
@@ -151,17 +151,7 @@ export function setupMine() {
     const f = ev.target.closest("[data-mine-find]");
     if (!f) return;
     ev.preventDefault();
-    const status = f.parentElement.querySelector("[data-mine-status]");
-    status.className = "text-sm mt-2 text-gray-500";
-    status.textContent = "Looking up your district…";
-    try {
-      const { state, district } = await lookupDistrict(f.querySelector("input").value.trim());
-      rememberMyReps(state, district, await repsFor(state, district));
-      await loadMine();
-    } catch (err) {
-      status.className = "text-sm mt-2 text-red-600";
-      status.textContent = err.message;
-    }
+    await findAndRemember(f.querySelector("input"), f.parentElement.querySelector("[data-mine-status]"), () => loadMine());
   });
   el.addEventListener("click", ev => {
     if (!ev.target.closest("[data-mine-change]")) return;

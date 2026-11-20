@@ -210,14 +210,21 @@
       </div>
       <form id="find-reps" class="mb-6 bg-surface border border-gray-200 rounded-xl p-4 sm:p-5">
         <label for="find-reps-address" class="font-serif text-lg font-bold text-gray-900">Find your representatives</label>
-        <p class="text-sm text-gray-500 mt-1">Enter your home address to see your two senators and your representative (or delegate).</p>
+        <p class="text-sm text-gray-500 mt-1">Enter your home address (or just your ZIP code) to see your two senators and your representative (or delegate).</p>
         <div class="mt-3 flex flex-col sm:flex-row gap-2">
-          <input id="find-reps-address" type="text" autocomplete="street-address" maxlength="200" required
-            placeholder="Street address, city, state (e.g. 400 Broad St, Seattle, WA)"
-            class="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+          <div class="relative flex-1 min-w-0">
+            <input id="find-reps-address" data-address type="text" autocomplete="street-address" maxlength="200" required
+              placeholder="Street address, city, state, or ZIP code" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="find-reps-address-list"
+              class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+            <div id="find-reps-address-list" data-address-list class="hidden absolute left-0 right-0 top-full mt-1 z-30 bg-surface border border-gray-300 rounded-lg shadow-lg overflow-hidden">
+              <ul role="listbox" aria-label="Address suggestions"></ul>
+              <p class="px-3 py-1 text-[10px] text-gray-500 border-t border-gray-200">Suggestions: Geoapify · © OpenStreetMap contributors</p>
+            </div>
+          </div>
           <button type="submit" class="px-4 py-2 rounded-lg bg-cta text-ink font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent">Find</button>
         </div>
-        <p class="text-xs text-gray-500 mt-2">Your address goes to the U.S. Census Bureau's geocoder to look up your congressional district. We don't store it.</p>
+        <p class="text-xs text-gray-500 mt-2">Your address goes to the U.S. Census Bureau's geocoder to look up your congressional district (and to Geoapify for suggestions while you type, or when the Census can't find it). We don't store it.</p>
+        <p id="find-reps-status" class="text-sm mt-2 empty:hidden" aria-live="polite"></p>
         <div id="find-reps-result" class="mt-4 empty:hidden" aria-live="polite"></div>
       </form>
       <div class="mb-6 space-y-3">
@@ -358,7 +365,7 @@
             <ul>
               <li><strong>Bills, actions, laws, CRS summaries and subjects, members:</strong> the Congress.gov API (Library of Congress).</li>
               <li><strong>House recorded votes:</strong> the Office of the Clerk of the U.S. House, via Congress.gov. <strong>Senate recorded votes:</strong> senate.gov's official vote records.</li>
-              <li><strong>Campaign finance:</strong> the Federal Election Commission (OpenFEC). <strong>Congressional districts for an address:</strong> the U.S. Census Bureau geocoder.</li>
+              <li><strong>Campaign finance:</strong> the Federal Election Commission (OpenFEC). <strong>Congressional districts for an address:</strong> the U.S. Census Bureau geocoder; for a ZIP code, the Census Bureau's ZIP code areas and district block files; address suggestions from Geoapify (© OpenStreetMap contributors).</li>
               <li>Three automatic updates run every night: votes, members and the House floor schedule at 10:00 UTC, bills at 10:30 UTC, and the This Congress figures at 11:00 UTC. The footer shows when the first two last finished, and a notice appears if one hasn't succeeded in 36 hours. We only show what these sources publish; when a value isn't available, we say so instead of estimating.</li>
             </ul>
           </section>
@@ -468,7 +475,9 @@
           <section>
             <h3>Your representatives</h3>
             <ul>
-              <li>Your address is sent to the U.S. Census Bureau's geocoder to find your congressional district, using the district map of the Congress now in office. We don't store or log the address.</li>
+              <li>Your address is sent to the U.S. Census Bureau's geocoder to find your congressional district, using the district map of the Congress now in office (again without an apartment or suite number if it can't match it). We don't store or log the address.</li>
+              <li>While you type, the text goes to <strong>Geoapify</strong> (OpenStreetMap data) for address suggestions. If the Census Bureau can't match an address, Geoapify's location for it is used, only when it found that building in the ZIP code or city and state you typed; the district is still read from the Census Bureau's map for that point.</li>
+              <li><strong>Just a ZIP code:</strong> ZIP codes don't follow district lines, so we use the Census Bureau's ZIP code areas (ZCTAs) and the Congress's district map, block by block. If the whole ZIP code is in one district, that's your district. If it reaches more than one, we list them with the share of the ZIP code's land in each (not its population) and ask you to pick or enter your street address. ZIP codes with no area of their own (PO boxes, some large buildings) tell us the state, and the district only where the state has a single seat. A city and state alone give your senators, not your House district.</li>
               <li>Phone numbers, websites and contact forms come from the public-domain <a href="https://github.com/unitedstates/congress-legislators" class="text-accent hover:underline" target="_blank" rel="noopener">congress-legislators</a> dataset (each member's current term), updated nightly. Phone numbers are their Washington offices; not every member has a separate contact form, and their website links to one.</li>
               <li><strong>Your members on a bill</strong> (bill pages, once you've entered an address): whether they sponsored or cosponsored it (Congress.gov's cosponsor list, including withdrawn cosponsors; only members of the bill's own chamber can), and how they voted on its final recorded votes: passage, accepting the other chamber's changes, veto overrides. Procedural steps (cloture, amendments, rules) aren't listed there; they're on the bill's Votes tab.</li>
             </ul>

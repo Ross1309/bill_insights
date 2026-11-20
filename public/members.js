@@ -221,12 +221,13 @@ function renderYourReps(members) {
     </div>`;
 }
 
-// Address -> { state, district } (POST keeps the address out of URLs and logs).
-export async function lookupDistrict(address) {
+// Address or ZIP (+ a picked suggestion's lat/lon) -> { state, district, how, districts, ... }
+// (find-district.js; POST keeps the address out of URLs and logs).
+export async function lookupDistrict(address, { lat, lon } = {}) {
   const res = await fetch("/api/find-district", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address }),
+    body: JSON.stringify(Number.isFinite(lat) && Number.isFinite(lon) ? { address, lat, lon } : { address }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Lookup failed (HTTP ${res.status}).`);
@@ -272,15 +273,63 @@ export async function withContacts(reps) {
 }
 export function forgetMyReps() { store.set("cw-reps", "null"); }
 
-async function findRepresentatives(address) {
-  const out = document.getElementById("find-reps-result");
-  out.innerHTML = `<p class="text-sm text-gray-500">Looking up your district…</p>`;
+
+// --- Lookup -> saved members --------------------------------------------------------
+
+const personName = m => String(m.name || "").split(", ").reverse().join(" ");
+const partyLetter = m => String(m.party || "").charAt(0);
+
+// The address in `input` -> saved members, then done(state, district). When only the
+// ZIP's districts or the state are known, `status` shows the choice / what's known.
+export async function findAndRemember(input, status, done) {
+  const address = input.value.trim();
+  if (!address) return;
+  const coords = input.dataset.pickLabel === input.value
+    ? { lat: Number(input.dataset.pickLat), lon: Number(input.dataset.pickLon) } : {};
+  status.className = "text-sm mt-2 text-gray-500";
+  status.textContent = "Looking up your district…";
   try {
-    const { state, district } = await lookupDistrict(address);
-    rememberMyReps(state, district, await repsFor(state, district));
-    setMemberFilters({ state, district, text: "", party: "", chamber: "" });
+    const r = await lookupDistrict(address, coords);
+    // Only for a ZIP answer: a city and state alone was never a street address.
+    const notFound = r.how !== "zip" ? "" : r.address_not_found ? "We couldn't find that street address. " : r.census_unavailable ? "The Census Bureau's address lookup isn't responding. " : "";
+    if (r.district != null) {
+      rememberMyReps(r.state, r.district, await repsFor(r.state, r.district));
+      status.textContent = "";
+      await done(r.state, r.district);
+      return;
+    }
+    status.className = "text-sm mt-2 text-gray-700";
+    if (r.districts?.length > 1) {
+      const options = await Promise.all(r.districts.map(async d => {
+        const rep = (await repsFor(d.state, d.district)).find(m => m.chamber === "House");
+        return { ...d, rep };
+      }));
+      status.innerHTML = `
+        <span class="block">${escapeHtml(notFound)}ZIP code ${escapeHtml(r.zip)} reaches ${options.length} congressional districts. Pick yours, or enter your street address to be sure.</span>
+        <span class="mt-2 flex flex-col gap-2">${options.map(o => `
+          <button type="button" data-pick-district="${escapeHtml(districtCode(o.state, o.district))}" class="text-left px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent">
+            <span class="font-semibold text-gray-900">${escapeHtml(districtCode(o.state, o.district))}</span>
+            <span class="text-gray-700">· ${o.rep ? `${escapeHtml(personName(o.rep))} (${escapeHtml(partyLetter(o.rep))})` : "vacant seat"}</span>
+            <span class="block text-xs text-gray-500">${o.share >= 50 ? "Most" : o.share >= 10 ? "Part" : "A small part"} of the ZIP code's area (${escapeHtml(String(o.share))}%)</span>
+          </button>`).join("")}</span>`;
+      status.querySelectorAll("[data-pick-district]").forEach(b => b.addEventListener("click", async () => {
+        const o = options.find(x => districtCode(x.state, x.district) === b.dataset.pickDistrict);
+        rememberMyReps(o.state, o.district, await repsFor(o.state, o.district));
+        status.textContent = "";
+        await done(o.state, o.district);
+      }));
+      return;
+    }
+    // Only the state: senators known, House district not.
+    const senators = (await repsFor(r.state, -1)).filter(m => m.chamber === "Senate");
+    const place = STATE_NAMES[r.state] || r.state;
+    const why = r.how === "zip" ? `ZIP code ${escapeHtml(r.zip)} has no area of its own (PO boxes, some large buildings), so we can tell your state but not your House district.`
+      : "A city and state aren't enough to tell your House district.";
+    status.innerHTML = `${escapeHtml(notFound)}${why} ${senators.length ? `Your senators: ${senators.map(m => `<button type="button" data-open="member" data-id="${escapeHtml(m.id)}" class="text-accent hover:underline">${escapeHtml(personName(m))} (${escapeHtml(partyLetter(m))}-${escapeHtml(m.state)})</button>`).join(" and ")}.` : ""}
+      Enter your street address${r.how === "zip" ? "" : " or ZIP code"} to find your representative in ${escapeHtml(place)}.`;
   } catch (err) {
-    out.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(err.message)}</p>`;
+    status.className = "text-sm mt-2 text-red-600";
+    status.textContent = err.message;
   }
 }
 
@@ -353,8 +402,8 @@ export function setMemberFilters(changes) {
 export function setupMemberFilters() {
   document.getElementById("find-reps")?.addEventListener("submit", ev => {
     ev.preventDefault();
-    const address = document.getElementById("find-reps-address").value.trim();
-    if (address) findRepresentatives(address);
+    findAndRemember(document.getElementById("find-reps-address"), document.getElementById("find-reps-status"),
+      (state, district) => setMemberFilters({ state, district, text: "", party: "", chamber: "" }));
   });
   document.getElementById("find-reps-result")?.addEventListener("click", ev => {
     if (ev.target.closest("[data-clear-reps]")) setMemberFilters({ district: null });

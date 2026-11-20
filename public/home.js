@@ -7,6 +7,7 @@
 import { callScriptHtml, contactLinks, escapeHtml as esc, formatDay, officialLabel, ordinal, PARTY_TEXT, STATE_NAMES } from "./util.js";
 import { voteHeadline, partyWords, weekBrief } from "./plain.js";
 import { voteCardHtml } from "./vote-card.js";
+import { ADDRESS_NOTE, addressInputHtml } from "./address.js";
 import { weekRange } from "./week.js";
 import { missedShort, WHY_NOTE } from "./participation.js";
 
@@ -106,11 +107,10 @@ function repsCard(reps, participation) {
   const form = `
     <form data-home-find class="mt-3 flex gap-2">
       <label for="home-address" class="sr-only">Your home address</label>
-      <input id="home-address" type="text" autocomplete="street-address" maxlength="200" required placeholder="Street address, city, state"
-        class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+      ${addressInputHtml({ id: "home-address", cls: "w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-accent" })}
       <button type="submit" class="px-3 py-2 rounded-lg bg-cta text-ink text-sm font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent">Find</button>
     </form>
-    <p class="text-[11px] text-gray-500 mt-2">Sent to the U.S. Census Bureau's geocoder to find your district; not stored by us. Your members are remembered in this browser only.</p>
+    <p class="text-[11px] text-gray-500 mt-2">${esc(ADDRESS_NOTE)}</p>
     <p data-home-find-status class="text-sm mt-2 empty:hidden"></p>`;
   return `
     <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col" aria-labelledby="home-reps-title">
@@ -128,7 +128,7 @@ function repsCard(reps, participation) {
           <button type="button" data-forget-reps aria-label="Forget your members saved in this browser" class="text-gray-500 hover:text-gray-800 underline">Forget</button>
         </div>
         <div data-home-change-form class="hidden">${form}</div>`
-      : `<p class="text-sm text-gray-600 mt-1">Enter your home address to see your two senators and your representative, and how they voted.</p>${form}`}
+      : `<p class="text-sm text-gray-600 mt-1">Enter your home address or ZIP code to see your two senators and your representative, and how they voted.</p>${form}`}
     </article>`;
 }
 
