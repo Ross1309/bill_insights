@@ -281,6 +281,8 @@ try {
   await waitText('#view-methodology', /How we count[\s\S]*Party agreement[\s\S]*Campaign finance/, 'Footer link opens How we count');
   await page.click('footer a[href="#how-laws-are-made"]');
   await waitText('#view-process', /How a bill becomes law[\s\S]*Committee[\s\S]*The President[\s\S]*Not everything Congress votes on is a bill/, 'Footer link opens How a bill becomes law');
+  await page.click('footer a[href="#privacy"]');
+  await waitText('#view-privacy', /Privacy & terms[\s\S]*Your address[\s\S]*reCAPTCHA[\s\S]*Terms of use/, 'Footer link opens Privacy & terms');
 
   if (LIVE) {
     // A law passed without roll calls: the Votes tab says how it passed (not "not synced").

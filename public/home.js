@@ -110,7 +110,7 @@ function repsCard(reps, participation) {
       ${addressInputHtml({ id: "home-address", cls: "w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-accent" })}
       <button type="submit" class="px-3 py-2 rounded-lg bg-cta text-ink text-sm font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent">Find</button>
     </form>
-    <p class="text-[11px] text-gray-500 mt-2">${esc(ADDRESS_NOTE)}</p>
+    <p class="text-[11px] text-gray-500 mt-2">${esc(ADDRESS_NOTE)} <a href="#privacy" class="text-accent hover:underline">Privacy</a></p>
     <p data-home-find-status class="text-sm mt-2 empty:hidden"></p>`;
   return `
     <article class="bg-surface border border-gray-200 rounded-2xl p-5 flex flex-col" aria-labelledby="home-reps-title">

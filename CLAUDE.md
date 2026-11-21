@@ -758,6 +758,17 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
   header, on Issues and on the "Your representatives" panel. Clipboard API, then
   `execCommand("copy")`, then `prompt()` (some in-app browsers block the first two).
 
+## Privacy & terms (#privacy, 2026-11-21)
+
+`view-privacy` in index.html (tab key `privacy`, no tab button; footer, the note under every
+address box, How we count). Plain-language statement of what the code does: addresses -> Census,
+then Geoapify (+ approximate area from `context.geo` for suggestions); ZIPs stay on our server;
+browser storage only (`cw-reps`, `cw-follow`, `cw-state`, `cw-issue`, `cw-hide-ceremonial`);
+Netlify, Firebase, reCAPTCHA (Google's required disclosure + links), congress.gov photos, GitHub;
+no cookies of ours; short terms of use. Contact = GitHub issues (owner may add an email).
+**Changing what is sent where or stored (a new service, key, cookie, storage key)? Update this
+page and its date in the same commit**, and the CSP if a new origin is involved.
+
 ## How we count, Report an error, keyboard focus
 
 - `#methodology` = "How we count" (`view-methodology` in index.html, a page with no tab
