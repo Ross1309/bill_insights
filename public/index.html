@@ -218,7 +218,7 @@
               class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
             <div id="find-reps-address-list" data-address-list class="hidden absolute left-0 right-0 top-full mt-1 z-30 bg-surface border border-gray-300 rounded-lg shadow-lg overflow-hidden">
               <ul role="listbox" aria-label="Address suggestions"></ul>
-              <p class="px-3 py-1 text-[10px] text-gray-500 border-t border-gray-200">Suggestions: Geoapify · © OpenStreetMap contributors</p>
+              <p class="px-3 py-1 text-[10px] text-gray-500 border-t border-gray-200">Powered by <a href="https://www.geoapify.com/" class="underline" target="_blank" rel="noopener">Geoapify</a> · © <a href="https://www.openstreetmap.org/copyright" class="underline" target="_blank" rel="noopener">OpenStreetMap contributors</a></p>
             </div>
           </div>
           <button type="submit" class="px-4 py-2 rounded-lg bg-cta text-ink font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent">Find</button>
@@ -532,16 +532,16 @@
       <div class="max-w-3xl">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Privacy &amp; terms</h2>
         <p class="text-sm text-gray-500 mt-1">Last updated November 21, 2026.</p>
-        <p class="text-gray-700 mt-3 leading-relaxed"><strong class="text-gray-900">The short version:</strong> no accounts, no ads, no analytics and no tracking cookies of ours, and nothing is sold. Your address is used once to find your district; we don't keep it. What the site remembers about you stays in your own browser.</p>
+        <p class="text-gray-700 mt-3 leading-relaxed"><strong class="text-gray-900">The short version:</strong> no accounts, no ads, no analytics and no cookies of ours, and nothing is sold or shared for advertising. Your address is used once to find your district; we don't keep it. What the site remembers for you (your members, what you follow) stays in your own browser.</p>
 
         <div class="mt-6 space-y-6 text-sm text-gray-700 leading-relaxed [&_h3]:font-serif [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1">
           <section>
             <h3>Your address</h3>
             <ul>
               <li><strong>Looking up your representatives:</strong> our server sends the address to the U.S. Census Bureau's geocoder to find your congressional district. If the Census Bureau can't match it, the address goes to <strong>Geoapify</strong> (an address service built on OpenStreetMap) to find where it is, and the district is then read from the Census Bureau's map for that spot.</li>
-              <li><strong>Just a ZIP code:</strong> looked up in our own tables built from Census Bureau files. It isn't sent anywhere.</li>
-              <li><strong>Suggestions while you type:</strong> once you've typed a house number and a few letters, the text goes to Geoapify for address suggestions, along with your approximate area (about city level, estimated by our host from your internet connection) so nearby addresses come first.</li>
-              <li>We don't log or store addresses, and our address lookups aren't cached. The Census Bureau's and Geoapify's own privacy policies cover what they do with a request: <a href="https://www.census.gov/about/policies/privacy.html" class="text-accent hover:underline" target="_blank" rel="noopener">Census Bureau</a>, <a href="https://www.geoapify.com/privacy-policy/" class="text-accent hover:underline" target="_blank" rel="noopener">Geoapify</a>.</li>
+              <li><strong>Just a ZIP code:</strong> looked up on our server in tables built from Census Bureau files. It isn't sent to any other service.</li>
+              <li><strong>Suggestions while you type:</strong> once you've typed a house number and a few letters, the text goes to Geoapify for address suggestions, along with your approximate location so nearby addresses come first. That location is our host's estimate from your internet connection (rounded to about a kilometer, and usually only accurate to the city).</li>
+              <li>These requests are sent by our server, so the Census Bureau and Geoapify don't receive your IP address. We don't log or store addresses, and our address lookups aren't cached. Geoapify says it keeps the details of each request for up to 24 hours. Their own privacy policies cover what they do with a request: <a href="https://www.census.gov/about/policies/privacy.html" class="text-accent hover:underline" target="_blank" rel="noopener">Census Bureau</a>, <a href="https://www.geoapify.com/privacy-policy/" class="text-accent hover:underline" target="_blank" rel="noopener">Geoapify</a>.</li>
             </ul>
           </section>
 
@@ -549,7 +549,8 @@
             <h3>Saved in your browser only</h3>
             <ul>
               <li>Your members (from the address lookup: their names and district, not the address), what you follow and when you last looked, the state and topic you picked, and whether ceremonial bills are hidden. These are kept in your browser's local storage on this device and are never sent to us.</li>
-              <li><strong>Forget</strong> (on Home and My members) removes your saved members. Clearing this site's data in your browser removes everything.</li>
+              <li>Google's Firebase code (which reads the site's data) also keeps two small records in your browser's storage: a token proving the browser passed the reCAPTCHA check, and a note of the days the code was used, which it sends to Google along with its requests.</li>
+              <li><strong>Forget</strong> (on Home and My members) removes your saved members. Clearing this site's data in your browser removes everything. Your browser may also offer to remember what you type in the address box, as it does on any site; that's the browser's own feature.</li>
             </ul>
           </section>
 
@@ -557,10 +558,10 @@
             <h3>Services your browser connects to</h3>
             <p>Like any website, these see your IP address and basic browser information when your browser talks to them:</p>
             <ul>
-              <li><strong>Netlify</strong> hosts the site and its server functions and keeps standard request logs (<a href="https://www.netlify.com/privacy/" class="text-accent hover:underline" target="_blank" rel="noopener">Netlify privacy policy</a>).</li>
-              <li><strong>Google Firebase</strong> serves the site's data (votes, bills, members).</li>
+              <li><strong>Netlify</strong> hosts the site and its server functions and, like any host, handles request data such as IP addresses (<a href="https://www.netlify.com/privacy/" class="text-accent hover:underline" target="_blank" rel="noopener">Netlify privacy policy</a>).</li>
+              <li><strong>Google Firebase</strong> serves the site's data (votes, bills, members). Its code is loaded from Google's servers (www.gstatic.com) on every visit.</li>
               <li><strong>Google reCAPTCHA</strong> (through Firebase App Check) checks that data requests come from a real browser on this site, which keeps the database from being scraped or abused. It loads only when a page reads the database directly, so a first visit to Home usually doesn't load it. This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" class="text-accent hover:underline" target="_blank" rel="noopener">Privacy Policy</a> and <a href="https://policies.google.com/terms" class="text-accent hover:underline" target="_blank" rel="noopener">Terms of Service</a> apply. reCAPTCHA collects hardware and software information and may set its own cookies to do this.</li>
-              <li><strong>Congress.gov</strong> serves the members' official photos.</li>
+              <li><strong>Congress.gov</strong> serves the members' official photos. Its security service (Cloudflare) may set a short-lived bot-protection cookie when they load.</li>
               <li><strong>GitHub:</strong> "Report an error" opens a new issue on GitHub. It needs a GitHub account, and issues are public.</li>
             </ul>
             <p class="mt-2">Campaign finance figures, member details and bill histories are fetched by our server from the FEC and Congress.gov; nothing about you is sent with those requests.</p>
@@ -568,7 +569,12 @@
 
           <section>
             <h3>Cookies</h3>
-            <p>We don't set any cookies. Google reCAPTCHA may set its own, as described above.</p>
+            <p>We don't set any cookies. Two other services may set their own when the site uses them: Google reCAPTCHA (bot protection) and Congress.gov's Cloudflare service (bot protection, with the member photos). These are those services' cookies, so they may recognize your browser on other sites that use the same services. Google says reCAPTCHA's information is used to improve reCAPTCHA and for general security, not for personalized advertising.</p>
+          </section>
+
+          <section>
+            <h3>Do Not Track</h3>
+            <p>We don't track visitors across sites or over time, so every visit is treated the same, whatever your browser's Do Not Track or Global Privacy Control setting. The services above follow their own policies on those signals.</p>
           </section>
 
           <section>

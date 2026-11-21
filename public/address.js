@@ -14,7 +14,7 @@ export function addressInputHtml({ id, cls, placeholder = "Street address, city,
         aria-controls="${esc(id)}-list" class="${esc(cls)}" />
       <div id="${esc(id)}-list" data-address-list class="hidden absolute left-0 right-0 top-full mt-1 z-30 bg-surface border border-gray-300 rounded-lg shadow-lg overflow-hidden">
         <ul role="listbox" aria-label="Address suggestions"></ul>
-        <p class="px-3 py-1 text-[10px] text-gray-500 border-t border-gray-200">Suggestions: Geoapify · © OpenStreetMap contributors</p>
+        <p class="px-3 py-1 text-[10px] text-gray-500 border-t border-gray-200">Powered by <a href="https://www.geoapify.com/" class="underline" target="_blank" rel="noopener">Geoapify</a> · © <a href="https://www.openstreetmap.org/copyright" class="underline" target="_blank" rel="noopener">OpenStreetMap contributors</a></p>
       </div>
     </div>`;
 }
@@ -130,6 +130,7 @@ export function setupAddressSuggest() {
   });
   document.addEventListener("focusout", ev => {
     const input = ev.target.closest?.("[data-address]");
-    if (input) setTimeout(() => { if (document.activeElement !== input) close(input); }, 150);
+    // Focus moving into the list (its attribution links) keeps it open.
+    if (input) setTimeout(() => { if (document.activeElement !== input && !listOf(input)?.contains(document.activeElement)) close(input); }, 150);
   });
 }

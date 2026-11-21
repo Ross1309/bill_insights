@@ -763,9 +763,15 @@ cyan `#A8DADC`, accent pink `#FFC1CC`, buttons/CTA lavender `#B39CD0`.
 `view-privacy` in index.html (tab key `privacy`, no tab button; footer, the note under every
 address box, How we count). Plain-language statement of what the code does: addresses -> Census,
 then Geoapify (+ approximate area from `context.geo` for suggestions); ZIPs stay on our server;
-browser storage only (`cw-reps`, `cw-follow`, `cw-state`, `cw-issue`, `cw-hide-ceremonial`);
-Netlify, Firebase, reCAPTCHA (Google's required disclosure + links), congress.gov photos, GitHub;
-no cookies of ours; short terms of use. Contact = GitHub issues (owner may add an email).
+browser storage only (`cw-reps`, `cw-follow`, `cw-state`, `cw-issue`, `cw-hide-ceremonial`, plus
+Firebase's IndexedDB `firebase-app-check-database` / `firebase-heartbeat-database`); Netlify,
+Firebase (gstatic code on every visit), reCAPTCHA (Google's required disclosure + links;
+`_GRECAPTCHA` cookie), congress.gov photos (Cloudflare `__cf_bm` cookie), GitHub; no cookies of
+ours; Do Not Track / GPC statement (CalOPPA); short terms of use. Contact = GitHub issues (owner
+may add an email). Audited 2026-11-21 in a real browser against the live site (hosts contacted,
+storage, cookies). Geoapify's free plan requires the linked "Powered by Geoapify" + OSM
+copyright credit under the suggestions (address.js and index.html); Geoapify keeps request
+details up to 24 h.
 **Changing what is sent where or stored (a new service, key, cookie, storage key)? Update this
 page and its date in the same commit**, and the CSP if a new origin is involved.
 
