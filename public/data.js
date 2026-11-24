@@ -77,12 +77,14 @@ export const voteCache = new Map();
 export const memberById = new Map();
 const functionCache = new Map();
 // Rate-limited functions are served at their own paths (see each function's config).
-const FUNCTION_PATHS = { "member-profile": "/api/member-profile", "bill-detail": "/api/bill-detail" };
+const FUNCTION_PATHS = { "member-profile": "/api/member-profile", "bill-detail": "/api/bill-detail", "bill-parts": "/api/bill-parts" };
 
-export function fetchFunction(name, id) {
-  const key = `${name}:${id}`;
+// `params`: more query parameters (bill-parts: the text version), part of the cache key.
+export function fetchFunction(name, id, params = {}) {
+  const extra = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+  const key = `${name}:${id}:${extra}`;
   if (!functionCache.has(key)) {
-    functionCache.set(key, fetch(`${FUNCTION_PATHS[name] || `/.netlify/functions/${name}`}?id=${encodeURIComponent(id)}`)
+    functionCache.set(key, fetch(`${FUNCTION_PATHS[name] || `/.netlify/functions/${name}`}?id=${encodeURIComponent(id)}${extra ? `&${extra}` : ""}`)
       .then(async res => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);

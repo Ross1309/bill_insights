@@ -35,3 +35,6 @@
 
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Bill window, Contents: each part's arrow turns when that part (not a parent) is open. */
+details[open] > summary .part-chev { transform: rotate(90deg); }

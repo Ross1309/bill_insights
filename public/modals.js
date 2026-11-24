@@ -15,6 +15,7 @@ import { missedLong } from "./participation.js";
 import { termFacts } from "./terms.js";
 import { billStory, recordedVoteId } from "./story.js";
 import { memberTrendsHtml } from "./member-trends.js";
+import { contentsHtml, contentsLineHtml } from "./bill-contents.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole, myReps } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
@@ -161,8 +162,15 @@ const memberModal = {
 const billModal = {
   load(e) {
     loadInto(e, "bill", getBill(e.id));
-    loadInto(e, "detail", fetchFunction("bill-detail", e.id));
+    const detail = fetchFunction("bill-detail", e.id);
+    loadInto(e, "detail", detail);
     loadInto(e, "votes", getVotesForBill(e.id));
+    // What's in this bill (Contents tab): the latest text version's parts, read once the
+    // text versions are known (bill-detail).
+    loadInto(e, "parts", detail.then(d => {
+      const v = d?.textVersions;
+      return v ? fetchFunction("bill-parts", e.id, { v: v.latest.code, from: v.first.code }) : null;
+    }));
     // "Your members on this bill": their positions on its final roll calls (full vote docs,
     // cached; at most 4), only once an address was given on this device.
     const reps = myReps();
@@ -228,6 +236,7 @@ const billModal = {
         ${staged ? stageTrackerHtml(staged) : ""}
         ${factList(facts)}
         ${ai}
+        ${contentsLineHtml(e)}
         ${storyHtml(e)}
         ${yourMembersHtml(e)}
         ${crs}
@@ -264,6 +273,7 @@ const billModal = {
       return `
         <div class="space-y-3">${e.data.votes.map(v => voteCardHtml(v, { billSummary: false })).join("")}</div>`;
     }],
+    ["contents", "Contents", e => contentsHtml(e, { spinner, errorBlock })],
   ],
 };
 

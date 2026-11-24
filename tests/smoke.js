@@ -230,6 +230,14 @@ try {
     const sitemap = await (await fetch(new URL('sitemap.xml', url))).text();
     check((sitemap.match(/<url>/g) || []).length > 1000, 'Sitemap lists bills and members');
   }
+  if (LIVE) {
+    // What's in this bill: a spending package's divisions from the official text (bill-parts).
+    await openDetail('bill', 'hr2882-118');
+    await waitText('#modal-root', /What's in this bill: 7 divisions/, 'Bill Summary points to its contents');
+    await modalTab('Contents');
+    await waitText('#modal-root', /Enrolled Bill[\s\S]*Earliest published text[\s\S]*Division A[\s\S]*Department of Defense Appropriations Act, 2024[\s\S]*Division G[\s\S]*Other Matters/, 'Contents tab lists the divisions');
+    await closeModal();
+  }
   await openDetail('member', MEMBER);
   await waitText('#modal-root', /Jayapal/, 'Member detail opens');
   await waitText('#modal-root', /Votes this Congress[\s\S]*Missed \d+ of \d+ recorded votes[\s\S]*Typical House member/, 'Member window shows missed votes with context');

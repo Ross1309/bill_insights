@@ -853,6 +853,37 @@ numbers, new buildings and typos (27 typical inputs: 13 failed).
   election in FEC data -> previous election" fallback hasn't been hit by a real member.
 - Browsers cache responses for 12h, so format changes show up after that.
 
+## What's in this bill (bill window, Contents tab; 2026-11-24)
+
+The factual answer to "what else got put in this bill?" (the user's "Pork-O-Matic" idea, minus
+any score or judgment): the structure of the latest official text.
+- `bill-detail` also returns `textVersions` { latest, first, count } ({ code, type, date }; code =
+  the version part of the file name, BILLS-118hr4366**enr**.xml; `textVersions()` in
+  netlify/lib/bill-parts.js). Congress.gov lists versions newest first; "Public Law" has no XML.
+- `GET /api/bill-parts?id=&v=&from=` (netlify/functions/bill-parts.js): reads the bill XML from
+  GovInfo (no key, no Congress.gov quota; falls back to the same file on congress.gov), parses it
+  with `billParts()` (regex tokenizer, ~50 ms for a 2 MB bill) and returns parts (division,
+  title, subtitle, part, chapter...) with heading, words, sections, `unheaded` and items
+  (sections with headings; spending bills' `agency` = appropriations-major and `account` =
+  appropriations-intermediate headings, with words). `from` = earliest version: its words +
+  official title (shell bills: H.R. 2882's introduced text was 104 words about the Udall
+  Foundation; the 2024 NDAA was introduced at 165 words). CDN cache 7 days (a version never
+  changes), 404s 1 h. Not rate-limited (the plan's 2 rules are used); it spends no API quota.
+- Parser rules: `quoted-block` text counts toward size, its sections/titles aren't the bill's;
+  only a part's direct-child enum/header are its own; a spending title without a header takes
+  its first appropriations heading as its name (Defense titles); agency/account headings are
+  stored in sentence case but printed in small caps, so they're title-cased (`tidyHeading`);
+  all-caps headings are title-cased with acronyms kept. Rules print the bill they make in order
+  in a second resolution-body: those sections are really in the resolution's text.
+- UI: public/bill-contents.js (`contentsHtml`, `contentsLineHtml` on Summary for bills with 2+
+  parts). Share bars use `bg-accent`; arrows turn via `details[open] > summary .part-chev`
+  (src/styles.css), not group-open (nested parts). How we count: "What's in this bill".
+- Not built (checked 2026-11-24): CBO estimates (cbo.gov returns 403 to scripts and the built-in
+  browser; for shell bills the linked estimate is the original bill's). Next phase planned:
+  enacted earmarks from the Congressional Record's CPF/CDS tables on GovInfo (FY2026; FY2025 had
+  none; the Senate's own tables are behind a CAPTCHA; the House's FY26 xlsx = requests, FY27 xlsx
+  = House awards, neither is enacted).
+
 ## Detail modals (frontend)
 
 - One modal shell with a stack (Back button): anything with `data-open="member|bill|vote"

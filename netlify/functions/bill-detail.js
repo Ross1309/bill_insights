@@ -1,12 +1,13 @@
 // GET /api/bill-detail?id={bill_id}   e.g. id=hr9612-119
 //
 // Server-side proxy to Congress.gov for a bill's sponsor, cosponsor count, latest
-// official CRS summary and action history. Works for bills that aren't in our
+// official CRS summary, action history and text versions (for bill-parts). Works for bills that aren't in our
 // `bills` collection too (votes often reference those). Only sourced fields;
 // anything missing is null.
 
 import { billMetadata, congressGovUrl, parseBillId, stripHtml } from '../lib/bills.js';
 import { getJson, json } from '../lib/http.js';
+import { textVersions } from '../lib/bill-parts.js';
 
 const API = 'https://api.congress.gov/v3';
 const ACTIONS_LIMIT = 100;
@@ -51,7 +52,7 @@ export default async (req) => {
   const q = `api_key=${apiKey}&format=json`;
 
   try {
-    const [detailRes, actionsRes, summariesRes, cosponsorsRes] = await Promise.all([
+    const [detailRes, actionsRes, summariesRes, cosponsorsRes, textRes] = await Promise.all([
       getJson(`${base}?${q}`),
       getJson(`${base}/actions?${q}&limit=${ACTIONS_LIMIT}`).catch(err => {
         console.error(`Actions fetch failed for ${billId}: ${err.message}`);
@@ -63,6 +64,10 @@ export default async (req) => {
       }),
       getJson(`${base}/cosponsors?${q}&limit=250`).catch(err => {
         console.error(`Cosponsors fetch failed for ${billId}: ${err.message}`);
+        return null;
+      }),
+      getJson(`${base}/text?${q}`).catch(err => {
+        console.error(`Text versions fetch failed for ${billId}: ${err.message}`);
         return null;
       }),
     ]);
@@ -113,6 +118,7 @@ export default async (req) => {
       crsSummary,
       actionsCount: detail.actions?.count ?? null,
       actions: actionsRes ? shapeActions(actionsRes.actions || []) : null,
+      textVersions: textRes ? textVersions(textRes.textVersions) : null,
     }, 200, { 'Cache-Control': 'public, max-age=3600', 'Netlify-Vary': 'query=id', 'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=21600, stale-while-revalidate=86400' });
   } catch (err) {
     console.error(`bill-detail ${billId}:`, err);
