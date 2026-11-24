@@ -7,7 +7,8 @@
 // (Overview: "Earmarks they requested"), each member on their own record, never ranked.
 
 import { getFirestoreDoc } from "./data.js";
-import { escapeHtml as esc } from "./util.js";
+import { escapeHtml as esc, loadErrorHtml } from "./util.js";
+import { isSpending } from "./bill-contents.js";
 
 export const EARMARK_YEARS = [2026];
 const LIST_STEP = 50;
@@ -32,10 +33,11 @@ export function money(n) {
 const projects = n => `${n.toLocaleString("en-US")} ${n === 1 ? "project" : "projects"}`;
 
 // The published tables of a bill: [{ fy, key, subcommittee, division, count, total, checks, ... }]
+// A failed read is an error (shown with Retry), never "no earmarks".
 export async function billEarmarks(billId) {
   const out = [];
   for (const fy of EARMARK_YEARS) {
-    const ix = await earmarkIndex(fy).catch(() => null);
+    const ix = await earmarkIndex(fy);
     for (const t of ix?.tables || []) if (t.bill_id === billId && t.published) out.push({ fy, ...t });
   }
   return out;
@@ -45,7 +47,7 @@ export async function billEarmarks(billId) {
 export async function memberEarmarks(id) {
   const out = [];
   for (const fy of EARMARK_YEARS) {
-    const ix = await earmarkIndex(fy).catch(() => null);
+    const ix = await earmarkIndex(fy);
     const m = ix?.by_member?.[id];
     if (m) out.push({ fy, count: m[0], total: m[1] });
   }
@@ -132,9 +134,17 @@ function listBlockHtml(e, key, { member = null, label = "Show the projects" } = 
 
 const WHAT = `Earmarks are projects members of Congress ask for by name, with a specific recipient and amount ("Community Project Funding" in the House, "Congressionally Directed Spending" in the Senate). Each one is published with the names of the members who asked for it.`;
 
-// Bill window, Contents tab.
+// Bill window, Contents tab. When the earmark data couldn't be read, a spending law says so
+// (with Retry) instead of looking like it has none.
 export function billEarmarksHtml(e) {
   const list = e.data.earmarks;
+  if (e.errors.earmarks && e.data.parts?.parts?.some(isSpending)) {
+    return `<section class="mt-5 border border-gray-200 rounded-xl p-4">
+      <h3 class="text-sm font-bold text-gray-900">Earmarks in this law</h3>
+      ${loadErrorHtml("the earmark data", { message: e.errors.earmarks }, "!py-3")}
+      <p class="text-center"><button type="button" data-retry class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cta text-ink">Retry</button></p>
+    </section>`;
+  }
   if (!list?.length) return "";
   const count = list.reduce((a, t) => a + t.count, 0), total = list.reduce((a, t) => a + t.total, 0);
   return `
@@ -163,6 +173,7 @@ export function billEarmarksLineHtml(e) {
 // Member window, Overview.
 export function memberEarmarksHtml(e) {
   const list = e.data.earmarks, m = e.data.member;
+  if (e.errors.earmarks) return `<p class="text-xs text-gray-500 mt-4">Earmarks they requested: couldn't load the earmark data right now.</p>`;
   if (!list?.length || !m?.state) return "";
   return `
     <section class="mt-4 border border-gray-200 rounded-lg p-3">

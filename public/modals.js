@@ -33,7 +33,7 @@ const memberModal = {
     loadInto(e, "profile", fetchFunction("member-profile", e.id));
     loadInto(e, "record", getMemberVotes(e.id));
     loadInto(e, "participation", loadParticipation());
-    loadInto(e, "earmarks", memberEarmarks(e.id).catch(() => []));
+    loadInto(e, "earmarks", memberEarmarks(e.id));
     if (e.financeRequested) loadInto(e, "finance", fetchFunction("member-finance", e.id)); // Retry
   },
   header(e) {
@@ -168,7 +168,7 @@ const billModal = {
     const detail = fetchFunction("bill-detail", e.id);
     loadInto(e, "detail", detail);
     loadInto(e, "votes", getVotesForBill(e.id));
-    loadInto(e, "earmarks", billEarmarks(e.id).catch(() => []));
+    loadInto(e, "earmarks", billEarmarks(e.id));
     // What's in this bill (Contents tab): the latest text version's parts, read once the
     // text versions are known (bill-detail).
     loadInto(e, "parts", detail.then(d => {
