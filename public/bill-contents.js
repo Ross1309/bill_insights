@@ -41,8 +41,10 @@ const list = (xs, max) => {
   return more > 0 ? `${shown.join(", ")} and ${more} more` : shown.length > 1 ? `${shown.slice(0, -1).join(", ")} and ${shown.at(-1)}` : shown.join("");
 };
 
-// A part that is a regular spending bill: its own heading says so ("... Appropriations Act, 2024").
-const isSpending = p => /\bappropriations act\b/i.test(p.heading || "");
+// A part that is a regular spending bill: its own heading says so ("... Appropriations Act,
+// 2024"). Stopgaps ("Continuing Appropriations Act") and emergency money ("Supplemental
+// Appropriations Act") aren't regular spending bills: they're listed with the other parts.
+const isSpending = p => /\bappropriations act\b/i.test(p.heading || "") && !/\b(continuing|supplemental)\b/i.test(p.heading || "");
 // In the rows, a spending bill's heading without the "Appropriations Act, 2024" every one of
 // them ends with (the color and the summary say it): "Department of Defense". The full
 // official heading stays in the row's tooltip.

@@ -888,6 +888,29 @@ any score or judgment): the structure of the latest official text.
   "Show all". Spending = the part's own heading says "Appropriations Act" (`isSpending`). The
   Summary tab shows the first glance sentence (`contentsLineHtml`, 2+ parts). Arrows turn via
   `details[open] > summary .part-chev` (src/styles.css), not group-open (nested parts).
+  Stopgaps ("Continuing Appropriations Act") and "Supplemental" ones aren't `isSpending`.
+- **Earmarks (next phase), proven 2026-11-24 on real data** (prototype parser in the session
+  scratchpad, not in the repo):
+  - FY2026 laws with earmark tables: H.R. 5371 (PL 119-37: Ag, Leg Branch, MilCon-VA),
+    H.R. 6938 (119-74: CJS, E&W, Interior), H.R. 7148 (119-75: Defense, LHHS, THUD, FSGG,
+    NSRP), H.R. 7147 (119-86: Homeland, dropped from the January package, enacted in April).
+  - Source: the explanatory statements in the Congressional Record on GovInfo, found with the
+    GovInfo search API (same api.data.gov key): S8043-2 (2025-11-09), H255 (2026-01-08, pt3),
+    H811 (2026-01-14), H1353-2 (2026-01-22, pt2, 2.8 MB: Defense/LHHS/HS/THUD).
+  - Tables are fixed-width text, rows between dashed lines, cells wrapped inside columns; column
+    layouts differ by bill (LHHS folds recipient + state into Project; THUD has State and
+    Recipient columns). Column bounds = all-blank gutters across the table's rows (strict:
+    a tolerant version cut into the Amount column). Image placeholders ([GRAPHIC] [TIFF
+    OMITTED]) follow some tables.
+  - Check: each table's rows must add up to the statement's own figures ("The agreement
+    includes $X for the projects", one per account). LHHS: 989 projects = $1,386,898,000,
+    exact. Homeland: 201 rows, $269.6M, 3 unread, no stated total found yet (and its enacted
+    version is H.R. 7147's). THUD: 3,220 rows, 56 unread, $5.04B vs an outside ~$3.6B: the
+    parse is wrong there (split names "Warr en", misplaced states); must reconcile before use.
+  - Requesters are last names: last name + state + chamber matched 94% to exactly one member
+    (0 ambiguous). Misses: accents (Luján), former members (use the historical file), and
+    THUD parse errors.
+  - Publish only tables that reconcile exactly; show the rest as not yet available.
 - Not built (checked 2026-11-24): CBO estimates (cbo.gov returns 403 to scripts and the built-in
   browser; for shell bills the linked estimate is the original bill's). Next phase planned:
   enacted earmarks from the Congressional Record's CPF/CDS tables on GovInfo (FY2026; FY2025 had

@@ -42,3 +42,18 @@ test('glance: other bills name their largest parts; similar first versions are l
 test('topics: section headings for catch-alls, without routine sections', () => {
   assert.deepEqual(topics(package2882.parts[2]), ['National Flood Insurance Program', 'E-verify', 'Udall Foundation Reauthorization']);
 });
+
+test('glance: stopgaps and supplementals are not regular spending bills', () => {
+  // H.R. 5371 (119th) in miniature: a stopgap, three regular bills and extenders.
+  const c = { words: 1000, sections: 50, version: 'enr', official_title: 'X.', items: [], first: null, parts: [
+    part('division', 'A', 'Continuing Appropriations Act, 2026', 100),
+    part('division', 'B', 'Agriculture, Rural Development, Food and Drug Administration, and Related Agencies Appropriations Act, 2026', 500),
+    part('division', 'C', 'Legislative Branch Appropriations Act, 2026', 200),
+    part('division', 'D', 'Further Additional Supplemental Appropriations Act, 2026', 100, { items: [sec('Disaster relief')] }),
+    part('division', 'E', 'Health Extenders', 100, { items: [sec('Community health centers')] }),
+  ] };
+  const g = glance(c, null);
+  assert.equal(g[0], '2 regular spending bills (appropriations) for fiscal year 2026, 70% of the text, plus 3 other parts (30%).');
+  assert.equal(g[1], 'Division D covers Disaster relief.');
+  assert.equal(g[2], 'Division E covers Community health centers.');
+});
