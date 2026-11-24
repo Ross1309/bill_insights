@@ -233,9 +233,9 @@ try {
   if (LIVE) {
     // What's in this bill: a spending package's divisions from the official text (bill-parts).
     await openDetail('bill', 'hr2882-118');
-    await waitText('#modal-root', /What's in this bill: 7 divisions/, 'Bill Summary points to its contents');
+    await waitText('#modal-root', /What's in this bill: 6 regular spending bills \(appropriations\) for fiscal year 2024/, 'Bill Summary points to its contents');
     await modalTab('Contents');
-    await waitText('#modal-root', /Enrolled Bill[\s\S]*Earliest published text[\s\S]*Division A[\s\S]*Department of Defense Appropriations Act, 2024[\s\S]*Division G[\s\S]*Other Matters/, 'Contents tab lists the divisions');
+    await waitText('#modal-root', /At a glance[\s\S]*Division G covers National Flood Insurance Program[\s\S]*When first published[\s\S]*104 words long[\s\S]*Division A[\s\S]*Department of Defense[\s\S]*Division G[\s\S]*Other Matters/, 'Contents tab: at a glance, then the divisions');
     await closeModal();
   }
   await openDetail('member', MEMBER);

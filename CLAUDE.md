@@ -875,9 +875,19 @@ any score or judgment): the structure of the latest official text.
   stored in sentence case but printed in small caps, so they're title-cased (`tidyHeading`);
   all-caps headings are title-cased with acronyms kept. Rules print the bill they make in order
   in a second resolution-body: those sections are really in the resolution's text.
-- UI: public/bill-contents.js (`contentsHtml`, `contentsLineHtml` on Summary for bills with 2+
-  parts). Share bars use `bg-accent`; arrows turn via `details[open] > summary .part-chev`
-  (src/styles.css), not group-open (nested parts). How we count: "What's in this bill".
+- UI (simplified 2026-11-24 after "hard to read"): public/bill-contents.js. **At a glance**
+  (`glance()`: template sentences, tests/bill-contents.test.js): spending package -> "N regular
+  spending bills (appropriations) for fiscal year Y, X% of the text, plus Division G, "Other
+  Matters" (1%)" + "Division G covers ..." (`topics()`: sub-part headings; catch-all headings
+  like Other Matters/Extensions open into their section headings; routine sections dropped) ;
+  other bills -> their 3 largest parts; "When first published (...), it was 104 words long,
+  titled ..." only when the first text is < 1/3 the size or has another official title. Then one
+  stacked bar (spending teal #13a5b2 / other violet #8f68cb, the validated chart pair), then
+  compact rows (share only; spending headings without "Appropriations Act, 2024", full heading
+  in the tooltip); inside: accounts joined by " · " (their names contain commas), first 8 items +
+  "Show all". Spending = the part's own heading says "Appropriations Act" (`isSpending`). The
+  Summary tab shows the first glance sentence (`contentsLineHtml`, 2+ parts). Arrows turn via
+  `details[open] > summary .part-chev` (src/styles.css), not group-open (nested parts).
 - Not built (checked 2026-11-24): CBO estimates (cbo.gov returns 403 to scripts and the built-in
   browser; for shell bills the linked estimate is the original bill's). Next phase planned:
   enacted earmarks from the Congressional Record's CPF/CDS tables on GovInfo (FY2026; FY2025 had
