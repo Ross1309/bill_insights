@@ -60,7 +60,7 @@ function partHtml(p, total, level = 0) {
   const head = `
     <span class="flex flex-wrap items-baseline justify-between gap-x-3">
       <span>${inner.trim() ? `<span class="part-chev inline-block w-3 text-gray-500 transition-transform" aria-hidden="true">›</span>` : ""}<span class="text-xs font-semibold text-gray-500">${esc(partName(p))}</span>
-        <span class="${level ? "text-sm" : "font-semibold"} text-gray-900">${esc(p.heading || "(no heading)")}</span></span>
+        ${p.heading ? `<span class="${level ? "text-sm" : "font-semibold"} text-gray-900">${esc(p.heading)}</span>` : ""}</span>
       <span class="text-xs text-gray-500 whitespace-nowrap">${share(p.words, total)} · ${n(p.words)} words</span>
     </span>
     ${barHtml(p.words, total)}`;
@@ -96,8 +96,10 @@ export function contentsHtml(e, { spinner, errorBlock }) {
   const d = e.data.detail, c = e.data.parts;
   if (e.errors.detail) return errorBlock(e.errors.detail);
   if (!d) return spinner("Loading the bill's text…");
+  // An answer cached from before bill-detail listed text versions (up to an hour after a deploy).
+  if (!("textVersions" in d)) return `<p class="text-sm text-gray-500 py-8 text-center">Reload the page to see what's in this bill.</p>`;
   if (!d.textVersions) return `<p class="text-sm text-gray-500 py-8 text-center">Congress.gov hasn't published this bill's text in a form we can read yet.</p>`;
-  if (e.errors.parts) return errorBlock(e.errors.parts);
+  if (e.errors.parts) return errorBlock(e.errors.parts, "Couldn't load the bill's text from GovInfo right now.");
   if (!c) return spinner("Reading the bill's text…");
   const v = d.textVersions.latest;
   const textLink = d.congress_gov_url ? `${d.congress_gov_url}/text` : null;

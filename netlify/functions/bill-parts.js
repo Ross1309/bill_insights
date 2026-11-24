@@ -32,7 +32,7 @@ async function readVersion(ids, code, deadline) {
   const { stem, urls } = sources(ids, code);
   let lastErr;
   for (const url of urls) {
-    const timeoutMs = Math.min(6000, deadline - Date.now());
+    const timeoutMs = deadline - Date.now();   // the 2023 omnibus (7.5 MB) takes ~2.5 s
     if (timeoutMs < 500) break;
     try {
       const xml = await getText(url, { timeoutMs, retries: 0 });

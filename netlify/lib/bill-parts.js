@@ -24,7 +24,8 @@ export function decode(s) {
 }
 
 const SMALL = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'the', 'to', 'with']);
-const KEEP = /^(U\.S\.|[IVXL]+|[A-Z]{2,5}(?:'S)?|\d.*)$/;   // acronyms, Roman numerals, numbers
+// Roman numerals ("TITLE XIV"), but not words made of the same letters ("CIVIL").
+const ROMAN = /^(?=[IVXLC])C{0,3}(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
 const ACRONYMS = new Set(['FDA', 'NASA', 'HUD', 'USDA', 'IRS', 'DHS', 'EPA', 'NIH', 'CDC', 'FBI', 'DOD', 'NSF', 'NOAA', 'FEMA', 'SBA', 'GSA', 'OMB', 'FCC', 'SEC', 'CFTC', 'TSA', 'ICE', 'CBP', 'VA', 'DC', 'US', 'USA', 'II', 'III', 'IV', 'VI', 'VII', 'VIII', 'IX', 'XI', 'XII', 'CHIPS', 'NDAA', 'COVID']);
 // "MILITARY CONSTRUCTION, VETERANS AFFAIRS, AND RELATED AGENCIES" -> "Military Construction,
 // Veterans Affairs, and Related Agencies". Headings that already use lower case stay as they
@@ -38,13 +39,15 @@ export function tidyHeading(s, { smallCaps = false } = {}) {
     if (!w || /^[\s—–]+$/.test(w)) return w;
     const isFirst = first; first = false;
     const bare = w.replace(/[^A-Za-z.']/g, '');
-    if (ACRONYMS.has(bare.replace(/[.']/g, '')) || (KEEP.test(bare) && ACRONYMS.has(bare))) return w;
+    // Acronyms, Roman numerals and dotted abbreviations ("U.S.C.") keep their capitals.
+    if (ACRONYMS.has(bare.replace(/[.']/g, '')) || ROMAN.test(bare) || /^[A-Za-z](\.[A-Za-z])+\.?$/.test(bare)) return w;
     const lower = w.toLowerCase();
     if (!isFirst && SMALL.has(lower.replace(/[^a-z]/g, ''))) return lower;
     return lower.replace(/(^|[-(/"“])([a-z])/g, (m, p, c) => p + c.toUpperCase());
   }).join('');
 }
 
+const clip = s => (s.length > MAX_HEADING ? `${s.slice(0, MAX_HEADING - 1).replace(/\s+\S*$/, '')}…` : s);
 const countWords = s => { const m = s.match(/\S+/g); return m ? m.length : 0; };
 
 // XML string -> { words, sections, official_title, parts: [node], items: [...] }
@@ -112,7 +115,9 @@ export function billParts(xml) {
         const top = stack.at(-1);
         const owner = [section, account, agency, top].find(o => o?.depth && depth === o.depth + 1) || null;
         const field = tag === 'enum' ? 'enum' : 'heading';
-        if (owner && !owner[field] && !(owner.kind !== 'section' && STRUCTURE.has(owner.kind) === false && field === 'enum')) capture = { target: owner, field, depth, text: '' };
+        // Agency and account headings have no number of their own.
+        const numbered = owner && (owner.kind === 'section' || STRUCTURE.has(owner.kind));
+        if (owner && !owner[field] && (field === 'heading' || numbered)) capture = { target: owner, field, depth, text: '' };
       }
       continue;
     }
@@ -122,7 +127,7 @@ export function billParts(xml) {
       const value = decode(capture.text).replace(/\s+/g, ' ').trim();
       if (capture.field === 'official') officialTitle = value;
       else capture.target[capture.field] = capture.field === 'heading'
-        ? tidyHeading(value, { smallCaps: capture.target.kind === 'agency' || capture.target.kind === 'account' }).slice(0, MAX_HEADING)
+        ? clip(tidyHeading(value, { smallCaps: capture.target.kind === 'agency' || capture.target.kind === 'account' }))
         : value.replace(/\.$/, '');
       capture = null;
     }
@@ -158,7 +163,7 @@ export function billParts(xml) {
   return { words: out.words, sections: out.sections, official_title: officialTitle, parts: out.parts, items: out.items };
 }
 
-// Congress.gov's text versions (newest first) -> { latest, first, count }, each { code, type,
+// Congress.gov's text versions -> { latest, first, count }, each { code, type,
 // date }: the code is the version part of the official file name (BILLS-118hr4366enr.xml ->
 // "enr"), which bill-parts uses to read that version from GovInfo. Versions without XML
 // (the "Public Law" entry, very old bills) are left out.
@@ -167,7 +172,10 @@ export function textVersions(list) {
     const xml = (v.formats || []).find(f => f.type === 'Formatted XML')?.url || '';
     const code = /BILLS-\d+[a-z]+\d+([a-z]+)\.xml$/.exec(xml)?.[1];
     return code ? { code, type: v.type || null, date: v.date ? v.date.slice(0, 10) : null } : null;
-  }).filter(Boolean);
+  }).filter(Boolean)
+    // Newest first. Congress.gov lists them that way, with the enrolled bill undated: an
+    // undated version counts as the newest. (A stable sort keeps the API's order on ties.)
+    .sort((a, b) => (b.date || '9999').localeCompare(a.date || '9999'));
   if (!withXml.length) return null;
   return { latest: withXml[0], first: withXml.at(-1), count: withXml.length };
 }

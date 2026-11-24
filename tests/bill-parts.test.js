@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { billParts, decode, tidyHeading } from '../netlify/lib/bill-parts.js';
+import { billParts, decode, textVersions, tidyHeading } from '../netlify/lib/bill-parts.js';
 
 // A tiny bill in the House/Senate bill XML format: two divisions, a spending title with an
 // agency heading and two accounts, a numbered provision without a heading, and a section that
@@ -82,5 +82,19 @@ test('tidyHeading / decode', () => {
   assert.equal(tidyHeading('Military construction, defense-Wide', { smallCaps: true }), 'Military Construction, Defense-Wide');
   assert.equal(tidyHeading('Extension of special diabetes programs'), 'Extension of special diabetes programs');
   assert.equal(tidyHeading('TITLE IV—FDA AND NASA'), 'Title IV—FDA and NASA');
+  assert.equal(tidyHeading('TITLE XIV—CIVIL RIGHTS'), 'Title XIV—Civil Rights');
+  assert.equal(tidyHeading('AMENDMENTS TO 10 U.S.C.'), 'Amendments to 10 U.S.C');
+  // Long headings are cut at a word, with an ellipsis.
+  const long = billParts(`<bill><legis-body><section><enum>1.</enum><header>${'word '.repeat(60)}</header></section></legis-body></bill>`).items[0].heading;
+  assert.ok(long.length <= 160 && long.endsWith('word…'), long);
   assert.equal(decode('A &amp; B &#x2014; C &#8212; &quot;D&quot;'), 'A & B — C — "D"');
+});
+
+test('textVersions: newest first, undated enrolled bill newest, versions without XML left out', () => {
+  const f = (code, type, date) => ({ type, date, formats: code ? [{ type: 'Formatted XML', url: `https://www.congress.gov/118/bills/hr2882/BILLS-118hr2882${code}.xml` }] : [{ type: 'PDF', url: 'x.pdf' }] });
+  const v = textVersions([f('ih', 'Introduced in House', '2023-04-26T04:00:00Z'), f(null, 'Public Law', '2024-03-24T03:59:59Z'),
+    f('eh', 'Engrossed in House', '2024-02-05T05:00:00Z'), f('enr', 'Enrolled Bill', null)]);
+  assert.deepEqual(v, { latest: { code: 'enr', type: 'Enrolled Bill', date: null }, first: { code: 'ih', type: 'Introduced in House', date: '2023-04-26' }, count: 3 });
+  assert.equal(textVersions([f(null, 'Public Law', '2024-03-24')]), null);
+  assert.equal(textVersions(undefined), null);
 });
