@@ -689,6 +689,11 @@ export function setupModals() {
       e.errors = {};
       MODAL_KINDS[e.kind].load(e);
       Object.assign(e.data, kept);
+      // Earmark lists opened on request aren't part of load(): reload the ones still missing.
+      for (const k of Object.keys(e.filter)) {
+        const key = k.startsWith("emOpen:") ? k.slice(7) : null;
+        if (key && e.data[`em:${key}`] === undefined) loadInto(e, `em:${key}`, loadEarmarkList(key));
+      }
       renderModal();
     }
   });

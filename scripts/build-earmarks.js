@@ -7,7 +7,7 @@
 // in the OS temp dir), parses the table, runs its checks, matches requesters to members
 // (congress-legislators, current + historical), prints a report, and with --write stores:
 //   stats/earmarks-<fy>                 index: per table counts, totals, checks, notes; totals by
-//                                       state and by member (bioguide -> [count, total])
+//                                       state and by member (bioguide -> [count, total, state])
 //   stats/earmarks-<fy>-<key>           one table: accounts + rows (bill window)
 //   stats/earmarks-<fy>-state-<ST>      across tables, every project located in the state or requested
 //                                       by one of its members (a Virginia senator's DC project is in
@@ -119,7 +119,9 @@ for (const { src, parsed } of live) {
     const st = r.state || '??';
     byState[st] = byState[st] || [0, 0]; byState[st][0]++; byState[st][1] += r.amount;
     const ids = new Set([...r.houseMatched, ...r.senateMatched].map(m => m.id).filter(Boolean));
-    for (const id of ids) { byMember[id] = byMember[id] || [0, 0]; byMember[id][0]++; byMember[id][1] += r.amount; }
+    // [count, total, state]: the state lets a former member's window (no members doc) find
+    // their state's doc.
+    for (const id of ids) { byMember[id] = byMember[id] || [0, 0, homeState.get(id) || null]; byMember[id][0]++; byMember[id][1] += r.amount; }
     const homes = new Set([r.state, ...[...ids].map(id => homeState.get(id))].filter(Boolean));
     for (const st of homes) (stateRows[st] ||= []).push(r);
     r.table = src.key;

@@ -31,6 +31,8 @@ export function money(n) {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 const projects = n => `${n.toLocaleString("en-US")} ${n === 1 ? "project" : "projects"}`;
+// One project's amount, exact: "$1,031,000" (totals above it are rounded with money()).
+const exact = n => `$${Math.round(n).toLocaleString("en-US")}`;
 
 // The published tables of a bill: [{ fy, key, subcommittee, division, count, total, checks, ... }]
 // A failed read is an error (shown with Retry), never "no earmarks".
@@ -43,13 +45,13 @@ export async function billEarmarks(billId) {
   return out;
 }
 
-// A member's totals per year: [{ fy, count, total }]
+// A member's totals per year: [{ fy, count, total, state }]
 export async function memberEarmarks(id) {
   const out = [];
   for (const fy of EARMARK_YEARS) {
     const ix = await earmarkIndex(fy);
     const m = ix?.by_member?.[id];
-    if (m) out.push({ fy, count: m[0], total: m[1] });
+    if (m) out.push({ fy, count: m[0], total: m[1], state: m[2] || null });
   }
   return out;
 }
@@ -110,7 +112,7 @@ export function earmarkListHtml(doc, opts = {}) {
       const from = r[9] ? TABLE_NAMES[r[9]] : null;
       return `
         <li class="py-2 border-b border-gray-200">
-          <p class="flex justify-between gap-3 text-sm"><span class="text-gray-900">${esc(r[2] || r[1])}</span><span class="font-semibold text-gray-900 whitespace-nowrap">${esc(money(r[5]))}</span></p>
+          <p class="flex justify-between gap-3 text-sm"><span class="text-gray-900">${esc(r[2] || r[1])}</span><span class="font-semibold text-gray-900 whitespace-nowrap">${esc(exact(r[5]))}</span></p>
           <p class="text-xs text-gray-600">${r[1] && r[1] !== r[2] ? `${esc(r[1])} · ` : ""}${esc(where)}${agency || account ? ` · ${esc([agency, account].filter(Boolean).join(", "))}` : ""}${from ? ` · ${esc(from)}` : ""}</p>
           <p class="text-xs text-gray-500">Requested by ${requesters([...r[6], ...r[7]], doc.people) || "not listed"}</p>
         </li>`;
@@ -121,7 +123,10 @@ export function earmarkListHtml(doc, opts = {}) {
 // A list block: the "Show the projects" button, or the search box and the list once loaded.
 function listBlockHtml(e, key, { member = null, label = "Show the projects" } = {}) {
   const doc = e.data[`em:${key}`];
-  if (e.errors[`em:${key}`]) return `<p class="text-sm text-red-600 mt-2">Couldn't load the projects: ${esc(e.errors[`em:${key}`])}</p>`;
+  if (e.errors[`em:${key}`]) {
+    return `<p class="text-sm text-red-600 mt-2">Couldn't load the projects: ${esc(e.errors[`em:${key}`])}
+      <button type="button" data-earmark-show="${esc(key)}" class="ml-1 text-accent hover:underline">Try again</button></p>`;
+  }
   if (doc === undefined && !e.filter[`emOpen:${key}`]) {
     return `<button type="button" data-earmark-show="${esc(key)}" class="mt-2 px-3 py-1.5 rounded-lg text-sm font-semibold text-accent border border-accent/40 hover:bg-accent/10">${esc(label)}</button>`;
   }
@@ -174,13 +179,16 @@ export function billEarmarksLineHtml(e) {
 export function memberEarmarksHtml(e) {
   const list = e.data.earmarks, m = e.data.member;
   if (e.errors.earmarks) return `<p class="text-xs text-gray-500 mt-4">Earmarks they requested: couldn't load the earmark data right now.</p>`;
-  if (!list?.length || !m?.state) return "";
+  if (!list?.length) return "";
+  // Former members have no members doc: the earmark index carries their state.
+  const state = m?.state || list.find(y => y.state)?.state;
+  if (!state) return "";
   return `
     <section class="mt-4 border border-gray-200 rounded-lg p-3">
       <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Earmarks they requested</h3>
       ${list.map(y => `
         <p class="text-sm text-gray-800 mt-1">Fiscal year ${y.fy}: <strong>${projects(y.count)}</strong> in spending laws, ${esc(money(y.total))}.</p>
-        ${listBlockHtml(e, `${y.fy}:state:${m.state}`, { member: e.id, label: "Show their projects" })}`).join("")}
+        ${listBlockHtml(e, `${y.fy}:state:${y.state || state}`, { member: e.id, label: "Show their projects" })}`).join("")}
       <p class="text-[11px] text-gray-500 mt-2">${esc(WHAT)} A project two members asked for counts in full for each. <a href="#methodology" class="text-accent hover:underline">How we count</a></p>
     </section>`;
 }
