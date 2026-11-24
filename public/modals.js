@@ -16,6 +16,7 @@ import { termFacts } from "./terms.js";
 import { billStory, recordedVoteId } from "./story.js";
 import { memberTrendsHtml } from "./member-trends.js";
 import { contentsHtml, contentsLineHtml } from "./bill-contents.js";
+import { billEarmarks, billEarmarksHtml, billEarmarksLineHtml, earmarkListRefresh, LIST_STEP, loadEarmarkList, memberEarmarks, memberEarmarksHtml } from "./earmarks.js";
 import { POSITION_GROUPS, resultBadgeClass, sourceLabel, voteBillInfo, voteBillLine, voteHeadingBadge, voteTalliesHtml } from "./votes.js";
 import { memberPhoto, memberRole, myReps } from "./members.js";
 import { renderFinanceTab } from "./finance.js";
@@ -32,6 +33,7 @@ const memberModal = {
     loadInto(e, "profile", fetchFunction("member-profile", e.id));
     loadInto(e, "record", getMemberVotes(e.id));
     loadInto(e, "participation", loadParticipation());
+    loadInto(e, "earmarks", memberEarmarks(e.id).catch(() => []));
     if (e.financeRequested) loadInto(e, "finance", fetchFunction("member-finance", e.id)); // Retry
   },
   header(e) {
@@ -75,6 +77,7 @@ const memberModal = {
         ${votes}
         ${factList(facts)}
         ${m && m.current !== false ? committeesHtml(m.committees) : ""}
+        ${memberEarmarksHtml(e)}
         ${p ? `
           <div class="grid grid-cols-2 gap-3 mt-4">
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center"><p class="text-xs text-gray-500 uppercase font-semibold">Bills sponsored</p><p class="text-xl font-bold text-gray-900">${p.sponsoredCount ?? "—"}</p></div>
@@ -165,6 +168,7 @@ const billModal = {
     const detail = fetchFunction("bill-detail", e.id);
     loadInto(e, "detail", detail);
     loadInto(e, "votes", getVotesForBill(e.id));
+    loadInto(e, "earmarks", billEarmarks(e.id).catch(() => []));
     // What's in this bill (Contents tab): the latest text version's parts, read once the
     // text versions are known (bill-detail).
     loadInto(e, "parts", detail.then(d => {
@@ -237,6 +241,7 @@ const billModal = {
         ${factList(facts)}
         ${ai}
         ${contentsLineHtml(e)}
+        ${billEarmarksLineHtml(e)}
         ${storyHtml(e)}
         ${yourMembersHtml(e)}
         ${crs}
@@ -273,7 +278,7 @@ const billModal = {
       return `
         <div class="space-y-3">${e.data.votes.map(v => voteCardHtml(v, { billSummary: false })).join("")}</div>`;
     }],
-    ["contents", "Contents", e => contentsHtml(e, { spinner, errorBlock })],
+    ["contents", "Contents", e => contentsHtml(e, { spinner, errorBlock, extra: billEarmarksHtml(e) })],
   ],
 };
 
@@ -611,7 +616,7 @@ function renderModal() {
 // --- Keyboard focus stays inside the open detail ------------------------------
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-const FOCUS_ATTRS = ["data-tab", "data-close", "data-back", "data-copy-link", "data-retry", "data-vote-filter", "data-open"];
+const FOCUS_ATTRS = ["data-tab", "data-close", "data-back", "data-copy-link", "data-retry", "data-vote-filter", "data-earmark-filter", "data-open"];
 
 // A selector that finds "the same" control after a re-render (or null if focus
 // wasn't inside the modal).
@@ -659,6 +664,23 @@ export function setupModals() {
       modalRoot.querySelector(`[data-tab="${tab.dataset.tab}"]`)?.focus();
       return;
     }
+    // Earmarks: load a list on request; "Show more" extends it in place.
+    const show = ev.target.closest("[data-earmark-show]");
+    if (show) {
+      const e = modalStack.at(-1), key = show.dataset.earmarkShow;
+      e.filter[`emOpen:${key}`] = true;
+      loadInto(e, `em:${key}`, loadEarmarkList(key));
+      renderModal();
+      modalRoot.querySelector(`[data-earmark-filter="${CSS.escape(key)}"]`)?.focus();
+      return;
+    }
+    const more = ev.target.closest("[data-earmark-more]");
+    if (more) {
+      const e = modalStack.at(-1), key = more.dataset.earmarkMore;
+      e.filter[`emLimit:${key}`] = (e.filter[`emLimit:${key}`] || LIST_STEP) + LIST_STEP;
+      earmarkListRefresh(e, key, modalRoot);
+      return;
+    }
     if (ev.target.closest("[data-retry]")) {
       // Reload only what failed: the kind's load() re-requests every key, so keep the ones
       // that already arrived (their loaders are cached or cheap; the results are kept).
@@ -672,6 +694,14 @@ export function setupModals() {
   });
   // Vote member filters update only the list, so the input keeps focus.
   const onFilter = ev => {
+    const emKey = ev.target.dataset?.earmarkFilter;
+    if (emKey && modalStack.length) {
+      const e = modalStack.at(-1);
+      e.filter[`emText:${emKey}`] = ev.target.value;
+      delete e.filter[`emLimit:${emKey}`];
+      earmarkListRefresh(e, emKey, modalRoot);
+      return;
+    }
     const field = ev.target.dataset?.voteFilter;
     const e = modalStack.at(-1);
     if (!field || !e || e.kind !== "vote") return;

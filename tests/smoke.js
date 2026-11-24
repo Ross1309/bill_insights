@@ -241,6 +241,10 @@ try {
   await openDetail('member', MEMBER);
   await waitText('#modal-root', /Jayapal/, 'Member detail opens');
   await waitText('#modal-root', /Votes this Congress[\s\S]*Missed \d+ of \d+ recorded votes[\s\S]*Typical House member/, 'Member window shows missed votes with context');
+  // Earmarks (stats/earmarks-2026*): the member's own projects, loaded on request.
+  await waitText('#modal-root', /Earmarks they requested[\s\S]*Fiscal year 2026: \d+ projects? in spending laws/, 'Member window shows the earmarks they requested');
+  await page.click('#modal-root [data-earmark-show]');
+  await waitText('#modal-root', /\d+ projects?, \$[\d.,]+ (million|billion)?[\s\S]*Requested by[\s\S]*Jayapal/, 'Their earmark projects list with requesters');
   await modalTab('Voting Record');
   await waitText('#modal-root', /In the \d+(st|nd|rd|th) Congress, voted on \d+ of \d+/, 'Member Voting Record renders');
   await waitText('#modal-root', /Month by month[\s\S]*Votes missed[\s\S]*Voted with their party/, 'Member Voting Record: month by month');

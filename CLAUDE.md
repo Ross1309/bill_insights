@@ -889,8 +889,7 @@ any score or judgment): the structure of the latest official text.
   Summary tab shows the first glance sentence (`contentsLineHtml`, 2+ parts). Arrows turn via
   `details[open] > summary .part-chev` (src/styles.css), not group-open (nested parts).
   Stopgaps ("Continuing Appropriations Act") and "Supplemental" ones aren't `isSpending`.
-- **Earmarks (next phase), proven 2026-11-24 on real data** (prototype parser in the session
-  scratchpad, not in the repo):
+- **Earmarks: built 2026-11-24** (see "Earmarks" below). Original findings:
   - FY2026 laws with earmark tables: H.R. 5371 (PL 119-37: Ag, Leg Branch, MilCon-VA),
     H.R. 6938 (119-74: CJS, E&W, Interior), H.R. 7148 (119-75: Defense, LHHS, THUD, FSGG,
     NSRP), H.R. 7147 (119-86: Homeland, dropped from the January package, enacted in April).
@@ -916,6 +915,46 @@ any score or judgment): the structure of the latest official text.
   enacted earmarks from the Congressional Record's CPF/CDS tables on GovInfo (FY2026; FY2025 had
   none; the Senate's own tables are behind a CAPTCHA; the House's FY26 xlsx = requests, FY27 xlsx
   = House awards, neither is enacted).
+
+## Earmarks (2026-11-24)
+
+Enacted earmarks (CPF/CDS) per spending law, from the explanatory statements' tables in the
+Congressional Record. Static per fiscal year: `node scripts/build-earmarks.js [--fy 2026]
+[--write]` (not nightly). Add a year: find its tables (GovInfo search API, collection CREC,
+"Congressionally Directed Spending" + "Requestor"), add entries to
+netlify/lib/earmark-sources.js with checks, run without --write until every table is OK, add the
+year to `EARMARK_YEARS` in public/earmarks.js, update How we count.
+- **Parser** (netlify/lib/earmarks.js): `findTables` (dashed separators; header has
+  "Requestor/Requester"; rows start at the margin with 2+ space gaps; the table ends at the first
+  non-row block), `parseTable` (column bounds = gutters blank in 98.5% of lines; unlabeled columns
+  merge into the nearer neighbor; words kept whole across bounds; amounts may wrap "11,000,00" +
+  "0"; Senate leader dots -> spaces; "[Dollars in thousands]" scales; money columns: the earmark is
+  `amountHeading` (E&W "Additional Amount") else the last; a row printed one column left is
+  realigned; "3,000,000 Landsman" splits; hard-wrapped words rejoin only when the piece isn't a
+  word seen whole elsewhere in the table; "--" -> em dash), `names()` (the Record's "P" for a
+  space, mid-word wraps), `statedTotals`, `lawAmounts`/`lawDivisionText`, `runCheck`
+  (law | statement | reference | parts), `memberIndex` (members serving from the Congress's start
+  to the print date: Lindsey Graham left 2026-07-11 and Darline Graham was appointed after;
+  Sherrill/Connolly/Greene left after requesting), `matchRequesters` ("Scott, David (GA)" uses the
+  first name; unique-nationwide fallback for out-of-state projects; "Scott (GA)" alone stays
+  unmatched: two GA reps), `packRows`.
+- **FY2026 results**: 9 tables, 8,485 projects, $15.76 billion, all checks pass; 99.9% of 11,556 requester names
+  matched (14 "Scott (GA)" not). Known source gaps (noted in the UI): Agriculture table +$29 vs
+  the law (Distance Learning and Telemedicine); CJS Byrne table -$1,031,000 vs the law (the House
+  committee's copy has the same total). MilCon-VA: count only (126 = CRS), amounts in thousands.
+  Financial Services: the combined table = its four per-section tables exactly.
+- **Docs** (public via the existing stats/ read rule): `stats/earmarks-<fy>` index (tables with
+  counts, totals, checks, notes; `by_state`, `by_member` [count, total]); `stats/earmarks-<fy>-<key>`
+  per table (accounts + rows `[account#, recipient, project, location, state, amount, houseIds,
+  senateIds, origination]`, requesters as bioguide or "~Name", `people` {id: [name, party, state]},
+  largest THUD ~375 KB); `stats/earmarks-<fy>-state-<ST>` rows in the state OR requested by one of
+  its members (+ table key), for the member window. Rows are arrays inside an array: Firestore
+  (admin and web SDKs) stores and reads them fine (checked).
+- **UI** (public/earmarks.js): bill window Summary line + Contents tab section "Earmarks in this
+  law" (per table: count, total, how it was checked, notes, "Show the projects" -> search + 50 at a
+  time); member window Overview "Earmarks they requested" (own record only, never ranked; their
+  state's doc filtered to them). `data-earmark-filter` re-renders only the list (focus kept).
+  Smoke: member window section + list (local mode, Firestore only).
 
 ## Detail modals (frontend)
 

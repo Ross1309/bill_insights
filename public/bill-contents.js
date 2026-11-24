@@ -176,7 +176,8 @@ export function contentsLineHtml(e) {
       <button type="button" data-tab="contents" class="text-accent hover:underline">See what's in it →</button></p>`;
 }
 
-export function contentsHtml(e, { spinner, errorBlock }) {
+// `extra`: HTML placed right after "At a glance" (the earmarks of a spending law).
+export function contentsHtml(e, { spinner, errorBlock, extra = "" }) {
   const d = e.data.detail, c = e.data.parts;
   if (e.errors.detail) return errorBlock(e.errors.detail);
   if (!d) return spinner("Loading the bill's text…");
@@ -195,6 +196,7 @@ export function contentsHtml(e, { spinner, errorBlock }) {
       <ul class="mt-2 space-y-1.5 text-sm text-gray-700">${glance(c, d.textVersions).map(s => `<li>${s}</li>`).join("")}</ul>
       ${barHtml(c)}
     </section>
+    ${extra}
     ${c.parts.length ? `
       <h3 class="text-sm font-bold text-gray-900 mt-5">The parts <span class="font-normal text-gray-500">· share of the text; tap one to see inside${split ? `; spending bills shown without "Appropriations Act"` : ""}</span></h3>
       <div class="mt-1">${c.parts.map(p => partHtml(p, c.words, { level: 0, split })).join("")}</div>
