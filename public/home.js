@@ -252,5 +252,6 @@ export function renderHome(stats, { reps = null, positions = null, participation
       ${stats.laws_total != null ? tile(num(stats.laws_total), "bills became law", "this Congress") : ""}
       ${h != null ? tile(`${h}%`, "of House votes split by party", "most Democrats and most Republicans voted opposite ways") : ""}
       ${s != null ? tile(`${s}%`, "of Senate votes split by party", "counted the same way; many Senate votes are on nominations") : ""}
-    </div>`;
+    </div>
+    <p class="text-sm mt-4"><a href="#earmarks" class="font-semibold text-accent hover:underline">Earmarks: the projects members asked for by name in this year's spending laws, by law and by state →</a></p>`;
 }

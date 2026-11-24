@@ -24,6 +24,8 @@ const earmarkIndex = fy => statsDoc(`earmarks-${fy}`).then(ix => {
   return ix;
 });
 
+export const getEarmarkIndex = fy => earmarkIndex(fy);
+
 // "$930.7 million", "$1.39 billion", "$722,000"
 export function money(n) {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2).replace(/\.?0+$/, "")} billion`;

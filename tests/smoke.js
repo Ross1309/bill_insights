@@ -295,6 +295,12 @@ try {
   await waitText('#view-process', /How a bill becomes law[\s\S]*Committee[\s\S]*The President[\s\S]*Not everything Congress votes on is a bill/, 'Footer link opens How a bill becomes law');
   await page.click('footer a[href="#privacy"]');
   await waitText('#view-privacy', /Privacy & terms[\s\S]*Your address[\s\S]*reCAPTCHA[\s\S]*Terms of use/, 'Footer link opens Privacy & terms');
+  // Earmarks page: by law, then a state's projects; another state from the picker.
+  await page.click('footer a[href="#earmarks"]');
+  await waitText('#view-earmarks', /Earmarks[\s\S]*Fiscal year 2026: [\d,]+ projects[\s\S]*By spending law[\s\S]*Public Law 119-75[\s\S]*By state[\s\S]*\d+ projects?, \$/, 'Earmarks page: by law and by state');
+  await page.selectOption('[data-ep-state]', 'TX');
+  await waitText('[data-ep-list]', /\d+ projects?, \$[\s\S]*Requested by/, 'Earmarks page: another state\'s projects');
+  check(/#earmarks\/TX$/.test(page.url()), 'Earmarks page: the state is in the link');
 
   if (LIVE) {
     // A law passed without roll calls: the Votes tab says how it passed (not "not synced").

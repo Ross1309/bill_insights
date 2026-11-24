@@ -955,6 +955,16 @@ year to `EARMARK_YEARS` in public/earmarks.js, update How we count.
   time); member window Overview "Earmarks they requested" (own record only, never ranked; their
   state's doc filtered to them). `data-earmark-filter` re-renders only the list (focus kept).
   Smoke: member window section + list (local mode, Firestore only).
+- **Earmarks page** `#earmarks`, `#earmarks/<ST>` (public/earmarks-page.js, view `view-earmarks`,
+  tab key `earmarks`; 2026-11-24): the year's totals, by spending law (each law's divisions with
+  counts and totals, `law_title` from the law XML's dc:title, linking the bill window), "Your
+  members" when `cw-reps` is saved (their totals from `by_member`), and by state (alphabetical
+  picker, never sorted by amount; the state's doc filtered to projects located there, the
+  out-of-state ones its members asked for counted below; search + 50 at a time; remembers
+  `cw-state`). Tab button only from `sm` up (`data-cls` keeps "hidden sm:inline-block" through
+  switchTab): six tabs fill a 360 px phone, so phones reach it from Home ("by the numbers"
+  link), the Bills tab lead and the footer. (The phone bar's scrollWidth is 371 > 360 because of
+  its right padding; the six tabs end at 356 px. Same before this change.)
 
 ## Detail modals (frontend)
 

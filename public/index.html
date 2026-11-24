@@ -58,6 +58,8 @@
       <button type="button" id="nav-bills" class="nav-tab">Bills</button>
       <button type="button" id="nav-votes" class="nav-tab">Votes</button>
       <button type="button" id="nav-members" class="nav-tab">Members</button>
+      <!-- From sm up only: on phones Earmarks is linked from Home, the Bills tab and the footer. -->
+      <button type="button" id="nav-earmarks" class="nav-tab hidden sm:inline-block" data-cls="hidden sm:inline-block">Earmarks</button>
     </div>
   </nav>
 
@@ -136,7 +138,7 @@
     <section id="view-bills" class="tab-view hidden">
       <div class="mb-4 sm:mb-6">
         <h2 class="font-serif text-2xl font-bold text-gray-900">Bills</h2>
-        <p class="text-sm text-gray-500">Where each bill stands, from introduced to law, with plain-language summaries of the official ones. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a></p>
+        <p class="text-sm text-gray-500">Where each bill stands, from introduced to law, with plain-language summaries of the official ones. <a href="#how-laws-are-made" class="text-accent hover:underline">How a bill becomes law</a> · <a href="#earmarks" class="text-accent hover:underline">Earmarks in this year's spending laws</a></p>
       </div>
       <div id="bill-scope-filters" class="flex flex-wrap gap-2 mb-2" role="group" aria-label="Which bills">
         <button type="button" data-scope="moving" class="filter-chip">Moving or passed</button>
@@ -269,6 +271,11 @@
     <!-- How a bill becomes law (#how-laws-are-made; no tab-bar button). Linked from the
          stage tracker, the glossary, the Bills tab and This Congress. Our own words. -->
     <!-- MY MEMBERS (#my-members; no tab-bar button): your three members' records (mine.js) -->
+    <!-- EARMARKS (#earmarks, #earmarks/<state>): every earmark in the year's spending laws (earmarks-page.js) -->
+    <section id="view-earmarks" class="tab-view hidden">
+      <div id="earmarks-container" class="min-h-screen"></div>
+    </section>
+
     <section id="view-mine" class="tab-view hidden">
       <div id="mine-container" class="min-h-screen"></div>
     </section>
@@ -394,6 +401,7 @@
               <li><strong>Every table is checked before it's shown:</strong> its projects must add up to the amounts the law itself gives for them, or to the explanatory statement's own figures, or to an official count and total published elsewhere (Congressional Research Service reports, or the House Appropriations Committee's own copy of the table). A table that doesn't add up isn't shown. Two small differences in the official documents themselves are noted where they apply: the Agriculture table adds up to $29 more than the law, and the Byrne justice grants listed are $1,031,000 less than the law provides.</li>
               <li><strong>Who asked</strong> is printed by last name (sometimes with a state). We link a name to a member only when exactly one member of that chamber, serving in that Congress up to the day the table was printed, has that name in the project's state (or, failing that, in the whole chamber); otherwise the printed name is shown without a link. A project several members asked for counts in full for each of them.</li>
               <li>Energy and Water's Army Corps and Reclamation projects show the amount added to the President's budget request (the table's "Additional Amount"). Members' earmarks are shown on each member's own page, never ranked or compared.</li>
+              <li>The <a href="#earmarks" class="text-accent hover:underline">Earmarks page</a> totals them by spending law and by state (where the project is). States are listed alphabetically, not by amount.</li>
             </ul>
           </section>
 
@@ -638,6 +646,7 @@
         <p class="mt-3 flex flex-wrap gap-x-5 gap-y-1">
           <a href="#methodology" class="underline decoration-accent/50 hover:text-white">How we count</a>
           <a href="#how-laws-are-made" class="underline decoration-accent/50 hover:text-white">How a bill becomes law</a>
+          <a href="#earmarks" class="underline decoration-accent/50 hover:text-white">Earmarks</a>
           <a href="#privacy" class="underline decoration-accent/50 hover:text-white">Privacy &amp; terms</a>
           <a href="#" data-report-error class="underline decoration-accent/50 hover:text-white">Report an error</a>
         </p>

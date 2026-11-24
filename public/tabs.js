@@ -8,6 +8,7 @@ export const navBills = document.getElementById("nav-bills");
 export const navVotes = document.getElementById("nav-votes");
 export const navMembers = document.getElementById("nav-members");
 export const navCongress = document.getElementById("nav-congress");
+export const navEarmarks = document.getElementById("nav-earmarks");
 
 const viewOverview = document.getElementById("view-overview");
 const viewIssues = document.getElementById("view-issues");
@@ -19,13 +20,14 @@ const viewProcess = document.getElementById("view-process");           // no tab
 const viewWeek = document.getElementById("view-week");                 // no tab-bar button (#week/<Monday>)
 const viewCharts = document.getElementById("view-charts");
 const viewPrivacy = document.getElementById("view-privacy");           // no tab-bar button (#privacy)
-const viewMine = document.getElementById("view-mine");                 // no tab-bar button (#my-members)             // "This Congress" (#congress)
+const viewMine = document.getElementById("view-mine");                 // no tab-bar button (#my-members)
+const viewEarmarks = document.getElementById("view-earmarks");         // #earmarks
 
 // Each tab's loader, called every time it's shown (loaders skip work already done).
 export const onTabOpen = {};
 
 // Which tab is showing (for modules that only update the URL while they're visible).
-export const activeTab = () => Object.entries({ overview: viewOverview, issues: viewIssues, bills: viewBills, votes: viewVotes, members: viewMembers, methodology: viewMethodology, process: viewProcess, privacy: viewPrivacy, week: viewWeek, charts: viewCharts, mine: viewMine })
+export const activeTab = () => Object.entries({ overview: viewOverview, issues: viewIssues, bills: viewBills, votes: viewVotes, members: viewMembers, methodology: viewMethodology, process: viewProcess, privacy: viewPrivacy, week: viewWeek, charts: viewCharts, mine: viewMine, earmarks: viewEarmarks })
   .find(([, v]) => v && !v.classList.contains("hidden"))?.[0] || "overview";
 
 const TAB_BASE = "nav-tab py-3.5 text-sm sm:text-base font-semibold whitespace-nowrap border-b-2 focus:outline-none focus-visible:text-gray-900";
@@ -35,11 +37,12 @@ const TAB_IDLE = `${TAB_BASE} text-gray-500 border-transparent hover:text-gray-8
 // `push`: record it in browser history / the URL (false when the router is applying
 // a URL, e.g. Back/Forward or a pasted link).
 export function switchTab(tabName, { push = true } = {}) {
-  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers], methodology: [null, viewMethodology], process: [null, viewProcess], privacy: [null, viewPrivacy], week: [null, viewWeek], charts: [navCongress, viewCharts], mine: [null, viewMine] };
+  const tabs = { overview: [navOverview, viewOverview], issues: [navIssues, viewIssues], bills: [navBills, viewBills], votes: [navVotes, viewVotes], members: [navMembers, viewMembers], methodology: [null, viewMethodology], process: [null, viewProcess], privacy: [null, viewPrivacy], week: [null, viewWeek], charts: [navCongress, viewCharts], mine: [null, viewMine], earmarks: [navEarmarks, viewEarmarks] };
   for (const [name, [nav, view]] of Object.entries(tabs)) {
     const active = name === tabName;
     if (nav) {
-      nav.className = active ? TAB_ACTIVE : TAB_IDLE;
+      // data-cls: classes a tab keeps (Earmarks is hidden on phones, where six tabs fill the bar).
+      nav.className = `${active ? TAB_ACTIVE : TAB_IDLE}${nav.dataset.cls ? ` ${nav.dataset.cls}` : ""}`;
       // Sections are pages, not tab panels: the current one is marked as the current page.
       if (active) nav.setAttribute("aria-current", "page"); else nav.removeAttribute("aria-current");
     }

@@ -5,7 +5,7 @@ import { renderOverview } from "./overview.js";
 import { firestore, getBill, getHome, getFirestoreDoc, getMember, getMemberVotes, getOverviewDoc, getVote, loadParticipation } from "./data.js";
 import { billBaseline, billChange, followButtonHtml, followCount, isFollowing, LIMITS, loadFollows, memberBaseline, memberChange, setFollow, topicBaseline, topicChange } from "./follow.js";
 import { escapeHtml, loadErrorHtml, store } from "./util.js";
-import { activeTab, navBills, navCongress, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
+import { activeTab, navBills, navCongress, navEarmarks, navIssues, navMembers, navOverview, navVotes, onTabOpen, switchTab } from "./tabs.js";
 import { renderCongressPage } from "./congress-page.js";
 import { glossaryHtml, setupGlossary } from "./glossary.js";
 import { setupBillFilters, startBills } from "./bills.js";
@@ -15,6 +15,7 @@ import { DEFAULT_STATE, applyLegislatorsArg, legislatorsArg, findAndRemember, fo
 import { setupModals } from "./modals.js";
 import { renderWeekPage } from "./week.js";
 import { loadMine, setupMine } from "./mine.js";
+import { applyEarmarksArg, earmarksArg, loadEarmarksPage, setupEarmarksPage } from "./earmarks-page.js";
 import { renderHome, upcomingHtml } from "./home.js";
 import { setupSearch } from "./search.js";
 import { onTabArg, setRouteHandlers, shareUrl, startRouter, tabArg, replaceTab } from "./router.js";
@@ -399,6 +400,9 @@ async function init() {
   onTabOpen.votes = () => { if (!votesLoaded) fetchVotes(); };
   onTabOpen.members = showDirectory;
   onTabOpen.mine = loadMine;
+  onTabOpen.earmarks = loadEarmarksPage;
+  tabArg.earmarks = earmarksArg;
+  onTabArg.earmarks = applyEarmarksArg;
   // URL arguments (see router.js): Issues topic, Legislators state / district.
   tabArg.issues = () => currentIssue;
   // Before the first load starts, just choose the topic (the tab's loader loads it).
@@ -430,6 +434,7 @@ async function init() {
   setupIssues();
   setupHome();
   setupMine();
+  setupEarmarksPage();
   setupAddressSuggest();
   setupForgetReps();
   setupFollow();
@@ -452,6 +457,7 @@ function setupTabs() {
   navBills.addEventListener("click", () => switchTab("bills"));
   navVotes.addEventListener("click", () => switchTab("votes"));
   navMembers.addEventListener("click", () => switchTab("members"));
+  navEarmarks.addEventListener("click", () => switchTab("earmarks"));
 }
 
 init();

@@ -83,6 +83,8 @@ for (const src of sources) {
     parts: (src.checks.find(c => c.kind === 'parts')?.tables || []).map(k => parseTable(tables[k])),
   };
   const checks = src.checks.map(c => runCheck(c, parsed.rows, ctx));
+  // The law's short title ("HR 7148 ENR: Consolidated Appropriations Act, 2026"), for the page.
+  src.law_title = (/<dc:title>[^:<]*:\s*([^<]+)<\/dc:title>/.exec(await lawXml(src.bill_id))?.[1] || '').trim() || null;
   const problems = [...(parsed.unread.length ? [`${parsed.unread.length} rows without a readable amount`] : []), ...checks.filter(c => !c.ok).map(c => `${c.kind} check failed: ${c.detail}`)];
   // Requesters -> members. A combined "Requestor(s)" column (Financial Services) is matched
   // against both chambers.
@@ -130,7 +132,7 @@ for (const { src, parsed } of live) {
 const indexDoc = {
   fy,
   tables: results.map(({ src, parsed, checks, published, problems }) => ({
-    key: src.key, subcommittee: src.subcommittee, bill_id: src.bill_id, law: src.law, division: src.division,
+    key: src.key, subcommittee: src.subcommittee, bill_id: src.bill_id, law: src.law, law_title: src.law_title, division: src.division,
     published, count: parsed.rows.length, total: parsed.rows.reduce((a, r) => a + r.amount, 0),
     house: parsed.rows.filter(r => r.houseMatched.length).length, senate: parsed.rows.filter(r => r.senateMatched.length).length,
     checks: checks.map(c => ({ kind: c.kind, ok: c.ok, source: c.source, note: c.note })),
